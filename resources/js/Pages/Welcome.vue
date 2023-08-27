@@ -24,7 +24,7 @@ defineProps({
         </div>
 
         <div class="max-w-6xl mx-auto sm:px-6 lg:px-8" style="border-radius: 25px;padding:0 ;background-color: #282634;">
-            <img src="img/logo-color.png" alt="karbala"   style="margin: auto;width: 100%;border-radius: 25px;" />
+            <img src="img/logo-color1.png" alt="karbala"   style="margin: auto;width: 100%;border-radius: 25px;" />
       
 
         
