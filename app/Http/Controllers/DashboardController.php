@@ -348,7 +348,7 @@ class DashboardController extends Controller
         if($type==0){
             $data =    $data->where('results', $type);
         }
-        $data =$data->orderBy('no', 'DESC')->paginate(10);
+        $data =$data->orderBy('no', 'DESC')->paginate(25);
         return Response::json($data, 200);
     }
     public function getIndexCarSearch()

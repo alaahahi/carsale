@@ -501,6 +501,10 @@ getResultsCar();
                                       <th scope="col" class="px-1 py-3 text-base">
                                         {{ $t('remaining_amount') }}
                                       </th>
+                                      <th scope="col" class="px-1 py-3 text-base">{{ $t('dubai_shipping') }}</th>
+                                      <th scope="col" class="px-1 py-3 text-base">{{ $t('dubai_expenses') }}</th>
+                                      <th scope="col" class="px-1 py-3 text-base">{{ $t('erbil_shipping') }}</th>
+                                      <th scope="col" class="px-1 py-3 text-base">{{ $t('erbil_expenses') }}</th>
                                       <th scope="col" class="px-1 py-3 text-base">
                                         {{ $t('total_cost') }}
                                       </th>
@@ -531,6 +535,10 @@ getResultsCar();
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.carmodel?.name }}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.purchase_price }}</td> 
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.purchase_price  - car.paid_amount  }}</td>
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.dubai_shipping  }}</td> 
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.dubai_exp }}</td> 
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.erbil_shipping }}</td> 
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.erbil_exp }}</td> 
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.paid_amount + car.erbil_exp+car.erbil_shipping+car.dubai_exp+car.dubai_shipping }}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.pay_price }}</td> 
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.client?.name }}</td>
