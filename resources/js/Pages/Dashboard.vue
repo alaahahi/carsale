@@ -17,8 +17,16 @@ import { TailwindPagination } from "laravel-vue-pagination";
 import axios from 'axios';
 
 
-import { ref } from 'vue';
-
+import { ref, onMounted } from 'vue';
+onMounted(() => {
+  const table = document.querySelector('.table-container');
+  const thead = table.querySelector('thead');
+  console.log(thead)
+  table.addEventListener('scroll', () => {
+    const scrollTop = table.scrollTop;
+    thead.style.transform = `translateY(${scrollTop}px)`;
+  });
+});
 let searchTerm = ref('');
 
 let showModalCar =  ref(false);
@@ -473,7 +481,7 @@ getResultsCar();
                         </div>
                       </div>
                       <div>
-                        <div class="relative overflow-x-auto shadow-md sm:rounded-lg">
+                        <div class="relative overflow-x-auto shadow-md sm:rounded-lg table-container scrollbar scrollbar-thumb-blue-600 scrollbar-thumb-rounded">
                           <table class="w-full text-sm text-right text-gray-500 dark:text-gray-200 dark:text-gray-400 text-center">
                               <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 text-center" >
                                   <tr>
@@ -839,3 +847,33 @@ getResultsCar();
     </div>   
     </AuthenticatedLayout>
 </template>
+<style scoped>
+/* Add your preferred styling for the table here */
+.table-container {
+  max-height: 1000px; /* Adjust the maximum height as needed */
+  overflow-y: scroll;
+}
+
+
+/* Style the scrollbars for webkit-based browsers (e.g., Chrome) */
+.table-container::-webkit-scrollbar {
+  width: 12px;
+}
+
+.table-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 6px;
+}
+
+/* Style the scrollbars for Firefox */
+.table-container {
+  scrollbar-width: thin;
+  scrollbar-color: #888 #f1f1f1;
+}
+
+/* Add more styles as needed */
+</style>

@@ -125,7 +125,7 @@ class DashboardController extends Controller
         $paid_amount = $request->paid_amount??0;
         $purchase_price =$request->purchase_price;
         $debt_price =$purchase_price - $paid_amount;
-        if($request->image ){
+        if($request->image){
             foreach ($request->image as $image) {
                 $imageName = $image->getClientOriginalName().$no;
                 $filename = pathinfo($imageName, PATHINFO_FILENAME);
@@ -409,11 +409,7 @@ class DashboardController extends Controller
         return Response::json('ok', 200);    
     }
     public function DelCar(Request $request){
-
-
-
         $car=Car::find($request->id);
-
         if(($car->client_id??0)&&($car->paid_amount??0)){
             $desc=' مرتج حذف سيارة'.$car->paid_amount;
             $wallet = Wallet::where('user_id',$car->client_id)->first();
