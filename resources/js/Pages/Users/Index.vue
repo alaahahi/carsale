@@ -103,7 +103,6 @@ function open(id) {
                                         <th className="px-4 py-2 border dark:border-gray-900">اسم المستخدم</th>
                                         <th className="px-4 py-2 border dark:border-gray-900">الصلاحيات</th>
                                         <th className="px-4 py-2 border dark:border-gray-900">رقم الهاتف</th>
-                                        <th className="px-4 py-2 border dark:border-gray-900">الرصيد</th>
                                         <th className="px-4 py-2 border dark:border-gray-900">تنفيذ</th>         
                                     </tr>
                                 </thead>
@@ -115,7 +114,6 @@ function open(id) {
                                         <td className="px-4 py-2 border dark:border-gray-900">{{ user.email }}<span v-if="user.device" class="text-sm text-green-500 font-bold  py-2 px-2 hover:text-red-500">{{user.device}}</span></td>
                                         <td className="px-4 py-2 border dark:border-gray-900">{{ user.user_type ? user.user_type['name'] :"" }}</td>
                                         <td className="px-4 py-2 border dark:border-gray-900">{{ user.phone }}</td>
-                                        <td className="px-4 py-2 border dark:border-gray-900">{{ user.wallet ? user.wallet['balance'] :""   }}</td>
                                         <td className="px-4 py-2 border dark:border-gray-900"  style="min-height: 42px;">
                                             <Link
                                                 tabIndex="1"
