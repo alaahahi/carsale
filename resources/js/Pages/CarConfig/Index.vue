@@ -316,8 +316,8 @@ function confirmColor(V) {
                     </div>
                         <div class="mt-3  text-center"  style="direction: ltr;">
                             <TailwindPagination
-                                :data="laravelData"
-                                @pagination-change-page="getResults"
+                                :data="companyName"
+                                @pagination-change-page="getResultsName"
                                 :limit ="10"
                             />
                         </div>
@@ -393,8 +393,8 @@ function confirmColor(V) {
                     </div>
                         <div class="mt-3  text-center"  style="direction: ltr;">
                             <TailwindPagination
-                                :data="laravelData"
-                                @pagination-change-page="getResults"
+                                :data="companyModel"
+                                @pagination-change-page="getResultsModel"
                                 :limit ="10"
                             />
                         </div>
@@ -472,8 +472,8 @@ function confirmColor(V) {
                     </div>
                         <div class="mt-3  text-center"  style="direction: ltr;">
                             <TailwindPagination
-                                :data="laravelData"
-                                @pagination-change-page="getResults"
+                                :data="companyColor"
+                                @pagination-change-page="getResultsColor"
                                 :limit ="10"
                             />
                         </div>
