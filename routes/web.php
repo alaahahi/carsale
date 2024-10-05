@@ -10,6 +10,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\TransfersController;
 use App\Http\Controllers\CarConfigController;
+use App\Http\Controllers\InfoController;
 
 use App\Models\SystemConfig;
 
@@ -34,6 +35,8 @@ Route::get('/', function () {
         'phpVersion' => PHP_VERSION,
     ]);
 });
+Route::get('/import-cars', [InfoController::class, 'showUploadForm'])->name('car.import.form');
+Route::post('/import-cars', [InfoController::class, 'import'])->name('car.import');
 
 Route::group(['middleware' => ['auth','verified']], function () {
     Route::get('/dashboard', function () {return Inertia::render('Dashboard');})->middleware(['auth', 'verified'])->name('dashboard');

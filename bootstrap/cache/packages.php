@@ -56,6 +56,17 @@
       0 => 'Laravel\\Tinker\\TinkerServiceProvider',
     ),
   ),
+  'maatwebsite/excel' => 
+  array (
+    'providers' => 
+    array (
+      0 => 'Maatwebsite\\Excel\\ExcelServiceProvider',
+    ),
+    'aliases' => 
+    array (
+      'Excel' => 'Maatwebsite\\Excel\\Facades\\Excel',
+    ),
+  ),
   'nesbot/carbon' => 
   array (
     'providers' => 
@@ -75,6 +86,13 @@
     'providers' => 
     array (
       0 => 'Termwind\\Laravel\\TermwindServiceProvider',
+    ),
+  ),
+  'scottlaurent/accounting' => 
+  array (
+    'providers' => 
+    array (
+      0 => 'Scottlaurent\\Accounting\\Providers\\AccountingServiceProvider',
     ),
   ),
   'simplesoftwareio/simple-qrcode' => 
