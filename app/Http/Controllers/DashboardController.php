@@ -122,9 +122,6 @@ class DashboardController extends Controller
             $no = $maxNo + 1;
         }
         $images=[];
-        $paid_amount = $request->paid_amount??0;
-        $purchase_price =$request->purchase_price;
-        $debt_price =$purchase_price - $paid_amount;
         if($request->image){
             foreach ($request->image as $image) {
                 $imageName = $image->getClientOriginalName().$no;
@@ -136,17 +133,20 @@ class DashboardController extends Controller
 
         if(!$car_id){
         $car=Car::create([
-            'company_id' =>$request->company_id,
-            'name_id'=> $request->name_id,
-            'model_id'=> $request->model_id,
-            'color_id'=> $request->color_id,
+            'name'=> $request->name,
+            'model'=> $request->model,
+            'color'=> $request->color,
             'pin'=> $request->pin,
+            'source'=> $request->source,
             'purchase_data'=> $request->purchase_data,
-            'purchase_price'=> $purchase_price,
-            'paid_amount'=> $paid_amount,
+            'purchase_price'=> $request->purchase_price,
             'note'=> $request->note??'',
             'image'=>$images ? json_encode($images):"",
             'user_id'=> $request->user_id??0,
+            'erbil_exp'=>$request->erbil_exp,
+            'erbil_shipping'=>$request->erbil_shipping,
+            'dubai_exp'=>$request->dubai_exp,
+            'dubai_shipping'=>$request->dubai_shipping,
             'no'=>$no
              ]);
              if($paid_amount){
@@ -166,18 +166,18 @@ class DashboardController extends Controller
  
         }else{
             $car=Car::find($car_id);
-            $purchase_price_old=$car->purchase_price;
-            if($purchase_price > $purchase_price_old){
-                $purchase_price_new = $purchase_price - $purchase_price_old;
-                $desc=trans('text.editCar').' '.trans('text.from').$purchase_price_old.trans('text.to').$purchase_price;
-                $this->accountingController->increaseWallet($purchase_price_new, $desc,$this->debtSupplier->id,$car->id,'App\Models\Car');
-            }
-            if($purchase_price < $purchase_price_old){
-                $purchase_price_new =$purchase_price_old - $purchase_price;
-                $desc=trans('text.editCar').' '.trans('text.from').$purchase_price_old.trans('text.to').$purchase_price;
-                $this->accountingController->decreaseWallet($purchase_price_new, $desc,$this->debtSupplier->id,$car->id,'App\Models\Car');
+            // $purchase_price_old=$car->purchase_price;
+            // if($purchase_price > $purchase_price_old){
+            //     $purchase_price_new = $purchase_price - $purchase_price_old;
+            //     $desc=trans('text.editCar').' '.trans('text.from').$purchase_price_old.trans('text.to').$purchase_price;
+            //     $this->accountingController->increaseWallet($purchase_price_new, $desc,$this->debtSupplier->id,$car->id,'App\Models\Car');
+            // }
+            // if($purchase_price < $purchase_price_old){
+            //     $purchase_price_new =$purchase_price_old - $purchase_price;
+            //     $desc=trans('text.editCar').' '.trans('text.from').$purchase_price_old.trans('text.to').$purchase_price;
+            //     $this->accountingController->decreaseWallet($purchase_price_new, $desc,$this->debtSupplier->id,$car->id,'App\Models\Car');
 
-            }
+            // }
             $car->update([
                 'company_id' =>$request->company_id,
                 'name_id'=> $request->name_id,
@@ -185,10 +185,13 @@ class DashboardController extends Controller
                 'color_id'=> $request->color_id,
                 'pin'=> $request->pin,
                 'purchase_data'=> $request->purchase_data,
-                'purchase_price'=> $purchase_price,
-                'paid_amount'=> $paid_amount,
+                'purchase_price'=> $request->purchase_price,
                 'note'=> $request->note??'',
                 'image'=>$images ? json_encode($images):"",
+                'erbil_exp'=>$request->erbil_exp,
+                'erbil_shipping'=>$request->erbil_shipping,
+                'dubai_exp'=>$request->dubai_exp,
+                'dubai_shipping'=>$request->dubai_shipping,
                 'no'=>$no
                  ]);
         }
@@ -340,7 +343,7 @@ class DashboardController extends Controller
     }
     public function getIndexCar()
     {
-        $data =  Car::with('carmodel')->with('name')->with('color')->with('company')->with('client')->with('transactions');
+        $data =  Car::with('client')->with('transactions');
         $type =$_GET['type'] ?? '';
         if($type){
             $data =    $data->where('results', $type);

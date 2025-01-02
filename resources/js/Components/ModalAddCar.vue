@@ -1,15 +1,26 @@
 <script setup>
 import { ref, computed } from "vue";
+import axios from 'axios';
 
 const props = defineProps({
   show: Boolean,
-  company: Array,
-  color: Array,
-  carModel: Array,
-  name: Array,
   formData: Object,
   user: Array,
 });
+function VinApi (v){
+  props.formData.car_type=''
+    props.formData.year=''
+    axios.get(`https://vpic.nhtsa.dot.gov/api/vehicles/decodevinvalues/${v}?format=json`)
+  .then(response => {
+    props.formData.name=(response.data.Results[0].Make ? response.data.Results[0].Make:response.data.Results[0].Manufacturer)+' '+response.data.Results[0].Model
+    props.formData.model=response.data.Results[0].ModelYear
+
+  })
+  .catch(error => {
+    console.error(error);
+  })
+}
+
 </script>
   <template>
   <Transition name="modal">
@@ -23,94 +34,7 @@ const props = defineProps({
             <h2 class="text-center dark:text-gray-200">
               {{ $t("purchase_car") }}
             </h2>
-            <div
-              class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-4"
-            >
-              <div className="mb-4 mx-5">
-                <label class="dark:text-gray-200" for="company_id">{{
-                  $t("company")
-                }}</label>
-                <select
-                  v-model="formData.company_id"
-                  id="company_id"
-                  class="pr-8 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                >
-                  <option selected disabled>{{ $t("select_company") }}</option>
-                  <option
-                    v-for="(card, index) in company"
-                    :key="index"
-                    :value="card.id"
-                  >
-                    {{ card.name }}
-                  </option>
-                </select>
-              </div>
-              <div className="mb-4 mx-5">
-                <label class="dark:text-gray-200" for="name_id">{{
-                  $t("name")
-                }}</label>
-                <select
-                  v-model="formData.name_id"
-                  id="name_id"
-                  class="pr-8 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                >
-                  <option selected disabled>{{ $t("select_name") }}</option>
-                  <template v-for="(card, index) in name" :key="index">
-                    <option
-                      :value="card.id"
-                      v-if="card.company_id == formData.company_id"
-                    >
-                      {{ card.name }}
-                    </option>
-                  </template>
-                </select>
-              </div>
-            </div>
-            <div
-              class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-4"
-            >
-              <div className="mb-4 mx-5">
-                <label class="dark:text-gray-200" for="carmodel">{{
-                  $t("year")
-                }}</label>
-                <select
-                  v-model="formData.model_id"
-                  id="carmodel"
-                  class="pr-8 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                >
-                  <option selected disabled>{{ $t("select_year") }}</option>
-                  <option
-                    v-for="(card, index) in carModel"
-                    :key="index"
-                    :value="card.id"
-                  >
-                    {{ card.name }}
-                  </option>
-                </select>
-              </div>
-              <div className="mb-4 mx-5">
-                <label class="dark:text-gray-200" for="color_id">{{
-                  $t("color")
-                }}</label>
-                <select
-                  v-model="formData.color_id"
-                  id="color_id"
-                  class="pr-8 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                >
-                  <option selected disabled>{{ $t("select_color") }}</option>
-                  <option
-                    v-for="(card, index) in color"
-                    :key="index"
-                    :value="card.id"
-                  >
-                    {{ card.name }}
-                  </option>
-                </select>
-              </div>
-            </div>
-            <div
-              class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-4"
-            >
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-4">
               <div className="mb-4 mx-5">
                 <label class="dark:text-gray-200" for="pin">
                   {{ $t("vim") }}</label
@@ -118,10 +42,44 @@ const props = defineProps({
                 <input
                   id="pin"
                   type="text"
+                  @change="VinApi(formData.pin)"
                   class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
                   v-model="formData.pin"
                 />
               </div>
+              <div className="mb-4 mx-5">
+                <label class="dark:text-gray-200" for="color">{{
+                  $t("color")
+                }}</label>
+                <input
+                  type="text"
+                  v-model="formData.color"
+                  id="color"
+                  class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
+                >
+              </div>
+
+              <div className="mb-4 mx-5">
+                <label class="dark:text-gray-200" for="name">{{$t("car")}}</label>
+                <input
+                  v-model="formData.name"
+                  id="name"
+                  type="text"
+                  class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900">
+              </div>
+           
+              <div className="mb-4 mx-5">
+                <label class="dark:text-gray-200" for="carmodel">{{
+                  $t("year")
+                }}</label>
+                <input type="text"
+                  v-model="formData.model"
+                  id="carmodel"
+                  class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900">
+              </div>
+   
+          
+      
               <div className="mb-4 mx-5">
                 <label class="dark:text-gray-200" for="purchase_data">{{
                   $t("purchase_date")
@@ -130,13 +88,9 @@ const props = defineProps({
                   id="purchase_data"
                   type="date"
                   class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
-                  v-model="formData._data"
+                  v-model="formData.purchase_data"
                 />
               </div>
-            </div>
-            <div
-              class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-4"
-            >
               <div className="mb-4 mx-5" v-if="formData.id">
                 <label class="dark:text-gray-200" for="no">{{
                   $t("no")
@@ -147,7 +101,7 @@ const props = defineProps({
                   class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
                   v-model="formData.no"
                 />
-              </div>
+              </div> 
               <div className="mb-4 mx-5" >
                 <label class="dark:text-gray-200" for="purchase_price">{{
                   $t("purchase_price")
@@ -159,44 +113,79 @@ const props = defineProps({
                   v-model="formData.purchase_price"
                 />
               </div>
-              <div className="mb-4 mx-5" v-if="!formData.id">
-                <label class="dark:text-gray-200" for="paid_amount">{{
-                  $t("paid_amount")
-                }}</label>
-                <input
-                  id="paid_amount"
-                  type="number"
-                  class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
-                  v-model="formData.paid_amount"
-                />
-              </div>
-            </div>
-            <div className="mb-4 mx-5">
-              <label class="dark:text-gray-200" for="note">{{
-                $t("note")
+              <div className="mb-4 mx-5">
+              <label class="dark:text-gray-200" for="source">{{
+                $t("source")
               }}</label>
               <input
-                id="note"
+                id="source"
                 type="text"
                 class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
-                v-model="formData.note"
+                v-model="formData.source"
               />
             </div>
-            <div className="mb-4 mx-5">
-              <label class="dark:text-gray-200" for="user_id">{{
-                $t("user")
-              }}</label>
-              <select
-                v-model="formData.user_id"
-                id="name_id"
-                class="pr-8 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-              >
-                <option selected disabled>{{ $t("select_name") }}</option>
-                <template v-for="(card, index) in user" :key="index">
-                  <option :value="card.id">{{ card.name }}</option>
-                </template>
-              </select>
-            </div>
+              <div className="mb-4 mx-5">
+                <label class="dark:text-gray-200" for="note">{{
+                  $t("note")
+                }}</label>
+                <input
+                  id="note"
+                  type="text"
+                  class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
+                  v-model="formData.note"
+                />
+                </div>
+              </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-4">
+
+              <div className="mb-4 mx-5" >
+                <label class="dark:text-gray-200" for="dubai_exp">{{
+                  $t("dubai_expenses")
+                }}</label>
+                <input
+                  id="dubai_exp"
+                  type="number"
+                  class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
+                  v-model="formData.dubai_exp"
+                />
+              </div>
+              <div className="mb-4 mx-5" >
+                <label class="dark:text-gray-200" for="dubai_shipping">{{
+                  $t("dubai_shipping")
+                }}</label>
+                <input
+                  id="dubai_shipping"
+                  type="number"
+                  class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
+                  v-model="formData.dubai_shipping"
+                />
+              </div>
+              <div className="mb-4 mx-5" >
+                <label class="dark:text-gray-200" for="erbil_exp">{{
+                  $t("erbil_expenses")
+                }}</label>
+                <input
+                  id="erbil_exp"
+                  type="number"
+                  class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
+                  v-model="formData.erbil_exp"
+                />
+              </div>
+              <div className="mb-4 mx-5" >
+                <label class="dark:text-gray-200" for="erbil_shipping">{{
+                  $t("erbil_shipping")
+                }}</label>
+                <input
+                  id="erbil_shipping"
+                  type="number"
+                  class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
+                  v-model="formData.erbil_shipping"
+                />
+              </div>
+              </div>
+  
+
           </div>
 
           <div class="modal-footer my-2">
@@ -216,7 +205,7 @@ const props = defineProps({
                     $emit('a', formData);
                     formData = '';
                   "
-                  :disabled="!(formData.name_id)"
+                  :disabled="!(formData.pin)"
                 >
                   {{ $t("yes") }}
                 </button>

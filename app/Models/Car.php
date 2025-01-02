@@ -16,10 +16,10 @@ class Car extends Model
     protected $fillable = [
         'id',
         'no',
-        'name_id',
-        'company_id',
-        'color_id',
-        'model_id',
+        'name',
+        'company',
+        'color',
+        'model',
         'image',
         'pin',
         'price',
@@ -44,29 +44,14 @@ class Car extends Model
         'erbil_exp',
         'erbil_shipping',
         'dubai_exp',
-        'dubai_shipping'
+        'dubai_shipping',
+        'source'
     ];
     public function user()
     {
         return $this->belongsTo(User::class);
     }
     protected $dates = ['deleted_at']; // Define the deleted_at column as a date
-    public function company()
-    {
-        return $this->belongsTo(Company::class, 'company_id');
-    }
-    public function carmodel()
-    {
-        return $this->belongsTo(CarModel::class,'model_id');
-    }
-    public function name()
-    {
-        return $this->belongsTo(Name::class);
-    }
-    public function color()
-    {
-        return $this->belongsTo(Color::class);
-    }
     public function Client()
     {
         return $this->belongsTo(User::class);

@@ -1,5 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
+import { ModelListSelect } from "vue-search-select"
+import "vue-search-select/dist/VueSearchSelect.css"
 
 const props = defineProps({
   show: Boolean,
@@ -33,58 +35,7 @@ let showClient =  ref(false);
                           style="display: none;"
                           class=" mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900 "
                           v-model="formData.id" />
-
-                        <div className="mb-4 mx-5">
-                          <label  class="dark:text-gray-200" for="company_id" >{{ $t('company') }}</label>
-                          <select
-                            v-model="formData.company_id"
-                            id="company_id"
-                            disabled
-                            class="pr-8 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                            <option selected disabled>{{ $t('select_company') }}</option>
-                            <option v-for="(card, index) in company" :key="index" :value="card.id">{{ card.name }}</option>
-                          </select>
-                        </div>
-                        <div className="mb-4 mx-5">
-                          <label  class="dark:text-gray-200" for="name_id" >{{ $t('name') }}</label>
-                          <select
-                            v-model="formData.name_id"
-                            id="name_id"
-                            disabled
-                            class="pr-8 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                            <option selected disabled>{{ $t('select_name') }}</option>
-                            <template v-for="(card, index) in name" :key="index"  >
-                              <option   :value="card.id"  v-if="card.company_id == formData.company_id">{{ card.name }}</option>
-
-                            </template>
-                          </select>
-                        </div>
-                        <div className="mb-4 mx-5">
-                          <label  class="dark:text-gray-200" for="carmodel" >{{ $t('year') }}</label>
-                          <select
-                            v-model="formData.model_id"
-                            id="carmodel"
-                            disabled
-                            class="pr-8  bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                            <option selected disabled>{{ $t('select_year') }}</option>
-                            <option v-for="(card, index) in carModel" :key="index" :value="card.id">{{ card.name }}</option>
-                          </select>
-                        </div>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-3 lg:gap-4">
-     
-                        <div className="mb-4 mx-5">
-                          <label  class="dark:text-gray-200" for="color_id" >{{ $t('color') }}</label>
-                          <select
-                            v-model="formData.color_id"
-                            id="color_id"
-                            disabled
-                            class="pr-8 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                            <option selected disabled>{{ $t('select_color') }}</option>
-                            <option v-for="(card, index) in color" :key="index" :value="card.id">{{ card.name }}</option>
-                          </select>
-                        </div>
-                        <div className="mb-4 mx-5">
+                          <div className="mb-4 mx-5">
                         <label  class="dark:text-gray-200" for="pin">{{ $t('vim') }}</label>
                         <input
                           id="pin"
@@ -94,6 +45,38 @@ let showClient =  ref(false);
                           v-model="formData.pin" />
                         </div>
                         <div className="mb-4 mx-5">
+                          <label  class="dark:text-gray-200" for="name" >{{ $t('name') }}</label>
+                          <input
+                            v-model="formData.name"
+                            type="text"
+                            id="name"
+                            disabled
+                            class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"/>
+                        </div>
+                        <div className="mb-4 mx-5">
+                          <label  class="dark:text-gray-200" for="rmodel" >{{ $t('year') }}</label>
+                          <input
+                            v-model="formData.model"
+                            id="model"
+                            type="text"
+                            disabled
+                            class="pr-8  bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
+                
+                        </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-3 lg:gap-4">
+     
+                        <div className="mb-4 mx-5">
+                          <label  class="dark:text-gray-200" for="color" >{{ $t('color') }}</label>
+                          <input
+                            v-model="formData.color"
+                            id="color"
+                            type="text"
+                            disabled
+                            class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"/>
+                        </div>
+                        
+                        <div className="mb-4 mx-5">
                           <label  class="dark:text-gray-200" for="purchase_data">{{ $t('purchaseDate') }}</label>
                         <input
                           id="purchase_data"
@@ -102,26 +85,6 @@ let showClient =  ref(false);
                           style="padding-right: 0;"
                           class="mt-1 block text-end   w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm"
                           v-model="formData.purchase_data" />
-                        </div>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-3 lg:gap-3">
-                        <div className="mb-4 mx-5">
-                        <label  class="dark:text-gray-200" for="purchase_price" >{{ $t('purchase_price') }}</label>
-                        <input
-                          id="purchase_price"
-                          type="number"
-                          disabled
-                          class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900 "
-                          v-model="formData.purchase_price" />
-                        </div>
-                        <div className="mb-4 mx-5">
-                          <label  class="dark:text-gray-200" for="paid_amount">{{ $t('paidAmountToSupplier') }}</label>
-                        <input
-                          id="paid_amount"
-                          type="number"
-                          disabled
-                          class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900 "
-                          v-model="formData.paid_amount" />
                         </div>
                         <div className="mb-4 mx-5">
                           <label  class="dark:text-gray-200" for="paid_amount">{{ $t('totalExpenses') }}</label>
@@ -134,6 +97,19 @@ let showClient =  ref(false);
                            />
                         </div>
                         </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-3 lg:gap-3">
+                        <div className="mb-4 mx-5">
+                        <label  class="dark:text-gray-200" for="purchase_price" >{{ $t('purchase_price') }}</label>
+                        <input
+                          id="purchase_price"
+                          type="number"
+                          disabled
+                          class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900 "
+                          v-model="formData.purchase_price" />
+                        </div>
+                     
+              
+                        </div>
                         <div className="mb-4 mx-5">
                           <label  class="dark:text-gray-200" for="pay_price">{{ $t('sellingPrice') }}</label>
                         <input
@@ -143,16 +119,17 @@ let showClient =  ref(false);
                           v-model="formData.pay_price" />
                         </div>
                         <div class="mb-4 mx-5">
-                          <label  class="dark:text-gray-200" for="color_id">{{ $t('customer') }}</label>
+                          <label  class="dark:text-gray-200" for="color">{{ $t('customer') }}</label>
                           <div class="relative">
-                            <select
-                              v-if="!showClient"
-                              v-model="formData.client_id"
-                              id="color_id"
-                              class="pr-8 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                              <option selected disabled>   {{ $t('selectCustomer') }}</option>
-                              <option v-for="(card, index) in client" :key="index" :value="card.id">{{ card.name }}</option>
-                            </select>
+                            <ModelListSelect
+                            v-if="!showClient"
+                            optionValue="id"
+                            optionText="name"
+                            v-model="formData.client_id"
+                            :list="client"
+                            :placeholder="$t('selectCustomer')">
+                          </ModelListSelect>
+                            
                             <button
                               type="button"
                               @click="showClient=true;formData.client_name=''"
@@ -227,6 +204,18 @@ let showClient =  ref(false);
   </template>
   
   <style>
+      .ui.fluid.search.selection.dropdown{
+    justify-content: revert;
+    display: flex;
+    min-height: 40px;
+  }
+  .ui.dropdown .menu .selected.item{
+    background-color: #e012035d;
+  }
+  .ui.dropdown .menu>.item {
+    text-align: right;
+  }
+  
   .modal-mask {
     position: fixed;
     z-index: 9998;

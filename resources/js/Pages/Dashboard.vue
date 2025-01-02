@@ -11,7 +11,12 @@ import ModalSpanFromBox from "@/Components/ModalSpanFromBox.vue";
 import ModalAddTransfers from "@/Components/ModalAddTransfers.vue";
 import ModalAddCarPayment from "@/Components/ModalAddCarPayment.vue";
 import ModalDelCar from "@/Components/ModalDelCar.vue";
-
+import show from "@/Components/icon/show.vue";
+import imags from "@/Components/icon/imags.vue";
+import trash from "@/Components/icon/trash.vue";
+import edit from "@/Components/icon/edit.vue";
+import print from "@/Components/icon/print.vue";
+import pay from "@/Components/icon/pay.vue";
 
 import { TailwindPagination } from "laravel-vue-pagination";
 import axios from 'axios';
@@ -31,7 +36,6 @@ let searchTerm = ref('');
 
 let showModalCar =  ref(false);
 let showModalCarSale =  ref(false);
-let showModalAddExpenses =  ref(false);
 let showModalAddGenExpenses =  ref(false);
 let showModalToBox =  ref(false);
 let showModalFromBox =  ref(false);
@@ -45,16 +49,21 @@ function openModalDelCar(form={}) {
 }
 
 function openAddCar(form={}) {
+  if(!form.purchase_data){
+    form.purchase_data = getTodayDate()
+  }
+  if(!form.source){
+    form.source = 'Copart'
+  }
+  if(!form.purchase_price){
+    form.purchase_price = 0
+  }
     formData.value=form
     showModalCar.value = true;
 }
 function openSaleCar(form={}) {
     formData.value=form
     showModalCarSale.value = true;
-}
-function openAddExpenses(form={}) {
-    formData.value=form
-    showModalAddExpenses.value = true;
 }
 function openAddGenExpenses(form={}) {
     formGenExpenses.value=form
@@ -73,6 +82,7 @@ function openAddTransfers(form={}) {
     showModalAddTransfers.value = true;
 }
 function openAddCarPayment(form={}) {
+
     formData.value=form
     showModalAddCarPayment.value = true;
 }
@@ -163,16 +173,6 @@ function confirmPayCar(V) {
     console.error(error);
   })
 }
-function confirmExpenses(V) {
-  fetch(`/addExpenses?car_id=${V.id}&user_id=${V.user_id}&expenses_id=${V.expenses_id}&expens_amount=${V.expens_amount??0}&note=${V.noteExpenses??''}`)
-    .then(() => {
-      showModalAddExpenses.value = false;
-       window.location.reload();
-    })
-    .catch((error) => {
-      console.error(error);
-    });
-}
 function conGenfirmExpenses(V) {
   fetch(`/GenExpenses?user_id=${V.user_id}&amount=${V.amount??0}&reason=${V.reason??''}&note=${V.note??''}`)
     .then(() => {
@@ -240,7 +240,13 @@ function confirmDelCar(V) {
 
 
 }
-
+function getTodayDate() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 getResultsCar();
 </script>
 
@@ -274,17 +280,6 @@ getResultsCar();
         <template #header>
           </template>
     </ModalAddSale>
-    <ModalAddExpenses
-            :formData="formData"
-            :expenses="expenses"
-            :show="showModalAddExpenses ? true : false"
-            :user="user"
-            @a="confirmExpenses($event)"
-            @close="showModalAddExpenses = false"
-            >
-        <template #header>
-          </template>
-    </ModalAddExpenses>
     <ModalAddGenExpenses
             :formData="formData"
             :show="showModalAddGenExpenses ? true : false"
@@ -495,9 +490,6 @@ getResultsCar();
                                         {{ $t('name') }}
                                       </th>
                                       <th scope="col" class="px-1 py-3 text-base">
-                                        {{ $t('company') }}
-                                      </th>
-                                      <th scope="col" class="px-1 py-3 text-base">
                                         {{ $t('color') }}
                                       </th>
                                       <th scope="col" class="px-1 py-3 text-base">
@@ -507,7 +499,7 @@ getResultsCar();
                                         {{ $t('purchase_price') }}
                                       </th>
                                       <th scope="col" class="px-1 py-3 text-base">
-                                        {{ $t('remaining_amount') }}
+                                        {{ $t('source') }}
                                       </th>
                                       <th scope="col" class="px-1 py-3 text-base">{{ $t('dubai_shipping') }}</th>
                                       <th scope="col" class="px-1 py-3 text-base">{{ $t('dubai_expenses') }}</th>
@@ -537,17 +529,16 @@ getResultsCar();
                                 <tr v-for="car in car.data" :key="car.id" :class="car.results == 0?'bg-gray-100 dark:bg-gray-600':car.results == 1 ?'bg-red-100 dark:bg-red-900':car.results == 2 ?'bg-green-100 dark:bg-green-900':''"  class="bg-white border-b dark:bg-gray-900 dark:border-gray-900 hover:bg-gray-50 dark:hover:bg-gray-600">
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base ">{{ car.no }}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.pin }}</td>
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.name?.name}}</td>
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.company?.name}}</td>
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.color?.name }}</td>
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.carmodel?.name }}</td>
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.name}}</td>
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.color }}</td>
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.model }}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.purchase_price }}</td> 
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.purchase_price  - car.paid_amount  }}</td>
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.source  }}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.dubai_shipping  }}</td> 
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.dubai_exp }}</td> 
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.erbil_shipping }}</td> 
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.erbil_exp }}</td> 
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.paid_amount + car.erbil_exp+car.erbil_shipping+car.dubai_exp+car.dubai_shipping }}</td>
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.purchase_price + car.erbil_exp+car.erbil_shipping+car.dubai_exp+car.dubai_shipping }}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.pay_price }}</td> 
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.client?.name }}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.results != 0 ? car.pay_price-car.paid_amount_pay :'' }}</td>
@@ -559,31 +550,25 @@ getResultsCar();
                                       class="px-2 py-1 text-base text-white mx-1 bg-slate-500 rounded"
                                       @click="openAddCar(car)"
                                     >
-                                      {{ $t('edit') }}
+                                      <edit />
                                     </button>
           
                                     <button
                                       tabIndex="1"
-                                      class="px-4 py-1 text-base text-white mx-1 bg-purple-500 rounded"
+                                      class="px-2 py-1 text-base text-white mx-1 bg-purple-500 rounded"
                                       v-if="car.results == 0"
                                       @click="openSaleCar(car)"
                                     >
-                                      {{ $t('sell') }}
+                                      <pay />
                                     </button>
-                                    <button
-                                      tabIndex="1"
-                                      class="px-2 py-1 text-base text-white mx-1 bg-blue-600 rounded"
-                                      @click="openAddExpenses(car)"
-                                    >
-                                      {{ $t('expenses') }}
-                                    </button>
+
                                     <button
                                       tabIndex="1"
                                       class="px-2 py-1 text-base text-white mx-1 bg-green-500 rounded"
                                       v-if="car.results != 0 && (car.pay_price - car.paid_amount_pay == 0)"
                                       @click="openAddCarPayment(car)"
                                     >
-                                      {{ $t('view_payments') }}
+                                    <pay />
                                     </button>
                                     <button
                                       tabIndex="1"
@@ -591,7 +576,7 @@ getResultsCar();
                                       v-if="car.results == 1 && (car.pay_price - car.paid_amount_pay != 0)"
                                       @click="openAddCarPayment(car)"
                                     >
-                                      {{ $t('add_payment') }}
+                                    <pay />
                                     </button>
 
                                     <button
@@ -600,7 +585,7 @@ getResultsCar();
                                       class="px-2 py-1 text-base text-white mx-1 bg-orange-500 rounded"
                                       @click="openModalDelCar(car)"
                                     >
-                                      {{ $t('delete') }}
+                                      <trash />
                                     </button>
 
                                     </td>
