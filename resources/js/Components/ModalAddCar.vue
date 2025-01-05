@@ -205,7 +205,7 @@ function VinApi (v){
                     $emit('a', formData);
                     formData = '';
                   "
-                  :disabled="!(formData.pin)"
+                  :disabled="!(formData.name)"
                 >
                   {{ $t("yes") }}
                 </button>

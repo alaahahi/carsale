@@ -53,7 +53,19 @@ function openAddCar(form={}) {
     form.purchase_data = getTodayDate()
   }
   if(!form.source){
-    form.source = 'Copart'
+    form.source = ''
+  }
+  if(!form.dubai_exp){
+    form.dubai_exp = 0
+  }
+  if(!form.dubai_shipping){
+    form.dubai_shipping = 0
+  }
+  if(!form.erbil_exp){
+    form.erbil_exp = 0
+  }
+  if(!form.erbil_shipping){
+    form.erbil_shipping = 0
   }
   if(!form.purchase_price){
     form.purchase_price = 0

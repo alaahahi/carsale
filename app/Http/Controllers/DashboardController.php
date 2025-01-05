@@ -149,20 +149,20 @@ class DashboardController extends Controller
             'dubai_shipping'=>$request->dubai_shipping,
             'no'=>$no
              ]);
-             if($paid_amount){
-                $desc=trans('text.payCar').' '.$purchase_price.trans('text.payDone').$paid_amount;
+            //  if($paid_amount){
+            //     $desc=trans('text.payCar').' '.$purchase_price.trans('text.payDone').$paid_amount;
              
-                $this->accountingController->decreaseWallet($paid_amount, $desc,$this->mainAccount->id,$car->id,'App\Models\Car');
-                $this->accountingController->increaseWallet($paid_amount, $desc,$this->outAccount->id,$car->id,'App\Models\Car' );
-                $this->accountingController->increaseWallet($paid_amount, $desc,$this->outSupplier->id,$car->id,'App\Models\Car');
-                if($debt_price){
-                   $this->accountingController->increaseWallet($debt_price, $desc,$this->debtSupplier->id,$car->id,'App\Models\Car');
-                }
-             }else{
-                $desc=trans('text.payCar').' '.$purchase_price.trans('text.payDone').$paid_amount;
+            //     $this->accountingController->decreaseWallet($paid_amount, $desc,$this->mainAccount->id,$car->id,'App\Models\Car');
+            //     $this->accountingController->increaseWallet($paid_amount, $desc,$this->outAccount->id,$car->id,'App\Models\Car' );
+            //     $this->accountingController->increaseWallet($paid_amount, $desc,$this->outSupplier->id,$car->id,'App\Models\Car');
+            //     if($debt_price){
+            //        $this->accountingController->increaseWallet($debt_price, $desc,$this->debtSupplier->id,$car->id,'App\Models\Car');
+            //     }
+            //  }else{
+            //     $desc=trans('text.payCar').' '.$purchase_price.trans('text.payDone').$paid_amount;
 
-                $this->accountingController->increaseWallet($debt_price, $desc,$this->debtSupplier->id,$car->id,'App\Models\Car');
-             }
+            //     $this->accountingController->increaseWallet($debt_price, $desc,$this->debtSupplier->id,$car->id,'App\Models\Car');
+            //  }
  
         }else{
             $car=Car::find($car_id);
