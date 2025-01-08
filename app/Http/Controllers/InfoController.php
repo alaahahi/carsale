@@ -47,36 +47,31 @@ class InfoController extends Controller
             }
 
             $pin = $row[1];
-            $purchasePrice = $row[2];
-            $dubaiShipping = $row[3];
-            $dubaiExp = $row[4];
-            $erbilShipping = $row[5];
-            $erbilExp = $row[6];
-            $payPrice = $row[7];
-            $userName = $row[8];
+            $name = $row[2] +' '+$row[10];
+            $color = $row[3];
+            $model = $row[4] ;
+            $purchasePrice = $row[5];
+            $dubaiShipping = $row[6];
+            $dubaiExp = $row[7];
+            $erbilShipping = $row[8];
+            $erbilExp = $row[9];
 
-            // Find the user using LIKE for name
-            $user = User::where('name', 'LIKE', '%' . $userName . '%')->first();
 
-            // If user does not exist, create a new user
-            if (!$user) {
-                $user = User::create([
-                    'name' => $userName,
-                    // Add additional fields if necessary
-                ]);
-            }
 
             // Update the car based on the pin
             Car::updateOrCreate(
                 ['pin' => $pin],
                 [
+                    'name'=>$name,
+                    'model'=>$model,
+                    'color'=>$color,
+                    'source'=>$source,
                     'purchase_price' => $purchasePrice,
                     'dubai_shipping' => $dubaiShipping,
                     'dubai_exp' => $dubaiExp,
                     'erbil_shipping' => $erbilShipping,
                     'erbil_exp' => $erbilExp,
-                    'pay_price' => $payPrice,
-                    'user_id' => $user->id,
+
                 ]
             );
         }

@@ -41,8 +41,7 @@ class DashboardController extends Controller
     $this->outAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','out@account.com')->first();
     $this->debtAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','debt@account.com')->first();
     $this->transfersAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','transfers@account.com')->first();
-    $this->outSupplier= User::with('wallet')->where('type_id', $this->userAccount)->where('email','supplier-out')->first();
-    $this->debtSupplier= User::with('wallet')->where('type_id', $this->userAccount)->where('email','supplier-debt')->first();
+
     
     }
     public function __invoke(Request $request)
@@ -61,17 +60,22 @@ class DashboardController extends Controller
         $user=   User::where('type_id', $this->userSeles)->get();
         $car = Car::all();
         $carUser=  $car->where('user_id', $authUser->id)->count();
-        $company = Company::all();
-        $carModel = CarModel::all();
-        $name = Name::all();
+       
         $client = User::where('type_id', $this->userClient)->get();
-        $color = Color::all();
+    
         $expenses=ExpensesType::all(); 
 
+        $grandTotal = \App\Models\Car::selectRaw('
+        SUM(
+                    purchase_price + dubai_shipping + dubai_exp + erbil_shipping + erbil_exp
+                ) as grand_total
+            ')
+            ->value('grand_total'); // Directly retrieve the value
+
+
         return Inertia::render('Dashboard', ['url'=>$this->url,'debtAccount'=>$this->debtAccount,'transfersAccount'=>$this->transfersAccount,
-        'outAccount'=>$this->outAccount,'inAccount'=>$this->inAccount,'mainAccount'=>$this->mainAccount,'outSupplier'=>$this->outSupplier,'debtSupplier'=>$this->debtSupplier,
-        'expenses'=> $expenses,'user'=> $user,
-        'company'=> $company,'carModel'=> $carModel,'client'=>$client,'color'=> $color,'name'=> $name,'carCount'=> $car->count(),
+        'outAccount'=>$this->outAccount,'inAccount'=>$this->inAccount,'mainAccount'=>$grandTotal,
+        'expenses'=> $expenses,'user'=> $user,'client'=>$client ,'carCount'=> $car->count(),
         'working'=> $car->where('client_id',null)->count()]);   
 
     }
@@ -86,8 +90,6 @@ class DashboardController extends Controller
         'outAccount'=>$this->outAccount->wallet->balance,
         'inAccount'=>$this->inAccount->wallet->balance,
         'mainAccount'=>$this->mainAccount->wallet->balance,
-        'outSupplier'=>$this->outSupplier->wallet->balance,
-        'debtSupplier'=>$this->debtSupplier->wallet->balance,
         'allCars'=>$car->count(),
         'carsInStock'=>$car->where('client_id',null)->count()
         ];
@@ -154,7 +156,6 @@ class DashboardController extends Controller
              
             //     $this->accountingController->decreaseWallet($paid_amount, $desc,$this->mainAccount->id,$car->id,'App\Models\Car');
             //     $this->accountingController->increaseWallet($paid_amount, $desc,$this->outAccount->id,$car->id,'App\Models\Car' );
-            //     $this->accountingController->increaseWallet($paid_amount, $desc,$this->outSupplier->id,$car->id,'App\Models\Car');
             //     if($debt_price){
             //        $this->accountingController->increaseWallet($debt_price, $desc,$this->debtSupplier->id,$car->id,'App\Models\Car');
             //     }
@@ -283,8 +284,7 @@ class DashboardController extends Controller
                     $desc=trans('text.expensesExpPay').$expens_amount.'$'.$car->company?->name.' '.$car->name?->name;
                     $this->accountingController->decreaseWallet($expens_amount, $desc,$this->mainAccount->id,$car_id,'App\Models\Car',$user_id);
                     $this->accountingController->increaseWallet($expens_amount, $desc,$this->outAccount->id,$car_id,'App\Models\Car',$user_id);
-                    $this->accountingController->decreaseWallet($expens_amount, $desc,$this->debtSupplier->id,$car_id,'App\Models\Car',$user_id);
-                    $this->accountingController->increaseWallet($expens_amount, $desc,$this->outSupplier->id,$car_id,'App\Models\Car',$user_id);
+          
 
                 }
 
@@ -428,8 +428,7 @@ class DashboardController extends Controller
         }
         if(($car->purchase_price??0)-($car->paid_amount_pay??0)>0){
             $desc=' مرتج حذف سيارة'.$car->paid_amount_pay;
-            $this->accountingController->decreaseWallet($car->purchase_price-$car->paid_amount_pay, $desc,$this->outSupplier->id,$car->id,'App\Models\Car');
-            $this->accountingController->increaseWallet($car->purchase_price-$car->paid_amount_pay, $desc,$this->debtSupplier->id,$car->id,'App\Models\Car');
+           
         }
 
         $car->delete();
