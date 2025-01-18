@@ -190,6 +190,7 @@ class DashboardController extends Controller
                 'note'=> $request->note??'',
                 'image'=>$images ? json_encode($images):"",
                 'erbil_exp'=>$request->erbil_exp,
+                'source'=> $request->source,
                 'erbil_shipping'=>$request->erbil_shipping,
                 'dubai_exp'=>$request->dubai_exp,
                 'dubai_shipping'=>$request->dubai_shipping,
