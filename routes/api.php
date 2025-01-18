@@ -91,4 +91,6 @@ Route::get('delColor/{id}',[CarConfigController::class, 'delColor'])->name('delC
 Route::get('companyStoreEdit',[CarConfigController::class, 'index'])->name('companyStoreEdit');
 Route::post('companyStoreEdit',[CarConfigController::class, 'storeEdit'])->name('companyStoreEdit');
 
+Route::get('car/{carId}/history', [DashboardController::class, 'getCarHistory']);
+Route::post('car/history/{historyId}/restore', [DashboardController::class, 'restoreCarHistory']);
 

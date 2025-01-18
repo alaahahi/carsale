@@ -19,6 +19,8 @@ use App\Models\ExpensesType;
 use Illuminate\Support\Facades\DB;
 use App\Models\Transactions;
 use App\Models\Expenses;
+use App\Models\CarFieldHistory;
+
 use App\Helpers\UploadHelper;
 
 use Carbon\Carbon;
@@ -116,90 +118,83 @@ class DashboardController extends Controller
     }
     public function addCar(Request $request)
     {
-        $car_id=$request->id??0;
+        $car_id = $request->id ?? 0;
         $maxNo = Car::max('no');
-        if($car_id){
-            $no = $request->no;
-        }else{
-            $no = $maxNo + 1;
-        }
-        $images=[];
-        if($request->image){
+        $no = $car_id ? $request->no : $maxNo + 1;
+        $exp_note=$request->exp_note;
+        $images = [];
+        if ($request->image) {
             foreach ($request->image as $image) {
-                $imageName = $image->getClientOriginalName().$no;
+                $imageName = $image->getClientOriginalName() . $no;
                 $filename = pathinfo($imageName, PATHINFO_FILENAME);
                 $imagePath = UploadHelper::upload('image', $image, $filename, 'storage/car');
                 $images[] = $imagePath;
-            }    
+            }
         }
-
-        if(!$car_id){
-        $car=Car::create([
-            'name'=> $request->name,
-            'model'=> $request->model,
-            'color'=> $request->color,
-            'pin'=> $request->pin,
-            'source'=> $request->source,
-            'purchase_data'=> $request->purchase_data,
-            'purchase_price'=> $request->purchase_price,
-            'note'=> $request->note??'',
-            'image'=>$images ? json_encode($images):"",
-            'user_id'=> $request->user_id??0,
-            'erbil_exp'=>$request->erbil_exp,
-            'erbil_shipping'=>$request->erbil_shipping,
-            'dubai_exp'=>$request->dubai_exp,
-            'dubai_shipping'=>$request->dubai_shipping,
-            'no'=>$no
-             ]);
-            //  if($paid_amount){
-            //     $desc=trans('text.payCar').' '.$purchase_price.trans('text.payDone').$paid_amount;
-             
-            //     $this->accountingController->decreaseWallet($paid_amount, $desc,$this->mainAccount->id,$car->id,'App\Models\Car');
-            //     $this->accountingController->increaseWallet($paid_amount, $desc,$this->outAccount->id,$car->id,'App\Models\Car' );
-            //     if($debt_price){
-            //        $this->accountingController->increaseWallet($debt_price, $desc,$this->debtSupplier->id,$car->id,'App\Models\Car');
-            //     }
-            //  }else{
-            //     $desc=trans('text.payCar').' '.$purchase_price.trans('text.payDone').$paid_amount;
-
-            //     $this->accountingController->increaseWallet($debt_price, $desc,$this->debtSupplier->id,$car->id,'App\Models\Car');
-            //  }
- 
-        }else{
-            $car=Car::find($car_id);
-            // $purchase_price_old=$car->purchase_price;
-            // if($purchase_price > $purchase_price_old){
-            //     $purchase_price_new = $purchase_price - $purchase_price_old;
-            //     $desc=trans('text.editCar').' '.trans('text.from').$purchase_price_old.trans('text.to').$purchase_price;
-            //     $this->accountingController->increaseWallet($purchase_price_new, $desc,$this->debtSupplier->id,$car->id,'App\Models\Car');
-            // }
-            // if($purchase_price < $purchase_price_old){
-            //     $purchase_price_new =$purchase_price_old - $purchase_price;
-            //     $desc=trans('text.editCar').' '.trans('text.from').$purchase_price_old.trans('text.to').$purchase_price;
-            //     $this->accountingController->decreaseWallet($purchase_price_new, $desc,$this->debtSupplier->id,$car->id,'App\Models\Car');
-
-            // }
+    
+        if (!$car_id) {
+            $car = Car::create([
+                'name' => $request->name,
+                'model' => $request->model,
+                'color' => $request->color,
+                'pin' => $request->pin,
+                'source' => $request->source,
+                'purchase_data' => $request->purchase_data,
+                'purchase_price' => $request->purchase_price,
+                'note' => $request->note ?? '',
+                'image' => $images ? json_encode($images) : "",
+                'user_id' => $request->user_id ?? 0,
+                'erbil_exp' => $request->erbil_exp,
+                'erbil_shipping' => $request->erbil_shipping,
+                'dubai_exp' => $request->dubai_exp,
+                'dubai_shipping' => $request->dubai_shipping,
+                'no' => $no
+            ]);
+        } else {
+            $car = Car::find($car_id);
+    
+            // List of fields to track
+            $trackedFields = ['erbil_exp', 'erbil_shipping', 'dubai_exp', 'dubai_shipping'];
+            foreach ($trackedFields as $field) {
+                if ($request->has($field) && $car->$field != $request->$field) {
+                    // Log the change in car_field_histories table
+                    DB::table('car_field_histories')->insert([
+                        'car_id' => $car->id,
+                        'field' => $field,
+                        'old_value' => $car->$field,
+                        'new_value' => $request->$field,
+                        'updated_by' =>  $request->user_id ?? 0,
+                        'description'=>$exp_note,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                        'user_id' =>  $request->user_id ?? 0,
+                    ]);
+                }
+            }
+    
+            // Update car fields
             $car->update([
-                'company_id' =>$request->company_id,
-                'name_id'=> $request->name_id,
-                'model_id'=> $request->model_id,
-                'color_id'=> $request->color_id,
-                'pin'=> $request->pin,
-                'purchase_data'=> $request->purchase_data,
-                'purchase_price'=> $request->purchase_price,
-                'note'=> $request->note??'',
-                'image'=>$images ? json_encode($images):"",
-                'erbil_exp'=>$request->erbil_exp,
-                'source'=> $request->source,
-                'erbil_shipping'=>$request->erbil_shipping,
-                'dubai_exp'=>$request->dubai_exp,
-                'dubai_shipping'=>$request->dubai_shipping,
-                'no'=>$no
-                 ]);
+                'company_id' => $request->company_id,
+                'name_id' => $request->name_id,
+                'model_id' => $request->model_id,
+                'color_id' => $request->color_id,
+                'pin' => $request->pin,
+                'purchase_data' => $request->purchase_data,
+                'purchase_price' => $request->purchase_price,
+                'note' => $request->note ?? '',
+                'image' => $images ? json_encode($images) : "",
+                'erbil_exp' => $request->erbil_exp,
+                'erbil_shipping' => $request->erbil_shipping,
+                'dubai_exp' => $request->dubai_exp,
+                'dubai_shipping' => $request->dubai_shipping,
+                'source' => $request->source,
+                'no' => $no
+            ]);
         }
-
-        return Response::json('ok', 200);    
+    
+        return response()->json('ok', 200);
     }
+    
     public function getIndexExpenses () {
 
         $expenses = Expenses::with('user')->paginate(10);
@@ -358,12 +353,7 @@ class DashboardController extends Controller
     public function getIndexCarSearch()
     {
         $term = $_GET['q']??'';
-        $data =  Car::with('carmodel')->with('name')->with('color')->with('company')->with('client')->orwhere('pin', 'LIKE','%'.$term.'%')
-        ->orWhereHas('name', function ($query) use ($term) {
-            $query->where('name', 'LIKE', '%' . $term . '%');
-        })->orWhereHas('client', function ($query) use ($term) {
-            $query->where('name', 'LIKE', '%' . $term . '%');
-        });
+        $data =  Car::with('client')->orwhere('pin', 'LIKE','%'.$term.'%');
         $type =$_GET['type'] ?? '';
         if($type){
         $data =    $data->where('results', $type);
@@ -402,9 +392,7 @@ class DashboardController extends Controller
         $desc=trans('text.addPayment').' '.$amount.'$'.' || '.$_GET['note']??'';
         //$this->accountingController->decreaseWallet($amount, $desc,$this->debtSupplier->id,$car_id,'App\Models\Car',$user_id);
         if($car->pay_price-$car->paid_amount_pay >= 0){
-            $this->accountingController->increaseWallet($amount, $desc,$this->mainAccount->id,$car_id,'App\Models\Car',$user_id);
-            $this->accountingController->increaseWallet($amount, $desc,$this->inAccount->id,$car_id,'App\Models\Car',$user_id);
-            $this->accountingController->decreaseWallet($amount, $desc,$this->debtAccount->id,$car->id,'App\Models\Car',$user_id);
+
             $wallet->decrement('balance',$amount); 
         }
         if($car->pay_price-$car->paid_amount_pay==0){
@@ -422,9 +410,7 @@ class DashboardController extends Controller
         }
         if(($car->paid_amount??0)>0){
             $desc=' مرتج حذف سيارة'.$car->paid_amount;
-            $this->accountingController->increaseWallet($car->paid_amount, $desc,$this->mainAccount->id,$car->id,'App\Models\Car');
-            $this->accountingController->increaseWallet($car->paid_amount, $desc,$this->inAccount->id,$car->id,'App\Models\Car');
-            $this->accountingController->decreaseWallet($car->paid_amount, $desc,$this->outAccount->id,$car->id,'App\Models\Car' );
+     
 
         }
         if(($car->purchase_price??0)-($car->paid_amount_pay??0)>0){
@@ -446,5 +432,58 @@ class DashboardController extends Controller
 
         
     }
+
+    public function getCarHistory($carId)
+    {
+        try {
+            $history = CarFieldHistory::where('car_id', $carId)->get();
+
+            if ($history->isEmpty()) {
+                return response()->json(['message' => 'No history found for this car.'], 404);
+            }
+
+            return response()->json($history, 200);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Error fetching car history.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function restoreCarHistory($historyId)
+    {
+        try {
+            $history = CarFieldHistory::find($historyId);
+
+            if (!$history) {
+                return response()->json(['message' => 'History record not found.'], 404);
+            }
+
+            // Find the car and update the field to its old value
+            $car = Car::find($history->car_id);
+            if (!$car) {
+                return response()->json(['message' => 'Car not found.'], 404);
+            }
+
+            $field = $history->field;
+            $oldValue = $history->old_value;
+
+            // Update the car's field
+            $car->update([$field => $oldValue]);
+
+            // Log the restoration in the history table
+            CarFieldHistory::create([
+                'car_id' => $car->id,
+                'field' => $field,
+                'old_value' => $car->$field,
+                'new_value' => $oldValue,
+                'updated_by' => auth()->id(), // Replace with actual user ID if authentication is implemented
+            ]);
+
+            return response()->json(['message' => 'Field restored successfully.'], 200);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Error restoring history.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+
     
 }

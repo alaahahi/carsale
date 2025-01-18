@@ -10,12 +10,13 @@ import ModalAddToBox from "@/Components/ModalAddToBox.vue";
 import ModalSpanFromBox from "@/Components/ModalSpanFromBox.vue";
 import ModalAddTransfers from "@/Components/ModalAddTransfers.vue";
 import ModalAddCarPayment from "@/Components/ModalAddCarPayment.vue";
+import ModalCarHistory from "@/Components/ModalCarHistory.vue";
+
 import ModalDelCar from "@/Components/ModalDelCar.vue";
 import show from "@/Components/icon/show.vue";
 import imags from "@/Components/icon/imags.vue";
 import trash from "@/Components/icon/trash.vue";
 import edit from "@/Components/icon/edit.vue";
-import print from "@/Components/icon/print.vue";
 import pay from "@/Components/icon/pay.vue";
 
 import { TailwindPagination } from "laravel-vue-pagination";
@@ -41,6 +42,7 @@ let showModalToBox =  ref(false);
 let showModalFromBox =  ref(false);
 let showModalAddTransfers =  ref(false);
 let showModalAddCarPayment =  ref(false);
+let showModalCarHistory =  ref(false);
 let showModalDelCar =  ref(false);
 
 function openModalDelCar(form={}) {
@@ -97,6 +99,10 @@ function openAddCarPayment(form={}) {
 
     formData.value=form
     showModalAddCarPayment.value = true;
+}
+function openModalCarHistory(form={}) {
+formData.value=form
+showModalCarHistory.value = true;
 }
 const formData = ref({});
 const formGenExpenses = ref({});
@@ -335,16 +341,16 @@ getResultsCar();
         <template #header>
           </template>
     </ModalAddTransfers>
-    <ModalAddCarPayment
+    <ModalCarHistory
             :formData="formData"
-            :show="showModalAddCarPayment ? true : false"
+            :show="showModalCarHistory ? true : false"
             :user="user"
             @a="confirmAddPayment($event)"
-            @close="showModalAddCarPayment = false"
+            @close="showModalCarHistory = false"
             >
         <template #header>
           </template>
-    </ModalAddCarPayment>
+    </ModalCarHistory>
 
     <ModalDelCar
             :show="showModalDelCar ? true : false"
@@ -599,7 +605,14 @@ getResultsCar();
                                     >
                                       <trash />
                                     </button>
-
+                                    <button
+                                      tabIndex="1"
+                                      
+                                      class="px-2 py-1 text-base text-white mx-1 bg-green-500 rounded"
+                                      @click="openModalCarHistory(car)"
+                                    >
+                                      <show />
+                                    </button>
                                     </td>
                                 </tr>
                               </tbody>

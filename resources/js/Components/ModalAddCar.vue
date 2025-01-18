@@ -20,6 +20,10 @@ function VinApi (v){
     console.error(error);
   })
 }
+let showDubaiShipping = ref(false)
+let showDubaiExp = ref(false)
+let showErbilShipping = ref(false)
+let showErbilExp = ref(false)
 
 </script>
   <template>
@@ -144,6 +148,7 @@ function VinApi (v){
                   $t("dubai_expenses")
                 }}</label>
                 <input
+                  @focus="showDubaiShipping = false; showDubaiExp = true;showErbilShipping = false; showErbilExp = false;"
                   id="dubai_exp"
                   type="number"
                   class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
@@ -155,6 +160,7 @@ function VinApi (v){
                   $t("dubai_shipping")
                 }}</label>
                 <input
+                  @focus="showDubaiShipping = true; showDubaiExp = false;showErbilShipping = false; showErbilExp = false;"
                   id="dubai_shipping"
                   type="number"
                   class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
@@ -166,6 +172,7 @@ function VinApi (v){
                   $t("erbil_expenses")
                 }}</label>
                 <input
+                  @focus="showDubaiShipping = false; showDubaiExp = false;showErbilShipping = false; showErbilExp = true;"
                   id="erbil_exp"
                   type="number"
                   class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
@@ -177,10 +184,56 @@ function VinApi (v){
                   $t("erbil_shipping")
                 }}</label>
                 <input
+                  @focus="showDubaiShipping = false; showDubaiExp = false;showErbilShipping = true; showErbilExp = false;"
                   id="erbil_shipping"
                   type="number"
                   class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
                   v-model="formData.erbil_shipping"
+                />
+              </div>
+              <div className="mb-4 mx-5" v-if="showDubaiExp">
+                <label class="dark:text-gray-200" for="exp_note">
+                  وصف مصاريف دبي  
+                </label>
+                <input
+                  id="exp_note"
+                  type="text"
+                  class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
+                  v-model="formData.exp_note"
+                />
+              </div>
+              <div className="mb-4 mx-5" v-if="showDubaiShipping">
+                <label class="dark:text-gray-200" for="exp_note">
+                  وصف شحن دبي  
+                </label>
+                <input
+                  id="exp_note"
+                  type="text"
+                  class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
+                  v-model="formData.exp_note"
+                />
+              </div>
+
+              <div className="mb-4 mx-5" v-if="showErbilExp">
+                <label class="dark:text-gray-200" for="exp_note">
+                  وصف مصاريف اربيل  
+                </label>
+                <input
+                  id="exp_note"
+                  type="text"
+                  class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
+                  v-model="formData.exp_note"
+                />
+              </div>
+              <div className="mb-4 mx-5" v-if="showErbilShipping">
+                <label class="dark:text-gray-200" for="exp_note">
+                  وصف  شحن اربيل  
+                </label>
+                <input
+                  id="exp_note"
+                  type="text"
+                  class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
+                  v-model="formData.exp_note"
                 />
               </div>
               </div>

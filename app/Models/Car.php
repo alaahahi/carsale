@@ -92,4 +92,21 @@ class Car extends Model
         return $imageUrls;
     }
 
+    public function fieldHistories()
+    {
+        return $this->hasMany(CarFieldHistory::class, 'car_id');
+    }
+
+    // Method to log field changes
+    public function logFieldChange($field, $oldValue, $newValue, $userId = null)
+    {
+        CarFieldHistory::create([
+            'car_id' => $this->id,
+            'field' => $field,
+            'old_value' => $oldValue,
+            'new_value' => $newValue,
+            'user_id' => $userId,
+        ]);
+    }
+
   }
