@@ -190,7 +190,7 @@ let showClient =  ref(false);
                     @click="$emit('close');">{{ $t('cancel') }}</button>
                   </div>
                 <div class="basis-1/2 px-4">
-                  <button class="modal-default-button py-3  bg-rose-500 rounded col-6"  @click="$emit('a',formData);formData=''" :disabled="!(formData.paid_amount_pay && formData.pay_price )">{{ $t('yes') }}</button>
+                  <button class="modal-default-button py-3  bg-rose-500 rounded col-6"  @click="$emit('a',formData);formData=''" :disabled="!(formData.pay_price )">{{ $t('yes') }}</button>
                 </div>
 
             </div>

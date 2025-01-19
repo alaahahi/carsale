@@ -236,7 +236,7 @@ function confirmWithDrawFromBox(V) {
     });
 }
 function confirmAddPayment(V) {
-  fetch(`/addPaymentCar?car_id=${V.id}&user_id=${V.user_id}&amount=${V.amountPayment??0}&note=${V.notePayment??''}`)
+  fetch(`/addPaymentCar?car_id=${V.id}&user_id=${V.user_id}&pay_price=${V.pay_price??0}&amount=${V.amountPayment??0}&note=${V.notePayment??''}`)
     .then(() => {
       showModalFromBox.value = false;
       window.location.reload();
@@ -351,7 +351,16 @@ getResultsCar();
         <template #header>
           </template>
     </ModalCarHistory>
-
+    <ModalAddCarPayment
+            :formData="formData"
+            :show="showModalAddCarPayment ? true : false"
+            :user="user"
+            @a="confirmAddPayment($event)"
+            @close="showModalAddCarPayment = false"
+            >
+        <template #header>
+          </template>
+    </ModalAddCarPayment>
     <ModalDelCar
             :show="showModalDelCar ? true : false"
             :formData="formData"
@@ -558,7 +567,7 @@ getResultsCar();
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.erbil_exp }}</td> 
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.purchase_price + car.erbil_exp+car.erbil_shipping+car.dubai_exp+car.dubai_shipping }}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.pay_price }}</td> 
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.client?.name }}</td>
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.client?.name }} </td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.results != 0 ? car.pay_price-car.paid_amount_pay :'' }}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.results != 0  ? car.pay_price -(car.purchase_price + car.erbil_exp+car.erbil_shipping+car.dubai_exp+car.dubai_shipping):''   }}</td>
                                     <td className="border dark:border-gray-800 text-start px-2 py-2">

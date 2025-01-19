@@ -386,7 +386,11 @@ class DashboardController extends Controller
         $user_id = $_GET['user_id']??0;
         $car_id = $_GET['car_id']??0;
         $amount=$_GET['amount']??0;
+        $pay_price =$_GET['pay_price']??0;
         $car = Car::find($car_id);
+        if($pay_price){
+            $car->update(['pay_price'=>$pay_price]);
+        }
         $car->increment('paid_amount_pay',$amount);
         $wallet = Wallet::where('user_id',$car->client_id)->first();
         $desc=trans('text.addPayment').' '.$amount.'$'.' || '.$_GET['note']??'';
@@ -398,6 +402,13 @@ class DashboardController extends Controller
         if($car->pay_price-$car->paid_amount_pay==0){
             $car->increment('results'); 
         }
+        $desc=trans('text.payDone').' '.$amount;
+        $this->accountingController->increaseWallet($amount, $desc,$this->mainAccount->id,$car->id,'App\Models\Car');
+        $this->accountingController->increaseWallet($amount, $desc,$this->inAccount->id,$car->id,'App\Models\Car');
+        if($pay_price-$car->paid_amount_pay >= 0){
+            $this->accountingController->increaseWallet($amount, $desc,$this->debtAccount->id,$car->id,'App\Models\Car');
+        }
+
         return Response::json('ok', 200);    
     }
     public function DelCar(Request $request){
