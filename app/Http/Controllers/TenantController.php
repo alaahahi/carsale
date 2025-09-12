@@ -3,11 +3,6 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Tenant;
-use Stancl\Tenancy\Database\Models\Domain;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;
-use App\Helpers\SubdomainHelper;
 
 class TenantController extends Controller
 {
@@ -18,7 +13,83 @@ class TenantController extends Controller
      */
     public function index()
     {
-        $tenants = Tenant::with('domains')->paginate(10);
+        //
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function create()
+    {
+        //
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        //
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function show($id)
+    {
+        //
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function edit($id)
+    {
+        //
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, $id)
+    {
+        //
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy($id)
+    {
+        //
+    }
+
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index()
+    {
+        $tenants = \App\Models\Tenant::with('domains')->paginate(10);
         return view('tenants.index', compact('tenants'));
     }
 
@@ -52,8 +123,8 @@ class TenantController extends Controller
 
         DB::transaction(function () use ($request) {
             // Create tenant
-            $tenant = Tenant::create([
-                'id' => Str::uuid(),
+            $tenant = \App\Models\Tenant::create([
+                'id' => \Illuminate\Support\Str::uuid(),
                 'name' => $request->name,
                 'email' => $request->email,
                 'phone' => $request->phone,
@@ -65,19 +136,18 @@ class TenantController extends Controller
             ]);
 
             // Create domain
-            Domain::create([
+            \Stancl\Tenancy\Database\Models\Domain::create([
                 'domain' => $request->domain,
                 'tenant_id' => $tenant->id,
             ]);
 
             // Create tenant database using artisan command
-            \Artisan::call('tenants:run', [
+            \Artisan::call('tenants:migrate', [
                 '--tenants' => $tenant->id,
-                '--' => 'migrate',
             ]);
             
             // Clear cache
-            SubdomainHelper::clearTenantCache($tenant->id, $request->domain);
+            \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $request->domain);
         });
 
         return redirect()->route('tenants.index')
@@ -92,7 +162,7 @@ class TenantController extends Controller
      */
     public function show($id)
     {
-        $tenant = Tenant::with('domains')->findOrFail($id);
+        $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
         return view('tenants.show', compact('tenant'));
     }
 
@@ -104,7 +174,7 @@ class TenantController extends Controller
      */
     public function edit($id)
     {
-        $tenant = Tenant::with('domains')->findOrFail($id);
+        $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
         return view('tenants.edit', compact('tenant'));
     }
 
@@ -117,7 +187,7 @@ class TenantController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $tenant = Tenant::findOrFail($id);
+        $tenant = \App\Models\Tenant::findOrFail($id);
         
         $request->validate([
             'name' => 'required|string|max:255',
@@ -144,12 +214,14 @@ class TenantController extends Controller
 
             // Update domain
             $domain = $tenant->domains->first();
-            $oldDomain = $domain->domain;
-            $domain->update(['domain' => $request->domain]);
-            
-            // Clear cache
-            SubdomainHelper::clearTenantCache($tenant->id, $oldDomain);
-            SubdomainHelper::clearTenantCache($tenant->id, $request->domain);
+            if ($domain) {
+                $oldDomain = $domain->domain;
+                $domain->update(['domain' => $request->domain]);
+                
+                // Clear cache for old and new domains
+                \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $oldDomain);
+                \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $request->domain);
+            }
         });
 
         return redirect()->route('tenants.index')
@@ -164,18 +236,14 @@ class TenantController extends Controller
      */
     public function destroy($id)
     {
-        $tenant = Tenant::findOrFail($id);
+        $tenant = \App\Models\Tenant::findOrFail($id);
         
-        DB::transaction(function () use ($tenant) {
-            // Clear cache before deletion
-            SubdomainHelper::clearTenantCache($tenant->id);
-            
-            // Delete tenant database - the database will be deleted automatically when tenant is deleted
-            // No need for separate delete command
-            
-            // Delete tenant and its domains
-            $tenant->delete();
-        });
+        // Clear cache
+        foreach ($tenant->domains as $domain) {
+            \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $domain->domain);
+        }
+        
+        $tenant->delete();
 
         return redirect()->route('tenants.index')
             ->with('success', 'تم حذف المستأجر بنجاح');
@@ -183,14 +251,17 @@ class TenantController extends Controller
 
     /**
      * Suspend tenant
+     *
+     * @param  string  $id
+     * @return \Illuminate\Http\Response
      */
     public function suspend($id)
     {
-        $tenant = Tenant::findOrFail($id);
+        $tenant = \App\Models\Tenant::findOrFail($id);
         $tenant->update(['status' => 'suspended']);
         
         // Clear cache
-        SubdomainHelper::clearTenantCache($tenant->id);
+        \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id);
         
         return redirect()->route('tenants.index')
             ->with('success', 'تم تعليق المستأجر بنجاح');
@@ -198,120 +269,192 @@ class TenantController extends Controller
 
     /**
      * Activate tenant
+     *
+     * @param  string  $id
+     * @return \Illuminate\Http\Response
      */
     public function activate($id)
     {
-        $tenant = Tenant::findOrFail($id);
+        $tenant = \App\Models\Tenant::findOrFail($id);
         $tenant->update(['status' => 'active']);
         
         // Clear cache
-        SubdomainHelper::clearTenantCache($tenant->id);
+        \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id);
         
         return redirect()->route('tenants.index')
             ->with('success', 'تم تفعيل المستأجر بنجاح');
     }
-    
+
     /**
      * Add domain to tenant
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string  $id
+     * @return \Illuminate\Http\Response
      */
     public function addDomain(Request $request, $id)
     {
-        $tenant = Tenant::findOrFail($id);
+        $tenant = \App\Models\Tenant::findOrFail($id);
         
         $request->validate([
             'domain' => 'required|string|max:255|unique:domains,domain',
         ]);
-        
-        $domain = Domain::create([
+
+        \Stancl\Tenancy\Database\Models\Domain::create([
             'domain' => $request->domain,
             'tenant_id' => $tenant->id,
         ]);
-        
+
         // Clear cache
-        SubdomainHelper::clearTenantCache($tenant->id, $request->domain);
-        
-        return redirect()->route('tenants.show', $id)
+        \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $request->domain);
+
+        return redirect()->route('tenants.show', $tenant->id)
             ->with('success', 'تم إضافة الدومين بنجاح');
     }
-    
+
     /**
      * Remove domain from tenant
+     *
+     * @param  string  $id
+     * @param  string  $domainId
+     * @return \Illuminate\Http\Response
      */
     public function removeDomain($id, $domainId)
     {
-        $tenant = Tenant::findOrFail($id);
-        $domain = Domain::where('id', $domainId)
-            ->where('tenant_id', $tenant->id)
-            ->firstOrFail();
-        
-        $domainName = $domain->domain;
-        $domain->delete();
+        $tenant = \App\Models\Tenant::findOrFail($id);
+        $domain = \Stancl\Tenancy\Database\Models\Domain::findOrFail($domainId);
         
         // Clear cache
-        SubdomainHelper::clearTenantCache($tenant->id, $domainName);
+        \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $domain->domain);
         
-        return redirect()->route('tenants.show', $id)
+        $domain->delete();
+
+        return redirect()->route('tenants.show', $tenant->id)
             ->with('success', 'تم حذف الدومين بنجاح');
     }
-    
+
     /**
      * Update domain
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string  $id
+     * @param  string  $domainId
+     * @return \Illuminate\Http\Response
      */
     public function updateDomain(Request $request, $id, $domainId)
     {
-        $tenant = Tenant::findOrFail($id);
-        $domain = Domain::where('id', $domainId)
-            ->where('tenant_id', $tenant->id)
-            ->firstOrFail();
+        $tenant = \App\Models\Tenant::findOrFail($id);
+        $domain = \Stancl\Tenancy\Database\Models\Domain::findOrFail($domainId);
         
         $request->validate([
             'domain' => 'required|string|max:255|unique:domains,domain,' . $domainId,
         ]);
-        
+
         $oldDomain = $domain->domain;
         $domain->update(['domain' => $request->domain]);
-        
-        // Clear cache
-        SubdomainHelper::clearTenantCache($tenant->id, $oldDomain);
-        SubdomainHelper::clearTenantCache($tenant->id, $request->domain);
-        
-        return redirect()->route('tenants.show', $id)
+
+        // Clear cache for old and new domains
+        \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $oldDomain);
+        \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $request->domain);
+
+        return redirect()->route('tenants.show', $tenant->id)
             ->with('success', 'تم تحديث الدومين بنجاح');
     }
-    
+
     /**
      * Clear tenant cache
+     *
+     * @param  string  $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function clearCache($id)
     {
-        $tenant = Tenant::findOrFail($id);
-        SubdomainHelper::clearTenantCache($tenant->id);
-        
-        return redirect()->route('tenants.show', $id)
-            ->with('success', 'تم مسح الكاش بنجاح');
+        try {
+            $tenant = \App\Models\Tenant::findOrFail($id);
+            
+            foreach ($tenant->domains as $domain) {
+                \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $domain->domain);
+            }
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'تم مسح كاش المستأجر بنجاح'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'حدث خطأ أثناء مسح الكاش: ' . $e->getMessage()
+            ], 500);
+        }
     }
-    
+
     /**
-     * Get tenant by subdomain (API)
+     * Clear all tenant cache
+     *
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function getBySubdomain(Request $request)
+    public function clearAllCache()
     {
-        $subdomain = $request->input('subdomain');
-        
-        if (!$subdomain) {
-            return response()->json(['error' => 'Subdomain is required'], 400);
+        try {
+            \App\Helpers\SubdomainHelper::clearAllTenantCache();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'تم مسح جميع الكاش بنجاح'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'حدث خطأ أثناء مسح الكاش: ' . $e->getMessage()
+            ], 500);
         }
-        
-        $tenant = SubdomainHelper::getTenantBySubdomain($subdomain);
-        
-        if (!$tenant) {
-            return response()->json(['error' => 'Tenant not found'], 404);
+    }
+
+    /**
+     * Check database connection for a specific tenant
+     *
+     * @param  string  $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function checkDatabaseConnection($id)
+    {
+        try {
+            $tenant = \App\Models\Tenant::findOrFail($id);
+            
+            // Initialize tenancy for this tenant
+            tenancy()->initialize($tenant);
+            
+            // Get current database connection info
+            $connection = DB::connection();
+            $databaseName = $connection->getDatabaseName();
+            $host = $connection->getConfig('host');
+            $port = $connection->getConfig('port');
+            
+            // Test the connection
+            $pdo = $connection->getPdo();
+            $tables = $connection->select('SHOW TABLES');
+            
+            return response()->json([
+                'success' => true,
+                'tenant' => [
+                    'id' => $tenant->id,
+                    'name' => $tenant->name,
+                    'domains' => $tenant->domains->pluck('domain')
+                ],
+                'database' => [
+                    'name' => $databaseName,
+                    'host' => $host,
+                    'port' => $port,
+                    'connection_active' => true,
+                    'tables_count' => count($tables)
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'خطأ في الاتصال بقاعدة البيانات: ' . $e->getMessage()
+            ], 500);
         }
-        
-        return response()->json([
-            'tenant' => $tenant,
-            'domains' => $tenant->domains,
-        ]);
     }
 }
-

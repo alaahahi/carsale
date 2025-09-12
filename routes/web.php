@@ -35,6 +35,70 @@ Route::get('/tenant-info', [MainController::class, 'showTenantBySubdomain'])->na
 Route::get('/admin', [MainController::class, 'admin'])->name('main.admin');
 Route::get('/dashboard', [MainController::class, 'dashboard'])->name('main.dashboard');
 
+// Database info route (standalone)
+Route::get('admin/tenants/database-info', function() {
+    try {
+        $info = [];
+        
+        // Central database info
+        $centralConnection = DB::connection();
+        $info['central'] = [
+            'name' => $centralConnection->getDatabaseName(),
+            'host' => $centralConnection->getConfig('host'),
+            'port' => $centralConnection->getConfig('port'),
+            'driver' => $centralConnection->getConfig('driver'),
+            'connection_active' => true
+        ];
+        
+        // Get all tenants and their database info
+        $tenants = \App\Models\Tenant::with('domains')->get();
+        $info['tenants'] = [];
+        
+        foreach ($tenants as $tenant) {
+            try {
+                // Initialize tenancy for this tenant
+                tenancy()->initialize($tenant);
+                
+                $tenantConnection = DB::connection();
+                $info['tenants'][] = [
+                    'id' => $tenant->id,
+                    'name' => $tenant->name,
+                    'domains' => $tenant->domains->pluck('domain'),
+                    'database' => [
+                        'name' => $tenantConnection->getDatabaseName(),
+                        'host' => $tenantConnection->getConfig('host'),
+                        'port' => $tenantConnection->getConfig('port'),
+                        'driver' => $tenantConnection->getConfig('driver'),
+                        'connection_active' => true
+                    ]
+                ];
+            } catch (\Exception $e) {
+                $info['tenants'][] = [
+                    'id' => $tenant->id,
+                    'name' => $tenant->name,
+                    'domains' => $tenant->domains->pluck('domain'),
+                    'database' => [
+                        'name' => 'car_tenant_' . $tenant->id,
+                        'connection_active' => false,
+                        'error' => $e->getMessage()
+                    ]
+                ];
+            }
+        }
+        
+        return response()->json([
+            'success' => true,
+            'data' => $info
+        ]);
+        
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'خطأ في الحصول على معلومات قاعدة البيانات: ' . $e->getMessage()
+        ], 500);
+    }
+})->name('tenants.database-info');
+
 // Direct admin access routes (without central middleware)
 Route::group(['prefix' => 'admin'], function () {
     Route::get('/', function () {
@@ -48,6 +112,8 @@ Route::group(['prefix' => 'admin'], function () {
     Route::delete('tenants/{id}/domains/{domainId}', [TenantController::class, 'removeDomain'])->name('tenants.domains.remove');
     Route::put('tenants/{id}/domains/{domainId}', [TenantController::class, 'updateDomain'])->name('tenants.domains.update');
     Route::post('tenants/{id}/clear-cache', [TenantController::class, 'clearCache'])->name('tenants.clear-cache');
+    Route::post('tenants/clear-all-cache', [TenantController::class, 'clearAllCache'])->name('tenants.clear-all-cache');
+    Route::get('tenants/{id}/check-database', [TenantController::class, 'checkDatabaseConnection'])->name('tenants.check-database');
 });
 
 // Central routes (admin panel) - for subdomain access
@@ -59,6 +125,9 @@ Route::group(['middleware' => ['central'], 'prefix' => 'central-admin'], functio
     Route::delete('tenants/{id}/domains/{domainId}', [TenantController::class, 'removeDomain'])->name('central.tenants.domains.remove');
     Route::put('tenants/{id}/domains/{domainId}', [TenantController::class, 'updateDomain'])->name('central.tenants.domains.update');
     Route::post('tenants/{id}/clear-cache', [TenantController::class, 'clearCache'])->name('central.tenants.clear-cache');
+    Route::post('tenants/clear-all-cache', [TenantController::class, 'clearAllCache'])->name('central.tenants.clear-all-cache');
+    Route::get('tenants/{id}/check-database', [TenantController::class, 'checkDatabaseConnection'])->name('central.tenants.check-database');
+    Route::get('tenants/database-info', [TenantController::class, 'getDatabaseInfo'])->name('central.tenants.database-info');
 });
 
 // Tenant routes

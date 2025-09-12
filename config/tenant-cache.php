@@ -20,7 +20,7 @@ return [
     | supports tags for better cache management.
     |
     */
-    'store' => env('TENANT_CACHE_STORE', 'redis'),
+    'store' => env('TENANT_CACHE_STORE', 'file'),
 
     /*
     |--------------------------------------------------------------------------
