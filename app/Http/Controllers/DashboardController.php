@@ -6,7 +6,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Http;
-use App\Models\Info;
 use App\Models\User;
 use App\Models\Car;
 use App\Models\Company;

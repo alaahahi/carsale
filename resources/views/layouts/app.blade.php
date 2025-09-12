@@ -84,7 +84,9 @@
 
         <!-- Page Content -->
         <main class="py-8">
-            @yield('content')
+            <div id="app" data-page="{{ json_encode($page ?? []) }}">
+                @yield('content')
+            </div>
         </main>
     </div>
     

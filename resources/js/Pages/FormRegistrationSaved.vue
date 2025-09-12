@@ -11,7 +11,7 @@ const searchTerm = ref('');
 const showReceiveBtn = ref(0);
 const getResults = async (page = 1) => {
   const response = await fetch(
-    `/getIndexFormRegistrationCompleted?page=${page}&user_id=${user_id.value}`
+    `/getIndexCar?page=${page}&user_id=${user_id.value}`
   );
   laravelData.value = await response.json();
 };

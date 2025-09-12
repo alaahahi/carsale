@@ -22,16 +22,31 @@ const i18n = createI18n({
   },
 });
 
-createInertiaApp({
-    title: (title) => `${title} - ${appName}`,
-    resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
-    setup({ el, app, props, plugin }) {
-        return createApp({ render: () => h(app, props) })
-            .use(plugin)
-            .use(i18n)
-            .use(ZiggyVue, Ziggy)
-            .mount(el);
-    },
-});
+// التحقق من وجود عنصر #app مع data-page صحيح قبل تهيئة Inertia
+const appElement = document.getElementById('app');
+if (appElement && appElement.dataset.page) {
+    try {
+        const pageData = JSON.parse(appElement.dataset.page);
+        if (pageData && pageData.component) {
+            createInertiaApp({
+                title: (title) => `${title} - ${appName}`,
+                resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
+                setup({ el, app, props, plugin }) {
+                    return createApp({ render: () => h(app, props) })
+                        .use(plugin)
+                        .use(i18n)
+                        .use(ZiggyVue, Ziggy)
+                        .mount(el);
+                },
+            });
 
-InertiaProgress.init({ color: '#4B5563' });
+            InertiaProgress.init({ color: '#4B5563' });
+        } else {
+            console.log('No valid Inertia page data found, skipping Inertia initialization');
+        }
+    } catch (error) {
+        console.log('Invalid Inertia page data, skipping Inertia initialization:', error.message);
+    }
+} else {
+    console.log('Inertia app element not found or no page data, skipping Inertia initialization');
+}

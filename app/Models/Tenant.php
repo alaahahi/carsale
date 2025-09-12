@@ -56,6 +56,30 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     }
 
     /**
+     * Get the database configuration for this tenant (one-to-one relationship)
+     */
+    public function databaseConfig()
+    {
+        return $this->hasOne(TenantDatabaseConfig::class, 'tenant_id');
+    }
+
+    /**
+     * Get the database configurations for this tenant (keeping for backward compatibility)
+     */
+    public function databaseConfigs()
+    {
+        return $this->hasMany(TenantDatabaseConfig::class, 'tenant_id');
+    }
+
+    /**
+     * Get the active database configuration for this tenant
+     */
+    public function activeDatabaseConfig()
+    {
+        return $this->hasOne(TenantDatabaseConfig::class, 'tenant_id')->where('is_active', true);
+    }
+
+    /**
      * Check if tenant is active
      */
     public function isActive()
@@ -139,6 +163,115 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             
             config(['database.default' => $originalConnection]);
             return $result;
+        }
+    }
+
+    /**
+     * Create database with custom configuration
+     */
+    public function createDatabaseWithConfig($config = null)
+    {
+        try {
+            if ($config) {
+                // Use custom configuration
+                $connectionName = 'custom_tenant_' . $this->id;
+                $connectionInfo = $config->getConnectionInfo();
+                
+                config([
+                    "database.connections.{$connectionName}" => $connectionInfo
+                ]);
+                
+                // Create database using custom connection
+                $connection = \DB::connection($connectionName);
+                $connection->statement("CREATE DATABASE IF NOT EXISTS `{$config->database_name}`");
+                
+                return true;
+            } else {
+                // Use default tenancy configuration
+                return $this->createDatabase();
+            }
+        } catch (\Exception $e) {
+            throw new \Exception("فشل في إنشاء قاعدة البيانات: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Run migrations with custom configuration
+     */
+    public function runMigrationsWithConfig($config = null, $force = false)
+    {
+        try {
+            if ($config) {
+                // Use custom configuration for migrations
+                $connectionName = 'migration_tenant_' . $this->id;
+                $connectionInfo = $config->getConnectionInfo();
+                
+                config([
+                    "database.connections.{$connectionName}" => $connectionInfo
+                ]);
+                
+                // Run migrations using custom connection
+                \Artisan::call('migrate', [
+                    '--database' => $connectionName,
+                    '--force' => $force,
+                ]);
+                
+                return true;
+            } else {
+                // Use default tenancy migrations
+                \Artisan::call('tenants:migrate', [
+                    '--tenants' => $this->id,
+                ]);
+                
+                return true;
+            }
+        } catch (\Exception $e) {
+            throw new \Exception("فشل في تشغيل المايكريشن: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Test database connection with custom configuration
+     */
+    public function testDatabaseConnection($config = null)
+    {
+        try {
+            if ($config) {
+                return $config->testConnection();
+            } else {
+                // Test default tenant connection
+                $this->run(function() {
+                    \DB::connection()->getPdo();
+                });
+                return true;
+            }
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get database connection info
+     */
+    public function getDatabaseInfo($config = null)
+    {
+        try {
+            if ($config) {
+                return $config->getSafeConnectionInfo();
+            } else {
+                $this->run(function() use (&$info) {
+                    $connection = \DB::connection();
+                    $info = [
+                        'database' => $connection->getDatabaseName(),
+                        'host' => $connection->getConfig('host'),
+                        'port' => $connection->getConfig('port'),
+                        'driver' => $connection->getConfig('driver'),
+                    ];
+                });
+                return $info ?? [];
+            }
+        } catch (\Exception $e) {
+            return [];
         }
     }
 }

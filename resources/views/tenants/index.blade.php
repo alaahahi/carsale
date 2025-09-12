@@ -25,6 +25,10 @@
                     <i class="fas fa-database mr-2"></i>
                     معلومات قاعدة البيانات
                 </button>
+                <a href="{{ route('tenant-database-configs.index') }}" class="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex items-center justify-center">
+                    <i class="fas fa-cogs mr-2"></i>
+                    إدارة قواعد البيانات
+                </a>
             </div>
         </div>
     </div>
@@ -189,6 +193,15 @@
                                     <button onclick="checkTenantDatabase('{{ $tenant->id }}')" class="text-green-600 hover:text-green-900 transition-colors" title="فحص قاعدة البيانات">
                                         <i class="fas fa-database"></i>
                                     </button>
+                                    @if($tenant->databaseConfig)
+                                        <a href="{{ route('tenant-database-configs.show', $tenant->databaseConfig) }}" class="text-orange-600 hover:text-orange-900 transition-colors" title="عرض إعدادات قاعدة البيانات">
+                                            <i class="fas fa-cogs"></i>
+                                        </a>
+                                    @else
+                                        <a href="{{ route('tenants.create-database-config', $tenant->id) }}" class="text-blue-600 hover:text-blue-900 transition-colors" title="إضافة إعدادات قاعدة البيانات">
+                                            <i class="fas fa-plus"></i>
+                                        </a>
+                                    @endif
                                     
                                     @if($tenant->status === 'active')
                                         <form method="POST" action="{{ route('tenants.suspend', $tenant->id) }}" class="inline">

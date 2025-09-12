@@ -49,8 +49,8 @@ const switchLocale = (locale) => {
               </div>
               <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
                 <NavLink
-                  :href="route('FormRegistrationCompleted')"
-                  :active="route().current('FormRegistrationCompleted')"
+                  :href="route('getIndexCar')"
+                  :active="route().current('getIndexCar')"
                 >
                   {{ $t("allCars") }}
                 </NavLink>

@@ -3,77 +3,136 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\App;
+use Inertia\Inertia;
+use App\Models\User;
+use App\Models\SystemConfig;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Validator;
+use App\Http\Requests\Auth\LoginRequest;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\ImportInfo;
 use App\Exports\ExportInfo;
-use App\Models\Car;
-use App\Models\User;
-use App\Imports\CarDataImport;
 
 class InfoController extends Controller
 {
-    public function importView(Request $request){
-        return view('importFile');
+    public function __construct()
+    {
+        $this->url = env('FRONTEND_URL');
     }
- 
-    public function exportInfos(Request $request){
-        return Excel::download(new ExportInfo, 'Infos.xlsx');
+
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index()
+    {
+        // Info functionality removed - placeholder for future implementation
+        return Inertia::render('Info/Index', ['url' => $this->url, 'message' => 'Info functionality temporarily removed']);
     }
+
+    /**
+     * Show the form for creating a new resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function create()
+    {
+        // Info functionality removed - placeholder for future implementation
+        return Inertia::render('Info/Create', ['url' => $this->url, 'message' => 'Info functionality temporarily removed']);
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        // Info functionality removed - placeholder for future implementation
+        return Response::json(['message' => 'Info functionality temporarily removed'], 200);
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function show($id)
+    {
+        // Info functionality removed - placeholder for future implementation
+        return Response::json(['message' => 'Info functionality temporarily removed'], 200);
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function edit($id)
+    {
+        // Info functionality removed - placeholder for future implementation
+        return Inertia::render('Info/Edit', ['url' => $this->url, 'id' => $id, 'message' => 'Info functionality temporarily removed']);
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, $id)
+    {
+        // Info functionality removed - placeholder for future implementation
+        return Response::json(['message' => 'Info functionality temporarily removed'], 200);
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy($id)
+    {
+        // Info functionality removed - placeholder for future implementation
+        return Response::json(['message' => 'Info functionality temporarily removed'], 200);
+    }
+
+    /**
+     * Show upload form for importing cars
+     */
     public function showUploadForm()
     {
-        return view('car_import');
+        // Info functionality removed - placeholder for future implementation
+        return Inertia::render('Info/UploadForm', ['url' => $this->url, 'message' => 'Info functionality temporarily removed']);
     }
 
+    /**
+     * Import cars from Excel file
+     */
     public function import(Request $request)
     {
-        $request->validate([
-            'file' => 'required|mimes:xlsx,xls',
-        ]);
-
-        try {
-            Excel::import(new CarDataImport, $request->file('file'));
-            return redirect()->back()->with('success', 'Excel data imported successfully.');
-        } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Error importing data: ' . $e->getMessage());
-        }
+        // Info functionality removed - placeholder for future implementation
+        return Response::json(['message' => 'Info functionality temporarily removed'], 200);
     }
 
-    public function collection(Collection $rows)
+    /**
+     * Export infos to Excel
+     */
+    public function exportInfos(Request $request)
     {
-        foreach ($rows as $row) {
-            if ($row[0] == 'no') {
-                // Skip header row
-                continue;
-            }
-
-            $pin = $row[1];
-            $name = $row[2] +' '+$row[10];
-            $color = $row[3];
-            $model = $row[4] ;
-            $purchasePrice = $row[5];
-            $dubaiShipping = $row[6];
-            $dubaiExp = $row[7];
-            $erbilShipping = $row[8];
-            $erbilExp = $row[9];
-
-
-
-            // Update the car based on the pin
-            Car::updateOrCreate(
-                ['pin' => $pin],
-                [
-                    'name'=>$name,
-                    'model'=>$model,
-                    'color'=>$color,
-                    'source'=>$source,
-                    'purchase_price' => $purchasePrice,
-                    'dubai_shipping' => $dubaiShipping,
-                    'dubai_exp' => $dubaiExp,
-                    'erbil_shipping' => $erbilShipping,
-                    'erbil_exp' => $erbilExp,
-
-                ]
-            );
-        }
+        // Info functionality removed - placeholder for future implementation
+        return Response::json(['message' => 'Info functionality temporarily removed'], 200);
     }
 }

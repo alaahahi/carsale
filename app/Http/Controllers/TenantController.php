@@ -12,7 +12,7 @@ class TenantController extends Controller
  
     public function index()
     {
-        $tenants = \App\Models\Tenant::with('domains')->paginate(10);
+        $tenants = \App\Models\Tenant::with(['domains', 'databaseConfig'])->paginate(10);
         return view('tenants.index', compact('tenants'));
     }
 
@@ -42,6 +42,19 @@ class TenantController extends Controller
             'address' => 'nullable|string',
             'subscription_plan' => 'required|in:basic,premium,enterprise',
             'subscription_expires_at' => 'nullable|date|after:now',
+            // Database configuration validation
+            'database_creation_method' => 'required|in:auto,manual',
+            'db_subdomain' => 'required_if:database_creation_method,manual|string|max:255|unique:tenant_database_configs,subdomain',
+            'db_driver' => 'required_if:database_creation_method,manual|in:mysql,pgsql,sqlite',
+            'db_host' => 'required_if:database_creation_method,manual|string|max:255',
+            'db_port' => 'required_if:database_creation_method,manual|integer|min:1|max:65535',
+            'db_name' => 'required_if:database_creation_method,manual|string|max:255',
+            'db_username' => 'required_if:database_creation_method,manual|string|max:255',
+            'db_password' => 'required_if:database_creation_method,manual|string|max:255',
+            'db_charset' => 'nullable|string|max:255',
+            'db_collation' => 'nullable|string|max:255',
+            'run_migrations' => 'boolean',
+            'force_migrations' => 'boolean',
         ]);
 
         DB::transaction(function () use ($request) {
@@ -64,17 +77,65 @@ class TenantController extends Controller
                 'tenant_id' => $tenant->id,
             ]);
 
-            // Create tenant database using artisan command
-            \Artisan::call('tenants:migrate', [
-                '--tenants' => $tenant->id,
-            ]);
+            // Handle database configuration (one-to-one relationship)
+            $dbConfig = null;
+            if ($request->database_creation_method === 'manual') {
+                // Create custom database configuration
+                $dbConfig = \App\Models\TenantDatabaseConfig::create([
+                    'tenant_id' => $tenant->id,
+                    'subdomain' => $request->db_subdomain,
+                    'driver' => $request->db_driver,
+                    'host' => $request->db_host,
+                    'port' => $request->db_port,
+                    'database_name' => $request->db_name,
+                    'username' => $request->db_username,
+                    'password' => $request->db_password,
+                    'charset' => $request->db_charset ?? 'utf8mb4',
+                    'collation' => $request->db_collation ?? 'utf8mb4_unicode_ci',
+                    'is_active' => true,
+                    'description' => "إعداد قاعدة البيانات للمستأجر: {$tenant->name}",
+                ]);
+
+                // Test connection
+                if (!$dbConfig->testConnection()) {
+                    throw new \Exception('فشل في اختبار الاتصال بقاعدة البيانات المخصصة');
+                }
+
+                // Create database with custom configuration
+                $tenant->createDatabaseWithConfig($dbConfig);
+            } else {
+                // Use default tenancy configuration
+                $tenant->createDatabase();
+                
+                // Create default database configuration
+                $dbConfig = \App\Models\TenantDatabaseConfig::create([
+                    'tenant_id' => $tenant->id,
+                    'subdomain' => 'aindubai_' . $tenant->id,
+                    'driver' => 'mysql',
+                    'host' => config('database.connections.mysql.host'),
+                    'port' => config('database.connections.mysql.port'),
+                    'database_name' => 'aindubai_' . $tenant->id,
+                    'username' => config('database.connections.mysql.username'),
+                    'password' => config('database.connections.mysql.password'),
+                    'charset' => 'utf8mb4',
+                    'collation' => 'utf8mb4_unicode_ci',
+                    'is_active' => true,
+                    'description' => "إعداد قاعدة البيانات الافتراضي للمستأجر: {$tenant->name}",
+                ]);
+            }
+
+            // Run migrations if requested
+            if ($request->run_migrations) {
+                $force = $request->force_migrations ?? false;
+                $tenant->runMigrationsWithConfig($dbConfig, $force);
+            }
             
             // Clear cache
             \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $request->domain);
         });
 
         return redirect()->route('tenants.index')
-            ->with('success', 'تم إنشاء المستأجر بنجاح');
+            ->with('success', 'تم إنشاء المستأجر بنجاح مع إعدادات قاعدة البيانات');
     }
 
     /**
@@ -85,8 +146,117 @@ class TenantController extends Controller
      */
     public function show($id)
     {
-        $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
+        $tenant = \App\Models\Tenant::with(['domains', 'databaseConfig'])->findOrFail($id);
         return view('tenants.show', compact('tenant'));
+    }
+
+    /**
+     * Show tenant database configurations
+     */
+    public function databaseConfigs($id)
+    {
+        $tenant = \App\Models\Tenant::with(['domains', 'databaseConfigs'])->findOrFail($id);
+        $configs = $tenant->databaseConfigs()->paginate(10);
+        
+        return view('tenants.database-configs', compact('tenant', 'configs'));
+    }
+
+    /**
+     * Create database configuration for tenant
+     */
+    public function createDatabaseConfig($id)
+    {
+        $tenant = \App\Models\Tenant::findOrFail($id);
+        return view('tenants.create-database-config', compact('tenant'));
+    }
+
+    /**
+     * Store database configuration for tenant
+     */
+    public function storeDatabaseConfig(Request $request, $id)
+    {
+        $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
+        
+        // استخراج الـ subdomain تلقائياً من دومين المستأجر
+        $subdomain = $this->extractSubdomainFromTenantDomains($tenant);
+        
+        if (!$subdomain) {
+            return redirect()->back()
+                ->withErrors(['subdomain' => 'لا يمكن استخراج subdomain من دومينات المستأجر. تأكد من وجود دومينات صحيحة.'])
+                ->withInput();
+        }
+        
+        $request->validate([
+            'driver' => 'required|string|in:mysql,pgsql,sqlite',
+            'host' => 'required|string|max:255',
+            'port' => 'required|integer|min:1|max:65535',
+            'database_name' => 'required|string|max:255',
+            'username' => 'required|string|max:255',
+            'password' => 'required|string|max:255',
+            'charset' => 'nullable|string|max:255',
+            'collation' => 'nullable|string|max:255',
+            'is_active' => 'boolean',
+            'description' => 'nullable|string',
+        ]);
+
+        // التحقق من عدم وجود إعدادات قاعدة بيانات أخرى للمستأجر
+        $existingConfig = \App\Models\TenantDatabaseConfig::where('tenant_id', $tenant->id)->first();
+        if ($existingConfig) {
+            return redirect()->back()
+                ->withErrors(['tenant' => 'يوجد بالفعل إعدادات قاعدة بيانات لهذا المستأجر. يمكنك تعديل الإعدادات الموجودة.'])
+                ->withInput();
+        }
+
+        // التحقق من عدم وجود subdomain مكرر
+        $existingSubdomain = \App\Models\TenantDatabaseConfig::where('subdomain', $subdomain)->first();
+        if ($existingSubdomain) {
+            return redirect()->back()
+                ->withErrors(['subdomain' => 'هذا الـ subdomain مستخدم بالفعل من قبل مستأجر آخر.'])
+                ->withInput();
+        }
+
+        $config = \App\Models\TenantDatabaseConfig::create([
+            'tenant_id' => $tenant->id,
+            'subdomain' => $subdomain,
+            'driver' => $request->driver,
+            'host' => $request->host,
+            'port' => $request->port,
+            'database_name' => $request->database_name,
+            'username' => $request->username,
+            'password' => $request->password,
+            'charset' => $request->charset ?? 'utf8mb4',
+            'collation' => $request->collation ?? 'utf8mb4_unicode_ci',
+            'is_active' => $request->is_active ?? true,
+            'description' => $request->description ?? "إعداد قاعدة البيانات للمستأجر: {$tenant->name}",
+        ]);
+
+        // مسح الكاش للمستأجر والدومينات
+        foreach ($tenant->domains as $domain) {
+            \App\Helpers\SubdomainHelper::clearTenantDatabaseConfigCache($tenant->id, $domain->domain, $subdomain);
+        }
+
+        // Test connection
+        if ($config->testConnection()) {
+            return redirect()->route('tenants.database-configs', $tenant->id)
+                ->with('success', 'تم إنشاء إعدادات قاعدة البيانات بنجاح وتم اختبار الاتصال');
+        } else {
+            return redirect()->route('tenants.database-configs', $tenant->id)
+                ->with('warning', 'تم إنشاء إعدادات قاعدة البيانات ولكن فشل اختبار الاتصال');
+        }
+    }
+    
+    /**
+     * استخراج الـ subdomain من دومينات المستأجر
+     */
+    private function extractSubdomainFromTenantDomains($tenant)
+    {
+        foreach ($tenant->domains as $domain) {
+            $parts = explode('.', $domain->domain);
+            if (count($parts) > 2) {
+                return $parts[0]; // الجزء الأول هو الـ subdomain
+            }
+        }
+        return null;
     }
 
     /**
@@ -139,7 +309,7 @@ class TenantController extends Controller
             $domain = $tenant->domains->first();
             if ($domain) {
                 $oldDomain = $domain->domain;
-                $domain->update(['domain' => $request->domain]);
+            $domain->update(['domain' => $request->domain]);
                 
                 // Clear cache for old and new domains
                 \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $oldDomain);
@@ -166,7 +336,7 @@ class TenantController extends Controller
             \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $domain->domain);
         }
         
-        $tenant->delete();
+            $tenant->delete();
 
         return redirect()->route('tenants.index')
             ->with('success', 'تم حذف المستأجر بنجاح');
@@ -293,15 +463,22 @@ class TenantController extends Controller
     public function clearCache($id)
     {
         try {
-            $tenant = \App\Models\Tenant::findOrFail($id);
+            $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
             
+            // مسح كاش المستأجر وإعدادات قاعدة البيانات
             foreach ($tenant->domains as $domain) {
-                \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $domain->domain);
+                \App\Helpers\SubdomainHelper::clearTenantDatabaseConfigCache($tenant->id, $domain->domain);
+            }
+            
+            // مسح كاش إعدادات قاعدة البيانات إذا كانت موجودة
+            $dbConfig = \App\Models\TenantDatabaseConfig::where('tenant_id', $tenant->id)->first();
+            if ($dbConfig) {
+                \App\Helpers\SubdomainHelper::clearTenantDatabaseConfigCache($tenant->id, null, $dbConfig->subdomain);
             }
             
             return response()->json([
                 'success' => true,
-                'message' => 'تم مسح كاش المستأجر بنجاح'
+                'message' => 'تم مسح كاش المستأجر وإعدادات قاعدة البيانات بنجاح'
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -319,11 +496,11 @@ class TenantController extends Controller
     public function clearAllCache()
     {
         try {
-            \App\Helpers\SubdomainHelper::clearAllTenantCache();
+            \App\Helpers\SubdomainHelper::clearAllTenantDatabaseConfigCache();
             
             return response()->json([
                 'success' => true,
-                'message' => 'تم مسح جميع الكاش بنجاح'
+                'message' => 'تم مسح جميع كاش المستأجرين وإعدادات قاعدة البيانات بنجاح'
             ]);
         } catch (\Exception $e) {
             return response()->json([

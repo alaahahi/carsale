@@ -8,14 +8,12 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Wallet;
 use App\Models\User;
-use App\Models\Card;
 use App\Models\UserType;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Validator;
 use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
-use App\Models\Massage;
 use Carbon\Carbon;
 
 class UserController extends Controller
@@ -36,8 +34,8 @@ class UserController extends Controller
      */
     public function index()
     {
-        $cards= Card::all();
-        return Inertia::render('Users/Index', ['url'=>$this->url,'cards'=>$cards]);
+        // Card functionality removed
+        return Inertia::render('Users/Index', ['url'=>$this->url,'cards'=>[]]);
     }
     public function getSaler()
     {
@@ -48,8 +46,8 @@ class UserController extends Controller
 
     public function clients()
     {
-        $cards= Card::all();
-        return Inertia::render('Clients/Index', ['url'=>$this->url,'cards'=>$cards]);
+        // Card functionality removed
+        return Inertia::render('Clients/Index', ['url'=>$this->url,'cards'=>[]]);
     }
     
     public function show ()
@@ -287,53 +285,25 @@ class UserController extends Controller
     }
         
     public function getUserMassages($id,$user, Request $request)
-    
     {
-     try {
-       $authUser = $this->Authorization($request);
-       return  Massage::where('receiver_id', '=',  $authUser->id)->where('sender_id', '=',$user)->where('is_download', '=',0)->get();
-         } catch (\Throwable $th) {
-            return  Response::json(['status' => 401,'massage' => 'user Authorization not found'],401);
-        }
+        // Massage functionality removed
+        return Response::json(['status' => 404, 'message' => 'Massage functionality removed'], 404);
     }
+    
     public function getMassages($id, Request $request)
     {
-     try {
-            $authUser = $this->Authorization($request);
-            return  Massage::where('receiver_id', '=', $authUser->id)->where('is_download', '=',0)->get();
-     } catch (\Throwable $th) {
-                return  Response::json(['status' => 401,'massage' => 'user Authorization not found'],401);
-            }
+        // Massage functionality removed
+        return Response::json(['status' => 404, 'message' => 'Massage functionality removed'], 404);
     }
     public function ackUserMassages($sender,$receiver,$date)
     {
-        $date = substr($date, 0, strpos($date, "."));
-            try {
-                $massage =Massage::where('receiver_id', '=', $sender)->where('sender_id','=',$receiver)->where('created_at','<=',$date)->update(['is_download' => 1]);
-                if($massage){
-                    return Response::json(['status' => 200,'massage' => 'operation is  success file downloaded'],200);
-                }else
-                    return Response::json(['status' => 200,'massage' => 'operation is  success but no new massage'],200);
-            } catch (\Throwable $th) {
-                return $th;
-                    return  Response::json(['status' => 400,'massage' => 'massage not found'],400);
-            }
-            
+        // Massage functionality removed
+        return Response::json(['status' => 404, 'message' => 'Massage functionality removed'], 404);
     }
     public function userLocation($id)
     {
-        // date('Y-m-d H:i:s', strtotime($data['datetime']))
-            try {
-                $massage =Massage::where('sender_id','=',$id)->get();
-                $massage = $massage->map(function ($massage) {
-                    return ['lat' => floatval(Crypt::decryptString($massage->Lat)),'lng' => floatval(Crypt::decryptString($massage->lng))] ;
-                });          
-                 return Response::json(['status' => 200,'massage' => 'massage','data' =>   $massage],200);
-
-            } catch (\Throwable $th) {
-                return $th;
-                    return  Response::json(['status' => 400,'massage' => 'massage not found'],400);
-            }
+        // Massage functionality removed
+        return Response::json(['status' => 404, 'message' => 'Massage functionality removed'], 404);
     }
     public function addUserCard($card_id,$card,$user_id)
     {

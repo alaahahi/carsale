@@ -4,8 +4,6 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\UserController;
-use App\Http\Controllers\FormRegistrationController;
-use App\Http\Controllers\ResultsController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\TransfersController;
@@ -158,9 +156,13 @@ Route::group(['prefix' => 'admin'], function () {
     })->name('tenants.store');
     
     Route::get('tenants/{id}', function($id) {
-        $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
+        $tenant = \App\Models\Tenant::with(['domains', 'databaseConfigs'])->findOrFail($id);
         return view('tenants.show', compact('tenant'));
     })->name('tenants.show');
+    
+    Route::get('tenants/{id}/database-configs', [App\Http\Controllers\TenantController::class, 'databaseConfigs'])->name('tenants.database-configs');
+    Route::get('tenants/{id}/database-configs/create', [App\Http\Controllers\TenantController::class, 'createDatabaseConfig'])->name('tenants.create-database-config');
+    Route::post('tenants/{id}/database-configs', [App\Http\Controllers\TenantController::class, 'storeDatabaseConfig'])->name('tenants.store-database-config');
     
     Route::get('tenants/{id}/edit', function($id) {
         $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
@@ -332,20 +334,50 @@ Route::group(['prefix' => 'admin'], function () {
         }
     })->name('tenants.clear-all-cache');
     
+    Route::get('tenant-database-configs', [App\Http\Controllers\TenantDatabaseConfigController::class, 'index'])->name('tenant-database-configs.index');
+    Route::get('tenant-database-configs/create', [App\Http\Controllers\TenantDatabaseConfigController::class, 'create'])->name('tenant-database-configs.create');
+    Route::post('tenant-database-configs', [App\Http\Controllers\TenantDatabaseConfigController::class, 'store'])->name('tenant-database-configs.store');
+    Route::get('tenant-database-configs/{tenantDatabaseConfig}', [App\Http\Controllers\TenantDatabaseConfigController::class, 'show'])->name('tenant-database-configs.show');
+    Route::get('tenant-database-configs/{tenantDatabaseConfig}/edit', [App\Http\Controllers\TenantDatabaseConfigController::class, 'edit'])->name('tenant-database-configs.edit');
+    Route::put('tenant-database-configs/{tenantDatabaseConfig}', [App\Http\Controllers\TenantDatabaseConfigController::class, 'update'])->name('tenant-database-configs.update');
+    Route::delete('tenant-database-configs/{tenantDatabaseConfig}', [App\Http\Controllers\TenantDatabaseConfigController::class, 'destroy'])->name('tenant-database-configs.destroy');
+    Route::post('tenant-database-configs/{tenantDatabaseConfig}/test-connection', [App\Http\Controllers\TenantDatabaseConfigController::class, 'testConnection'])->name('tenant-database-configs.test-connection');
+    Route::post('tenant-database-configs/{tenantDatabaseConfig}/check-tables', [App\Http\Controllers\TenantDatabaseConfigController::class, 'checkTables'])->name('tenant-database-configs.check-tables');
+    Route::post('tenant-database-configs/{tenantDatabaseConfig}/check-admin', [App\Http\Controllers\TenantDatabaseConfigController::class, 'checkAdmin'])->name('tenant-database-configs.check-admin');
+    Route::post('tenant-database-configs/{tenantDatabaseConfig}/run-migrations', [App\Http\Controllers\TenantDatabaseConfigController::class, 'runMigrations'])->name('tenant-database-configs.run-migrations');
+    Route::post('tenant-database-configs/{tenantDatabaseConfig}/create-admin', [App\Http\Controllers\TenantDatabaseConfigController::class, 'createAdmin'])->name('tenant-database-configs.create-admin');
+    Route::get('tenant-database-configs/by-subdomain', [App\Http\Controllers\TenantDatabaseConfigController::class, 'getBySubdomain'])->name('tenant-database-configs.by-subdomain');
+    Route::post('tenant-database-configs/use-dynamic-connection', [App\Http\Controllers\TenantDatabaseConfigController::class, 'useDynamicConnection'])->name('tenant-database-configs.use-dynamic-connection');
+    
     Route::get('tenants/{id}/check-database', function($id) {
         try {
-            $tenant = \App\Models\Tenant::findOrFail($id);
+            $tenant = \App\Models\Tenant::with(['domains', 'databaseConfig'])->findOrFail($id);
             
-            // Initialize tenancy for this tenant
-            tenancy()->initialize($tenant);
+            // التحقق من وجود إعدادات قاعدة البيانات للمستأجر
+            if (!$tenant->databaseConfig) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'لا توجد إعدادات قاعدة بيانات لهذا المستأجر'
+                ], 404);
+            }
             
-            // Get current database connection info
-            $connection = DB::connection();
+            $dbConfig = $tenant->databaseConfig;
+            
+            // اختبار الاتصال بقاعدة البيانات المرتبطة بالمستأجر
+            $connectionInfo = $dbConfig->getConnectionInfo();
+            $connectionName = 'test_connection_' . $dbConfig->id;
+            
+            // إعداد اتصال مؤقت للاختبار
+            config([
+                "database.connections.{$connectionName}" => $connectionInfo
+            ]);
+            
+            $connection = DB::connection($connectionName);
             $databaseName = $connection->getDatabaseName();
             $host = $connection->getConfig('host');
             $port = $connection->getConfig('port');
             
-            // Test the connection
+            // اختبار الاتصال
             $pdo = $connection->getPdo();
             $tables = $connection->select('SHOW TABLES');
             
@@ -360,8 +392,11 @@ Route::group(['prefix' => 'admin'], function () {
                     'name' => $databaseName,
                     'host' => $host,
                     'port' => $port,
+                    'driver' => $dbConfig->driver,
                     'connection_active' => true,
-                    'tables_count' => count($tables)
+                    'tables_count' => count($tables),
+                    'subdomain' => $dbConfig->subdomain,
+                    'is_active' => $dbConfig->is_active
                 ]
             ]);
             
@@ -430,9 +465,13 @@ Route::group(['middleware' => ['central'], 'prefix' => 'central-admin'], functio
     })->name('central.tenants.store');
     
     Route::get('tenants/{id}', function($id) {
-        $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
+        $tenant = \App\Models\Tenant::with(['domains', 'databaseConfigs'])->findOrFail($id);
         return view('tenants.show', compact('tenant'));
     })->name('central.tenants.show');
+    
+    Route::get('tenants/{id}/database-configs', [App\Http\Controllers\TenantController::class, 'databaseConfigs'])->name('central.tenants.database-configs');
+    Route::get('tenants/{id}/database-configs/create', [App\Http\Controllers\TenantController::class, 'createDatabaseConfig'])->name('central.tenants.create-database-config');
+    Route::post('tenants/{id}/database-configs', [App\Http\Controllers\TenantController::class, 'storeDatabaseConfig'])->name('central.tenants.store-database-config');
     
     Route::get('tenants/{id}/edit', function($id) {
         $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
@@ -606,18 +645,33 @@ Route::group(['middleware' => ['central'], 'prefix' => 'central-admin'], functio
     
     Route::get('tenants/{id}/check-database', function($id) {
         try {
-            $tenant = \App\Models\Tenant::findOrFail($id);
+            $tenant = \App\Models\Tenant::with(['domains', 'databaseConfig'])->findOrFail($id);
             
-            // Initialize tenancy for this tenant
-            tenancy()->initialize($tenant);
+            // التحقق من وجود إعدادات قاعدة البيانات للمستأجر
+            if (!$tenant->databaseConfig) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'لا توجد إعدادات قاعدة بيانات لهذا المستأجر'
+                ], 404);
+            }
             
-            // Get current database connection info
-            $connection = DB::connection();
+            $dbConfig = $tenant->databaseConfig;
+            
+            // اختبار الاتصال بقاعدة البيانات المرتبطة بالمستأجر
+            $connectionInfo = $dbConfig->getConnectionInfo();
+            $connectionName = 'test_connection_' . $dbConfig->id;
+            
+            // إعداد اتصال مؤقت للاختبار
+            config([
+                "database.connections.{$connectionName}" => $connectionInfo
+            ]);
+            
+            $connection = DB::connection($connectionName);
             $databaseName = $connection->getDatabaseName();
             $host = $connection->getConfig('host');
             $port = $connection->getConfig('port');
             
-            // Test the connection
+            // اختبار الاتصال
             $pdo = $connection->getPdo();
             $tables = $connection->select('SHOW TABLES');
             
@@ -632,8 +686,11 @@ Route::group(['middleware' => ['central'], 'prefix' => 'central-admin'], functio
                     'name' => $databaseName,
                     'host' => $host,
                     'port' => $port,
+                    'driver' => $dbConfig->driver,
                     'connection_active' => true,
-                    'tables_count' => count($tables)
+                    'tables_count' => count($tables),
+                    'subdomain' => $dbConfig->subdomain,
+                    'is_active' => $dbConfig->is_active
                 ]
             ]);
             
@@ -645,68 +702,20 @@ Route::group(['middleware' => ['central'], 'prefix' => 'central-admin'], functio
         }
     })->name('central.tenants.check-database');
     
-    Route::get('tenants/database-info', function() {
-        try {
-            $info = [];
-            
-            // Central database info
-            $centralConnection = DB::connection();
-            $info['central'] = [
-                'name' => $centralConnection->getDatabaseName(),
-                'host' => $centralConnection->getConfig('host'),
-                'port' => $centralConnection->getConfig('port'),
-                'driver' => $centralConnection->getConfig('driver'),
-                'connection_active' => true
-            ];
-            
-            // Get all tenants and their database info
-            $tenants = \App\Models\Tenant::with('domains')->get();
-            $info['tenants'] = [];
-            
-            foreach ($tenants as $tenant) {
-                try {
-                    // Initialize tenancy for this tenant
-                    tenancy()->initialize($tenant);
-                    
-                    $tenantConnection = DB::connection();
-                    $info['tenants'][] = [
-                        'id' => $tenant->id,
-                        'name' => $tenant->name,
-                        'domains' => $tenant->domains->pluck('domain'),
-                        'database' => [
-                            'name' => $tenantConnection->getDatabaseName(),
-                            'host' => $tenantConnection->getConfig('host'),
-                            'port' => $tenantConnection->getConfig('port'),
-                            'driver' => $tenantConnection->getConfig('driver'),
-                            'connection_active' => true
-                        ]
-                    ];
-                } catch (\Exception $e) {
-                    $info['tenants'][] = [
-                        'id' => $tenant->id,
-                        'name' => $tenant->name,
-                        'domains' => $tenant->domains->pluck('domain'),
-                        'database' => [
-                            'name' => 'car_tenant_' . $tenant->id,
-                            'connection_active' => false,
-                            'error' => $e->getMessage()
-                        ]
-                    ];
-                }
-            }
-            
-            return response()->json([
-                'success' => true,
-                'data' => $info
-            ]);
-            
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'خطأ في الحصول على معلومات قاعدة البيانات: ' . $e->getMessage()
-            ], 500);
-        }
-    })->name('central.tenants.database-info');
+    Route::get('tenant-database-configs', [App\Http\Controllers\TenantDatabaseConfigController::class, 'index'])->name('central.tenant-database-configs.index');
+    Route::get('tenant-database-configs/create', [App\Http\Controllers\TenantDatabaseConfigController::class, 'create'])->name('central.tenant-database-configs.create');
+    Route::post('tenant-database-configs', [App\Http\Controllers\TenantDatabaseConfigController::class, 'store'])->name('central.tenant-database-configs.store');
+    Route::get('tenant-database-configs/{tenantDatabaseConfig}', [App\Http\Controllers\TenantDatabaseConfigController::class, 'show'])->name('central.tenant-database-configs.show');
+    Route::get('tenant-database-configs/{tenantDatabaseConfig}/edit', [App\Http\Controllers\TenantDatabaseConfigController::class, 'edit'])->name('central.tenant-database-configs.edit');
+    Route::put('tenant-database-configs/{tenantDatabaseConfig}', [App\Http\Controllers\TenantDatabaseConfigController::class, 'update'])->name('central.tenant-database-configs.update');
+    Route::delete('tenant-database-configs/{tenantDatabaseConfig}', [App\Http\Controllers\TenantDatabaseConfigController::class, 'destroy'])->name('central.tenant-database-configs.destroy');
+    Route::post('tenant-database-configs/{tenantDatabaseConfig}/test-connection', [App\Http\Controllers\TenantDatabaseConfigController::class, 'testConnection'])->name('central.tenant-database-configs.test-connection');
+    Route::post('tenant-database-configs/{tenantDatabaseConfig}/check-tables', [App\Http\Controllers\TenantDatabaseConfigController::class, 'checkTables'])->name('central.tenant-database-configs.check-tables');
+    Route::post('tenant-database-configs/{tenantDatabaseConfig}/check-admin', [App\Http\Controllers\TenantDatabaseConfigController::class, 'checkAdmin'])->name('central.tenant-database-configs.check-admin');
+    Route::post('tenant-database-configs/{tenantDatabaseConfig}/run-migrations', [App\Http\Controllers\TenantDatabaseConfigController::class, 'runMigrations'])->name('central.tenant-database-configs.run-migrations');
+    Route::post('tenant-database-configs/{tenantDatabaseConfig}/create-admin', [App\Http\Controllers\TenantDatabaseConfigController::class, 'createAdmin'])->name('central.tenant-database-configs.create-admin');
+    Route::get('tenant-database-configs/by-subdomain', [App\Http\Controllers\TenantDatabaseConfigController::class, 'getBySubdomain'])->name('central.tenant-database-configs.by-subdomain');
+    Route::post('tenant-database-configs/use-dynamic-connection', [App\Http\Controllers\TenantDatabaseConfigController::class, 'useDynamicConnection'])->name('central.tenant-database-configs.use-dynamic-connection');
 });
 
 // Tenant routes
@@ -732,7 +741,6 @@ Route::group(['middleware' => ['tenant']], function () {
     
     Route::get('getIndex',[UserController::class, 'getIndex'])->name("getIndex");
     Route::get('ban/{id}',[UserController::class, 'ban'])->name("ban");
-    Route::get('sentToCourt/{id}',[FormRegistrationController::class, 'sentToCourt'])->name("sentToCourt");
     Route::get('clients',[UserController::class, 'clients'])->name('clients');
     Route::get('getIndexClients',[UserController::class, 'getIndexClients'])->name("getIndexClients");
     Route::get('addClients',[UserController::class, 'addClients'])->name('addClients');
@@ -742,47 +750,7 @@ Route::group(['middleware' => ['tenant']], function () {
     Route::get('unban/{id}',[UserController::class, 'unban'])->name("unban");
     Route::get('/userLocation/{id}',[UserController::class, 'userLocation'])->name("userLocation");
     
-    Route::get('تسجيل-الاستمارة',[FormRegistrationController::class, 'create'])->name('تسجيل-الاستمارة');
-    Route::post('formRegistration',[FormRegistrationController::class, 'store'])->name('formRegistration');
-    
-    Route::post('formRegistrationstoreEdit/{id}',[FormRegistrationController::class, 'storeEdit'])->name('formRegistrationstoreEdit');
-    
-    
-    Route::get('formRegistration',[FormRegistrationController::class, 'index'])->name('formRegistration');
-    
-    Route::get('formRegistrationEdit/{id}',[FormRegistrationController::class, 'formRegistrationEdit'])->name('formRegistrationEdit');
-    
-    
-    Route::get('FormRegistrationSaved',[FormRegistrationController::class, 'saved'])->name('FormRegistrationSaved');
-    Route::get('FormRegistrationCourt',[FormRegistrationController::class, 'court'])->name('FormRegistrationCourt');
-    Route::get('FormRegistrationCompleted',[FormRegistrationController::class, 'completed'])->name('FormRegistrationCompleted');
-
-    
-    Route::get('getIndexFormRegistration',[FormRegistrationController::class, 'getIndex'])->name("getIndexFormRegistration");
-    Route::get('getIndexFormRegistrationSaved',[FormRegistrationController::class, 'getIndexSaved'])->name("getIndexFormRegistrationSaved");
-    Route::get('getIndexFormRegistrationCourt',[FormRegistrationController::class, 'getIndexCourt'])->name("getIndexFormRegistrationCourt");
-    Route::get('getIndexFormRegistrationCompleted',[FormRegistrationController::class, 'getIndexCompleted'])->name("getIndexFormRegistrationCompleted");
-    
-    
-    Route::get('labResults/{id}',[FormRegistrationController::class, 'labResults'])->name('labResults');
-    Route::get('labResultsEdit/{id}',[FormRegistrationController::class, 'labResultsEdit'])->name('labResultsEdit');
-    
-    
-    
-    Route::get('doctorResults/{id}',[FormRegistrationController::class, 'doctorResults'])->name('doctorResults');
-    Route::get('doctorResultsEdit/{id}',[FormRegistrationController::class, 'doctorResultsEdit'])->name('doctorResultsEdit');
-    
-    Route::post('results',[ResultsController::class, 'store'])->name('results');
-    Route::post('resultsEdit/{id}',[ResultsController::class, 'storeEdit'])->name('resultsEdit');
-    Route::post('resultsDoctor',[ResultsController::class, 'storeDoctor'])->name('resultsDoctor');
-    Route::post('resultsDoctorEdit/{id}',[ResultsController::class, 'storeDoctorEdit'])->name('resultsDoctorEdit');
-    Route::get('document/{id}', [FormRegistrationController::class, 'document'])->name('document');
-    Route::get('show/{id}', [FormRegistrationController::class, 'showfile'])->name('show');
-    
-    
-    Route::get('/livesearch', [FormRegistrationController::class, 'getProfiles'])->name('livesearch');
-    Route::get('/livesearchSaved', [FormRegistrationController::class, 'getProfilesSaved'])->name('livesearchSaved');
-    Route::get('/livesearchCompleted', [FormRegistrationController::class, 'getProfilesCompleted'])->name('livesearchCompleted');
+ 
 
     
     Route::get('/getcount', [DashboardController::class, 'getcountComp'])->name('getcount');
@@ -792,16 +760,6 @@ Route::group(['middleware' => ['tenant']], function () {
     Route::get('/receiveCard', [AccountingController::class, 'receiveCard'])->name('receiveCard');
     Route::get('/paySelse/{id}', [AccountingController::class, 'paySelse'])->name('paySelse');
 
-    // Route::get('hospital',[HospitalController::class, 'index'])->name('hospital');
-    // Route::get('hospitalAdd',[HospitalController::class, 'create'])->name('hospitalAdd');
-    // Route::get('hospitalEdit/{id}',[HospitalController::class, 'edit'])->name('hospitalEdit');
-    // Route::get('hospitalStoreEdit',[HospitalController::class, 'index'])->name('hospitalStoreEdit');
-    // Route::post('hospitalStoreEdit',[HospitalController::class, 'storeEdit'])->name('hospitalStoreEdit');
-    // Route::post('hospital',[HospitalController::class, 'store'])->name('hospital');
-    // Route::get('getIndexAppointment',[HospitalController::class, 'getIndex'])->name("getIndexAppointment");
-    // Route::get('livesearchAppointment', [HospitalController::class, 'livesearchAppointment'])->name('livesearchAppointment');
-    // Route::get('appointmentCome', [HospitalController::class, 'appointmentCome'])->name('appointmentCome');
-    // Route::get('appointmentCancel', [HospitalController::class, 'appointmentCancel'])->name('appointmentCancel');
 
     Route::get('addTransfers',[TransfersController::class, 'addTransfers'])->name('addTransfers');
     Route::get('transfers',[TransfersController::class, 'index'])->name('transfers');

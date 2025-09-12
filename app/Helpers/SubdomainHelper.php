@@ -5,6 +5,7 @@ namespace App\Helpers;
 use Illuminate\Support\Facades\Cache;
 use Stancl\Tenancy\Database\Models\Domain;
 use App\Models\Tenant;
+use App\Models\TenantDatabaseConfig;
 
 class SubdomainHelper
 {
@@ -146,5 +147,138 @@ class SubdomainHelper
         foreach ($domains as $domain) {
             self::clearTenantCache(null, $domain->domain);
         }
+    }
+    
+    /**
+     * Get tenant and database config by domain with enhanced caching
+     */
+    public static function getTenantAndDatabaseConfigByDomain($host)
+    {
+        $cacheKey = "tenant_db_config_domain_{$host}";
+        
+        return Cache::store(self::getCacheStore())->remember($cacheKey, self::getCacheDuration(), function () use ($host) {
+            // Extract subdomain from host
+            $subdomain = self::extractSubdomain($host);
+            
+            if (!$subdomain) {
+                return null;
+            }
+            
+            // Get tenant by subdomain
+            $tenant = self::getTenantBySubdomain($subdomain);
+            
+            if (!$tenant) {
+                return null;
+            }
+            
+            // Get database config for this tenant
+            $dbConfig = TenantDatabaseConfig::where('tenant_id', $tenant->id)
+                ->where('is_active', true)
+                ->first();
+            
+            return [
+                'tenant' => $tenant,
+                'database_config' => $dbConfig,
+                'subdomain' => $subdomain,
+                'host' => $host
+            ];
+        });
+    }
+    
+    /**
+     * Get tenant and database config by subdomain with enhanced caching
+     */
+    public static function getTenantAndDatabaseConfigBySubdomain($subdomain)
+    {
+        $cacheKey = "tenant_db_config_subdomain_{$subdomain}";
+        
+        return Cache::store(self::getCacheStore())->remember($cacheKey, self::getCacheDuration(), function () use ($subdomain) {
+            // Get tenant by subdomain
+            $tenant = self::getTenantBySubdomain($subdomain);
+            
+            if (!$tenant) {
+                return null;
+            }
+            
+            // Get database config for this tenant
+            $dbConfig = TenantDatabaseConfig::where('tenant_id', $tenant->id)
+                ->where('is_active', true)
+                ->first();
+            
+            return [
+                'tenant' => $tenant,
+                'database_config' => $dbConfig,
+                'subdomain' => $subdomain
+            ];
+        });
+    }
+    
+    /**
+     * Clear tenant and database config cache
+     */
+    public static function clearTenantDatabaseConfigCache($tenantId = null, $domain = null, $subdomain = null)
+    {
+        if ($tenantId) {
+            Cache::store(self::getCacheStore())->forget("tenant_id_{$tenantId}");
+        }
+        
+        if ($domain) {
+            Cache::store(self::getCacheStore())->forget("tenant_domain_{$domain}");
+            Cache::store(self::getCacheStore())->forget("tenant_db_config_domain_{$domain}");
+            
+            $extractedSubdomain = self::extractSubdomain($domain);
+            if ($extractedSubdomain) {
+                Cache::store(self::getCacheStore())->forget("tenant_subdomain_{$extractedSubdomain}");
+                Cache::store(self::getCacheStore())->forget("tenant_db_config_subdomain_{$extractedSubdomain}");
+            }
+        }
+        
+        if ($subdomain) {
+            Cache::store(self::getCacheStore())->forget("tenant_subdomain_{$subdomain}");
+            Cache::store(self::getCacheStore())->forget("tenant_db_config_subdomain_{$subdomain}");
+        }
+    }
+    
+    /**
+     * Clear all tenant and database config cache
+     */
+    public static function clearAllTenantDatabaseConfigCache()
+    {
+        Cache::store(self::getCacheStore())->forget('all_tenant_domains');
+        
+        // Clear individual tenant and database config caches
+        $domains = Domain::all();
+        foreach ($domains as $domain) {
+            self::clearTenantDatabaseConfigCache(null, $domain->domain);
+        }
+        
+        // Clear subdomain caches
+        $dbConfigs = TenantDatabaseConfig::all();
+        foreach ($dbConfigs as $config) {
+            self::clearTenantDatabaseConfigCache(null, null, $config->subdomain);
+        }
+    }
+    
+    /**
+     * Check if domain has valid tenant and database config
+     */
+    public static function isValidTenantDomain($host)
+    {
+        $data = self::getTenantAndDatabaseConfigByDomain($host);
+        return $data && $data['tenant'] && $data['database_config'];
+    }
+    
+    /**
+     * Get database connection info for domain
+     */
+    public static function getDatabaseConnectionInfo($host)
+    {
+        $data = self::getTenantAndDatabaseConfigByDomain($host);
+        
+        if (!$data || !$data['database_config']) {
+            return null;
+        }
+        
+        return $data['database_config']->getConnectionInfo();
     }
 }
