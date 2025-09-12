@@ -23,7 +23,24 @@ use App\Models\SystemConfig;
 // Central API routes
 Route::group(['middleware' => ['central'], 'prefix' => 'admin'], function () {
     // Admin API routes here
-    Route::get('tenants/by-subdomain', [TenantController::class, 'getBySubdomain'])->name('api.tenants.by-subdomain');
+    Route::get('tenants/by-subdomain', function(\Illuminate\Http\Request $request) {
+        $subdomain = $request->get('subdomain');
+        
+        if (!$subdomain) {
+            return response()->json(['error' => 'Subdomain is required'], 400);
+        }
+        
+        $tenant = \App\Helpers\SubdomainHelper::getTenantBySubdomain($subdomain);
+        
+        if (!$tenant) {
+            return response()->json(['error' => 'Tenant not found'], 404);
+        }
+        
+        return response()->json([
+            'tenant' => $tenant,
+            'domains' => $tenant->domains,
+        ]);
+    })->name('api.tenants.by-subdomain');
     
     // Subdomain API routes
     Route::group(['prefix' => 'subdomain'], function () {

@@ -23,6 +23,8 @@ return [
         'admin.car-management.local',
         'www.car-management.local',
         'app.car-management.local',
+        'aindubai.local',  // استثناء للعمل المحلي
+        'www.aindubai.local',  // استثناء للعمل المحلي
     ],
 
     /**
@@ -55,7 +57,7 @@ return [
          * Tenant database names are created like this:
          * prefix + tenant_id + suffix.
          */
-        'prefix' => 'car_tenant_',
+        'prefix' => 'aindubai_',
         'suffix' => '',
 
         /**
