@@ -3,6 +3,7 @@
 namespace App\Models;
 use App\Models\Massage;
 use App\Models\UserType;
+use App\Models\Tenant;
 use Illuminate\Support\Facades\Crypt;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -30,7 +31,8 @@ class User extends Authenticatable
         'parent_id',
         'is_band',
         'phone',
-        'device'
+        'device',
+        'tenant_id',
     ];
 
     /**
@@ -79,5 +81,10 @@ class User extends Authenticatable
     public function wallet()
     {
         return $this->hasOne(Wallet::class);
+    }
+    
+    public function tenant()
+    {
+        return $this->belongsTo(Tenant::class);
     }
 }

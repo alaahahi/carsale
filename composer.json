@@ -19,6 +19,7 @@
         "mpdf/mpdf": "^8.1",
         "scottlaurent/accounting": "^0.3.3",
         "simplesoftwareio/simple-qrcode": "^4.2",
+        "stancl/tenancy": "^3.6",
         "tightenco/ziggy": "^1.5"
     },
     "require-dev": {

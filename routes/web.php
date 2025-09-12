@@ -11,8 +11,10 @@ use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\TransfersController;
 use App\Http\Controllers\CarConfigController;
 use App\Http\Controllers\InfoController;
+use App\Http\Controllers\MainController;
 
 use App\Models\SystemConfig;
+use App\Http\Controllers\TenantController;
 
 /*
 |--------------------------------------------------------------------------
@@ -25,20 +27,57 @@ use App\Models\SystemConfig;
 |
 */
 
-Route::resource('/users', UserController::class)->middleware(['auth', 'verified']);
+// Main routes (accessible from main domain)
+Route::get('/', [MainController::class, 'index'])->name('main.index');
+Route::get('/select-tenant', [MainController::class, 'selectTenant'])->name('main.select-tenant');
+Route::post('/redirect-to-tenant', [MainController::class, 'redirectToTenant'])->name('main.redirect-to-tenant');
+Route::get('/tenant-info', [MainController::class, 'showTenantBySubdomain'])->name('main.tenant-info');
+Route::get('/admin', [MainController::class, 'admin'])->name('main.admin');
+Route::get('/dashboard', [MainController::class, 'dashboard'])->name('main.dashboard');
 
-Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'config' => SystemConfig::first(),
-        'canLogin' => Route::has('login'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
+// Direct admin access routes (without central middleware)
+Route::group(['prefix' => 'admin'], function () {
+    Route::get('/', function () {
+        return redirect()->route('tenants.index');
+    })->name('admin.index');
+    
+    Route::resource('tenants', TenantController::class);
+    Route::post('tenants/{id}/suspend', [TenantController::class, 'suspend'])->name('tenants.suspend');
+    Route::post('tenants/{id}/activate', [TenantController::class, 'activate'])->name('tenants.activate');
+    Route::post('tenants/{id}/domains', [TenantController::class, 'addDomain'])->name('tenants.domains.add');
+    Route::delete('tenants/{id}/domains/{domainId}', [TenantController::class, 'removeDomain'])->name('tenants.domains.remove');
+    Route::put('tenants/{id}/domains/{domainId}', [TenantController::class, 'updateDomain'])->name('tenants.domains.update');
+    Route::post('tenants/{id}/clear-cache', [TenantController::class, 'clearCache'])->name('tenants.clear-cache');
 });
-Route::get('/import-cars', [InfoController::class, 'showUploadForm'])->name('car.import.form');
-Route::post('/import-cars', [InfoController::class, 'import'])->name('car.import');
 
-Route::group(['middleware' => ['auth','verified']], function () {
+// Central routes (admin panel) - for subdomain access
+Route::group(['middleware' => ['central'], 'prefix' => 'central-admin'], function () {
+    Route::resource('tenants', TenantController::class);
+    Route::post('tenants/{id}/suspend', [TenantController::class, 'suspend'])->name('central.tenants.suspend');
+    Route::post('tenants/{id}/activate', [TenantController::class, 'activate'])->name('central.tenants.activate');
+    Route::post('tenants/{id}/domains', [TenantController::class, 'addDomain'])->name('central.tenants.domains.add');
+    Route::delete('tenants/{id}/domains/{domainId}', [TenantController::class, 'removeDomain'])->name('central.tenants.domains.remove');
+    Route::put('tenants/{id}/domains/{domainId}', [TenantController::class, 'updateDomain'])->name('central.tenants.domains.update');
+    Route::post('tenants/{id}/clear-cache', [TenantController::class, 'clearCache'])->name('central.tenants.clear-cache');
+});
+
+// Tenant routes
+Route::group(['middleware' => ['tenant']], function () {
+    Route::resource('/users', UserController::class)->middleware(['auth', 'verified']);
+
+    Route::get('/', function () {
+        return Inertia::render('Welcome', [
+            'config' => SystemConfig::first(),
+            'canLogin' => Route::has('login'),
+            'laravelVersion' => Application::VERSION,
+            'phpVersion' => PHP_VERSION,
+        ]);
+    });
+    
+    Route::get('/import-cars', [InfoController::class, 'showUploadForm'])->name('car.import.form');
+    Route::post('/import-cars', [InfoController::class, 'import'])->name('car.import');
+
+    Route::group(['middleware' => ['auth','verified']], function () {
     Route::get('/dashboard', function () {return Inertia::render('Dashboard');})->middleware(['auth', 'verified'])->name('dashboard');
 
     Route::get('dashboard',[DashboardController::class,'index'])->middleware(['auth', 'verified'])->name('dashboard');
@@ -157,8 +196,7 @@ Route::group(['middleware' => ['auth','verified']], function () {
     
     
 
- });
-
-
+    });
+});
 
 require __DIR__.'/auth.php';

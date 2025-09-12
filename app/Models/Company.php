@@ -17,11 +17,15 @@ class Company extends Model
         'name',
         'name_en',
         'status',
+        'tenant_id',
         'created_at',
         'updated_at'
     ];
     
     protected $dates = ['deleted_at']; // Define the deleted_at column as a date
 
-    // Rest of your model code...
+    public function tenant()
+    {
+        return $this->belongsTo(Tenant::class);
+    }
 }

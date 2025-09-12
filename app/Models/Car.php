@@ -45,7 +45,8 @@ class Car extends Model
         'erbil_shipping',
         'dubai_exp',
         'dubai_shipping',
-        'source'
+        'source',
+        'tenant_id',
     ];
     public function user()
     {
@@ -95,6 +96,11 @@ class Car extends Model
     public function fieldHistories()
     {
         return $this->hasMany(CarFieldHistory::class, 'car_id');
+    }
+
+    public function tenant()
+    {
+        return $this->belongsTo(Tenant::class);
     }
 
     // Method to log field changes

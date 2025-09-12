@@ -1,66 +1,139 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Car Management Multi-Tenant System
 
-<p align="center">
-<a href="https://travis-ci.org/laravel/framework"><img src="https://travis-ci.org/laravel/framework.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+نظام إدارة السيارات متعدد المستأجرين مبني على Laravel مع دعم قاعدة بيانات منفصلة لكل مستأجر.
 
-## About Laravel
+## المميزات
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Multi-Tenancy**: كل مستأجر له قاعدة بيانات منفصلة
+- **Domain-based Tenancy**: تحديد المستأجر بناءً على النطاق
+- **Central Admin Panel**: لوحة تحكم مركزية لإدارة المستأجرين
+- **Tenant Management**: إدارة شاملة للمستأجرين والاشتراكات
+- **Data Isolation**: عزل كامل للبيانات بين المستأجرين
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## التثبيت
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### 1. تثبيت المتطلبات
 
-## Learning Laravel
+```bash
+composer install
+npm install
+```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### 2. إعداد البيئة
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 2000 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### 3. إعداد قاعدة البيانات المركزية
 
-## Laravel Sponsors
+قم بتعديل ملف `.env`:
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=car_management_central
+DB_USERNAME=root
+DB_PASSWORD=your_password
+```
 
-### Premium Partners
+### 4. تشغيل Migrations
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+```bash
+php artisan migrate
+```
 
-## Contributing
+### 5. إعداد النطاقات المحلية
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+أضف هذه الأسطر إلى ملف `hosts`:
 
-## Code of Conduct
+```
+127.0.0.1 car-management.local
+127.0.0.1 admin.car-management.local
+127.0.0.1 tenant1.car-management.local
+127.0.0.1 tenant2.car-management.local
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## الاستخدام
 
-## Security Vulnerabilities
+### إنشاء مستأجر جديد
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+1. انتقل إلى لوحة التحكم المركزية: `http://admin.car-management.local/admin/tenants`
+2. انقر على "إنشاء مستأجر جديد"
+3. أدخل البيانات المطلوبة:
+   - اسم المستأجر
+   - النطاق (مثل: tenant1.car-management.local)
+   - البريد الإلكتروني
+   - خطة الاشتراك
+   - تاريخ انتهاء الاشتراك
 
-## License
+### الوصول للمستأجر
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+بعد إنشاء المستأجر، يمكن الوصول إليه عبر النطاق المحدد:
+`http://tenant1.car-management.local`
+
+### إدارة المستأجرين
+
+- **تفعيل/تعطيل**: يمكن تفعيل أو تعطيل المستأجرين
+- **تحديث البيانات**: تعديل معلومات المستأجر
+- **حذف المستأجر**: حذف المستأجر وقاعدة البيانات الخاصة به
+
+## البنية التقنية
+
+### قاعدة البيانات المركزية
+
+تحتوي على:
+- جدول `tenants`: معلومات المستأجرين
+- جدول `domains`: النطاقات المرتبطة بالمستأجرين
+- جداول النظام العامة
+
+### قواعد بيانات المستأجرين
+
+كل مستأجر له قاعدة بيانات منفصلة تحتوي على:
+- المستخدمين
+- السيارات
+- الشركات
+- المعاملات
+- المحافظ
+- سجل التغييرات
+
+### Middleware
+
+- `tenant`: لتحديد المستأجر الحالي
+- `central`: للوصول للوحة التحكم المركزية
+
+### Routes
+
+- **Central Routes**: `/admin/*` - إدارة المستأجرين
+- **Tenant Routes**: جميع المسارات الأخرى - تطبيق المستأجر
+
+## الأمان
+
+- عزل كامل للبيانات بين المستأجرين
+- منع الوصول غير المصرح به
+- تشفير البيانات الحساسة
+- التحقق من صحة الاشتراكات
+
+## التطوير
+
+### إضافة جدول جديد للمستأجرين
+
+1. أنشئ Migration في مجلد `database/migrations/tenant/`
+2. أضف العلاقة مع `tenant_id` في النموذج
+3. أضف العلاقة مع Tenant في النموذج
+
+### إضافة ميزة جديدة
+
+1. أضف Controller method
+2. أضف Route في المجموعة المناسبة
+3. أضف View إذا لزم الأمر
+
+## الدعم
+
+للحصول على الدعم، يرجى التواصل مع فريق التطوير.
+
+## الترخيص
+
+هذا المشروع مرخص تحت رخصة MIT.
