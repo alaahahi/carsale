@@ -9,6 +9,7 @@ use App\Models\User;
 use Inertia\Inertia;
 use App\Models\Transactions;
 use App\Models\Investment;
+use App\Models\Car;
 
 class UserWalletController extends Controller
 {
@@ -45,8 +46,7 @@ class UserWalletController extends Controller
         $userWalletBalance = $this->calculateUserWalletBalance($user->id);
 
         // حساب رأس المال (مجموع سعر الشراء + المصاريف لجميع السيارات)
-        $capital = DB::table('car')
-            ->selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
+        $capital = Car::selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
             ->value('total') ?? 0;
 
         return Inertia::render('UserWallet', [
@@ -83,13 +83,11 @@ class UserWalletController extends Controller
         $userWalletBalance = $this->calculateUserWalletBalance($user->id);
 
         // حساب رأس المال (مجموع سعر الشراء + المصاريف لجميع السيارات)
-        $capital = DB::table('car')
-            ->selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
+        $capital = Car::selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
             ->value('total') ?? 0;
 
         // حساب إجمالي الربح من مدفوعات السيارات
-        $totalCarPayments = DB::table('car')
-            ->whereNotNull('paid_amount_pay')
+        $totalCarPayments = Car::whereNotNull('paid_amount_pay')
             ->sum('paid_amount_pay') ?? 0;
         $totalProfit = max(0, $totalCarPayments - $capital);
 
@@ -265,11 +263,9 @@ public function addDirectInvestment(Request $request)
         $investment->calculatePercentage($totalCapital);
 
         // حساب نصيب الربح
-        $totalCarPayments = DB::table('car')
-            ->whereNotNull('paid_amount_pay')
+        $totalCarPayments = Car::whereNotNull('paid_amount_pay')
             ->sum('paid_amount_pay') ?? 0;
-        $totalSoldCarsCost = DB::table('car')
-            ->where('results', '!=', 0)
+        $totalSoldCarsCost = Car::where('results', '!=', 0)
             ->selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
             ->value('total') ?? 0;
         $totalProfit = max(0, $totalCarPayments - $totalSoldCarsCost);

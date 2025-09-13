@@ -74,7 +74,7 @@ class DashboardController extends Controller
 
         $grandTotal = \App\Models\Car::selectRaw('
         SUM(
-                    purchase_price + dubai_shipping + dubai_exp + erbil_shipping + erbil_exp
+                    purchase_price + COALESCE(dubai_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(erbil_exp, 0)
                 ) as grand_total
             ')
             ->value('grand_total'); // Directly retrieve the value
@@ -681,11 +681,8 @@ class DashboardController extends Controller
             })->sum('amount');
         
         // حساب رأس المال (مجموع سعر الشراء + جميع المصاريف لجميع السيارات)
-        $totalCapital = Car::sum('purchase_price') + 
-                       Car::sum('erbil_exp') + 
-                       Car::sum('erbil_shipping') + 
-                       Car::sum('dubai_exp') + 
-                       Car::sum('dubai_shipping');
+        $totalCapital = Car::selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
+                       ->value('total') ?? 0;
         
         return Response::json([
             'data' => $data,
