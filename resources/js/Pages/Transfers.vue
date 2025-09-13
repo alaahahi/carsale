@@ -12,9 +12,9 @@
               <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">إدارة جميع الدفعات الداخلة والخارجة</p>
               
               <!-- Action Buttons -->
-              <div class="mt-4 flex space-x-4">
+              <div class="mt-4 flex flex-wrap gap-4">
                 <button @click="showAddToBoxModal = true" 
-                        class="bg-green-600 hover:bg-green-700 mx-2 text-white font-bold py-3 px-6 rounded-lg flex items-center space-x-2">
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg flex items-center space-x-2">
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                   </svg>
@@ -22,12 +22,32 @@
                 </button>
                 
                 <button @click="showWithdrawFromBoxModal = true" 
-                        class="bg-red-600 hover:bg-red-700  mx-4 text-white font-bold py-3 px-6 rounded-lg flex items-center space-x-2">
+                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg flex items-center space-x-2">
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
                   </svg>
                   <span>سحب من الصندوق</span>
                 </button>
+
+                <button @click="showInvestmentModal = true" 
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg flex items-center space-x-2">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                  </svg>
+                  <span>إضافة استثمار</span>
+                </button>
+
+                <!-- User Wallet Buttons -->
+                <div v-if="usersWithWallets && usersWithWallets.length > 0" class="flex flex-wrap gap-2">
+                  <button v-for="user in usersWithWallets" :key="user.id"
+                          @click="viewUserWallet(user.id)"
+                          class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center space-x-2 text-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                    </svg>
+                    <span>{{ user.name }} ({{ Math.round(user.wallet.balance).toLocaleString() }}$)</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -166,6 +186,240 @@
                           ${{ Math.round(totalCapital).toLocaleString() }}
                         </dd>
                       </dl>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Investment Statistics Section -->
+            <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
+              <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">إحصائيات الاستثمارات</h3>
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <!-- إجمالي الاستثمارات النشطة -->
+                <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <div class="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="ml-4">
+                      <p class="text-sm font-medium text-purple-800 dark:text-purple-200">إجمالي الاستثمارات</p>
+                      <p class="text-2xl font-bold text-purple-900 dark:text-purple-100">
+                        ${{ Math.round(totalActiveInvestments).toLocaleString() }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- رأس المال بعد الاستثمارات -->
+                <div :class="finalRemainingCapital > 0 ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800' : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'" 
+                     class="rounded-lg p-4">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <div :class="finalRemainingCapital > 0 ? 'bg-red-500' : 'bg-green-500'" 
+                           class="w-8 h-8 rounded-full flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="ml-4">
+                      <p :class="finalRemainingCapital > 0 ? 'text-red-800 dark:text-red-200' : 'text-green-800 dark:text-green-200'" 
+                         class="text-sm font-medium">
+                        {{ finalRemainingCapital > 0 ? 'رأس المال المطلوب' : 'رأس المال كافي' }}
+                      </p>
+                      <p :class="finalRemainingCapital > 0 ? 'text-red-900 dark:text-red-100' : 'text-green-900 dark:text-green-100'" 
+                         class="text-2xl font-bold">
+                        ${{ Math.round(finalRemainingCapital).toLocaleString() }}
+                      </p>
+                      <p v-if="finalRemainingCapital > 0" class="text-xs text-red-600 dark:text-red-400 mt-1">
+                        يحتاج مزيد من الاستثمارات
+                      </p>
+                      <p v-else class="text-xs text-green-600 dark:text-green-400 mt-1">
+                        الاستثمارات كافية
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- عدد المستثمرين -->
+                <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="ml-4">
+                      <p class="text-sm font-medium text-green-800 dark:text-green-200">عدد المستثمرين</p>
+                      <p class="text-2xl font-bold text-green-900 dark:text-green-100">
+                        {{ activeInvestors ? activeInvestors.length : 0 }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- نسبة الاستثمارات -->
+                <div class="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <div class="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="ml-4">
+                      <p class="text-sm font-medium text-orange-800 dark:text-orange-200">نسبة الاستثمارات</p>
+                      <p class="text-2xl font-bold text-orange-900 dark:text-orange-100">
+                        {{ investmentPercentage.toFixed(1) }}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- New Enhanced Statistics Section -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <!-- رأس المال المتبقي -->
+              <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                <div class="p-6">
+                  <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                      <div class="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                        </svg>
+                      </div>
+                      <div class="ml-3">
+                        <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">رأس المال المتبقي</h3>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white">
+                          ${{ Math.round(remainingCapital).toLocaleString() }}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Progress Bar for Capital -->
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-indigo-600 h-2 rounded-full" 
+                         :style="{ width: capitalProgressPercentage + '%' }"></div>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-2">نسبة المدفوع: {{ capitalProgressPercentage.toFixed(1) }}%</p>
+                </div>
+              </div>
+
+              <!-- إجمالي المدفوعات -->
+              <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                <div class="p-6">
+                  <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                      <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                      </div>
+                      <div class="ml-3">
+                        <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">إجمالي المدفوعات</h3>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white">
+                          ${{ Math.round(totalCarPayments).toLocaleString() }}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Progress Bar for Payments -->
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-green-600 h-2 rounded-full" 
+                         :style="{ width: paymentProgressPercentage + '%' }"></div>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-2">نسبة الاسترداد: {{ paymentProgressPercentage.toFixed(1) }}%</p>
+                </div>
+              </div>
+
+              <!-- الربح الإجمالي -->
+              <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                <div class="p-6">
+                  <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                      <div class="w-8 h-8 rounded-full flex items-center justify-center"
+                           :class="totalProfit >= 0 ? 'bg-green-500' : 'bg-red-500'">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                      </div>
+                      <div class="ml-3">
+                        <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">الربح الإجمالي</h3>
+                        <p class="text-2xl font-bold"
+                           :class="totalProfit >= 0 ? 'text-green-600' : 'text-red-600'">
+                          ${{ Math.round(totalProfit).toLocaleString() }}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Progress Bar for Profit -->
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="h-2 rounded-full" 
+                         :class="totalProfit >= 0 ? 'bg-green-600' : 'bg-red-600'"
+                         :style="{ width: profitProgressPercentage + '%' }"></div>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-2">
+                    {{ totalProfit >= 0 ? 'ربح إيجابي' : 'خسارة' }}: {{ profitProgressPercentage.toFixed(1) }}%
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Grouped Investors Section -->
+            <div v-if="groupedInvestors && groupedInvestors.length > 0" class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
+              <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">المستثمرون النشطون (مجمعة)</h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div v-for="investor in groupedInvestors" :key="investor.user.id" 
+                     class="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
+                  <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center">
+                      <div class="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
+                        <span class="text-white font-bold text-sm">{{ (investor.user?.name || 'U').charAt(0) }}</span>
+                      </div>
+                      <div class="ml-3">
+                        <h4 class="font-medium text-gray-900 dark:text-white">{{ investor.user?.name || 'مستخدم غير معروف' }}</h4>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ investor.user?.email || 'بريد غير معروف' }}</p>
+                      </div>
+                    </div>
+                    <div class="text-xs text-gray-500">
+                      {{ investor.investmentCount }} استثمار
+                    </div>
+                  </div>
+                  <div class="space-y-2">
+                    <div class="flex justify-between">
+                      <span class="text-sm text-gray-600 dark:text-gray-400">إجمالي المستثمر:</span>
+                      <span class="font-medium text-gray-900 dark:text-white">${{ Math.round(investor.totalAmount) }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-sm text-gray-600 dark:text-gray-400">النسبة المئوية:</span>
+                      <span class="font-medium text-purple-600 dark:text-purple-400">{{ (investor.totalPercentage || 0).toFixed(2) }}%</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-sm text-gray-600 dark:text-gray-400">نصيب الربح:</span>
+                      <span :class="investor.totalProfitShare >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'" 
+                            class="font-medium">${{ Math.round(investor.totalProfitShare || 0) }}</span>
+                    </div>
+                  </div>
+                  <div class="mt-3 pt-3 border-t border-purple-200 dark:border-purple-700">
+                    <div class="flex justify-between">
+                      <button v-for="investment in investor.investments" :key="investment.id"
+                              @click="withdrawInvestment(investment.id)" 
+                              class="text-red-600 hover:text-red-800 text-xs font-medium bg-red-50 hover:bg-red-100 px-2 py-1 rounded">
+                        سحب ${{ Math.round(investment.amount) }}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -440,6 +694,58 @@
         </div>
       </div>
     </div>
+
+    <!-- Investment Modal -->
+    <div v-if="showInvestmentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+        <div class="mt-3">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white">إضافة استثمار جديد</h3>
+            <button @click="showInvestmentModal = false" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+          
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">المستثمر</label>
+            <select v-model="investmentForm.user_id" 
+                    class="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+              <option value="">اختر المستثمر</option>
+              <option v-for="user in usersWithWallets" :key="user.id" :value="user.id">
+                {{ user.name }} ({{ Math.round(user.wallet.balance).toLocaleString() }}$)
+              </option>
+            </select>
+          </div>
+          
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">المبلغ</label>
+            <input type="number" v-model="investmentForm.amount" 
+                   class="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                   placeholder="أدخل مبلغ الاستثمار">
+          </div>
+          
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">ملاحظات</label>
+            <textarea v-model="investmentForm.note" 
+                      class="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                      rows="3" placeholder="ملاحظات حول الاستثمار (اختياري)"></textarea>
+          </div>
+          
+          <div class="flex justify-end space-x-3">
+            <button @click="showInvestmentModal = false" 
+                    class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
+              إلغاء
+            </button>
+            <button @click="confirmAddInvestment" 
+                    class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700">
+              إضافة الاستثمار
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </AuthenticatedLayout>
 </template>
 
@@ -462,6 +768,19 @@ const props = defineProps({
   totalCapital: Number,
   totalUserIn: Number,
   totalUserOut: Number,
+  totalPaidFromCashbox: Number,
+  remainingCapital: Number,
+  totalCarPayments: Number,
+  totalProfit: Number,
+  totalSoldCarsCost: Number,
+  usersWithWallets: Array,
+  totalActiveInvestments: Number,
+  activeInvestors: Array,
+  groupedInvestors: Array,
+  capitalAfterInvestments: Number,
+  finalRemainingCapital: Number,
+  capitalStatus: String,
+  profitStatus: String,
 })
 
 // Reactive data
@@ -477,6 +796,7 @@ const filters = ref({
 // Modal states
 const showAddToBoxModal = ref(false)
 const showWithdrawFromBoxModal = ref(false)
+const showInvestmentModal = ref(false)
 
 // Form data
 const addToBoxForm = ref({
@@ -489,9 +809,38 @@ const withdrawFromBoxForm = ref({
   note: ''
 })
 
+const investmentForm = ref({
+  user_id: '',
+  amount: '',
+  note: ''
+})
+
 // Computed
 const netUserBalance = computed(() => {
   return (props.totalUserIn || 0) - (props.totalUserOut || 0)
+})
+
+// Progress calculations
+const capitalProgressPercentage = computed(() => {
+  if (!props.totalCapital || props.totalCapital === 0) return 0
+  return Math.min(((props.totalPaidFromCashbox || 0) / props.totalCapital) * 100, 100)
+})
+
+const paymentProgressPercentage = computed(() => {
+  if (!props.totalCapital || props.totalCapital === 0) return 0
+  return Math.min(((props.totalCarPayments || 0) / props.totalCapital) * 100, 100)
+})
+
+const profitProgressPercentage = computed(() => {
+  if (!props.totalCapital || props.totalCapital === 0) return 0
+  const profitRatio = Math.abs(props.totalProfit || 0) / props.totalCapital
+  return Math.min(profitRatio * 100, 100)
+})
+
+// Investment calculations
+const investmentPercentage = computed(() => {
+  if (!props.totalCapital || props.totalCapital === 0) return 0
+  return ((props.totalActiveInvestments || 0) / props.totalCapital) * 100
 })
 
 // Methods
@@ -540,6 +889,54 @@ const clearFilters = () => {
     dateTo: ''
   }
   loadTransactions()
+}
+
+const viewUserWallet = (userId) => {
+  // Redirect to user wallet page
+  window.open(`/user-wallet/${userId}`, '_blank')
+}
+
+const confirmAddInvestment = async () => {
+  if (!investmentForm.value.user_id || !investmentForm.value.amount || investmentForm.value.amount <= 0) {
+    toast.error('يرجى إدخال جميع البيانات المطلوبة')
+    return
+  }
+  
+  try {
+    const response = await axios.post('/api/investments/add', investmentForm.value)
+    
+    if (response.data.success) {
+      toast.success(response.data.message)
+      showInvestmentModal.value = false
+      investmentForm.value = { user_id: '', amount: '', note: '' }
+      // إعادة تحميل الصفحة لتحديث البيانات
+      window.location.reload()
+    } else {
+      toast.error(response.data.error || 'حدث خطأ في إضافة الاستثمار')
+    }
+  } catch (error) {
+    toast.error(error.response?.data?.error || 'حدث خطأ في إضافة الاستثمار')
+    console.error(error)
+  }
+}
+
+const withdrawInvestment = async (investmentId) => {
+  if (confirm('هل أنت متأكد من سحب هذا الاستثمار؟ سيتم إرجاع المبلغ إلى محفظة المستثمر.')) {
+    try {
+      const response = await axios.post(`/api/investments/${investmentId}/withdraw`)
+      
+      if (response.data.success) {
+        toast.success(response.data.message)
+        // إعادة تحميل الصفحة لتحديث البيانات
+        window.location.reload()
+      } else {
+        toast.error(response.data.error || 'حدث خطأ في سحب الاستثمار')
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'حدث خطأ في سحب الاستثمار')
+      console.error(error)
+    }
+  }
 }
 
 const formatDate = (dateString) => {
@@ -601,3 +998,4 @@ onMounted(() => {
   loadTransactions()
 })
 </script>
+

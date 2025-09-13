@@ -124,8 +124,8 @@ class DashboardController extends Controller
     public function addCar(Request $request)
     {
         $car_id = $request->id ?? 0;
-        $maxNo = Car::max('no');
-        $no = $car_id ? $request->no : $maxNo + 1;
+        $maxNo = Car::max(DB::raw('CAST(no AS UNSIGNED)'));
+        $no = $car_id ? $request->no : ($maxNo ?? 0) + 1;
         $exp_note=$request->exp_note;
         $images = [];
         if ($request->image) {
@@ -575,15 +575,25 @@ class DashboardController extends Controller
             $amount = abs($difference);
             
             // إنشاء معاملة جديدة
-            Transactions::create([
-                'amount' => $amount,
-                'type' => $transactionType,
-                'description' => $editNote ?: ($difference > 0 ? 'تعديل زيادة المبلغ المدفوع' : 'تعديل تقليل المبلغ المدفوع'),
-                'wallet_id' => 1, // افتراضياً محفظة الخزينة
-                'morphed_id' => $carId,
-                'morphed_type' => 'App\Models\Car',
-                'user_id' => auth()->id(),
-            ]);
+            // استخدام محفظة الدخل للمعاملات الإيجابية ومحفظة الخرج للمعاملات السلبية
+            $walletId = null;
+            if ($difference > 0 && $this->inAccount && $this->inAccount->wallet) {
+                $walletId = $this->inAccount->wallet->id;
+            } elseif ($difference < 0 && $this->outAccount && $this->outAccount->wallet) {
+                $walletId = $this->outAccount->wallet->id;
+            }
+            
+            if ($walletId) {
+                Transactions::create([
+                    'amount' => $amount,
+                    'type' => $transactionType,
+                    'description' => $editNote ?: ($difference > 0 ? 'تعديل زيادة المبلغ المدفوع' : 'تعديل تقليل المبلغ المدفوع'),
+                    'wallet_id' => $walletId,
+                    'morphed_id' => $carId,
+                    'morphed_type' => 'App\Models\Car',
+                    'user_id' => auth()->id(),
+                ]);
+            }
         }
         
         // تسجيل التغيير في التاريخ
@@ -659,7 +669,7 @@ class DashboardController extends Controller
         if($type==0){
             $data =    $data->where('results', $type);
         }
-        $data =$data->orderBy('no', 'DESC')->paginate(100);
+        $data =$data->orderByRaw('CAST(no AS UNSIGNED) DESC')->paginate(100);
         
         // حساب الأرقام من البيانات الفعلية
         $totalIncome = Transactions::where('type', 'in')->sum('amount');
@@ -699,7 +709,7 @@ class DashboardController extends Controller
         if($type==0){
             $data =    $data->where('results', $type);
         }
-        $data =$data->orderBy('no', 'DESC')->paginate(10);
+        $data =$data->orderByRaw('CAST(no AS UNSIGNED) DESC')->paginate(10);
         return Response::json($data, 200);
     }
     public function addToBox()

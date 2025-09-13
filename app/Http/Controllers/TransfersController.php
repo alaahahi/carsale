@@ -19,6 +19,7 @@ use App\Models\ExpensesType;
 use Illuminate\Support\Facades\DB;
 use App\Models\Transactions;
 use App\Models\Expenses;
+use App\Models\Investment;
 
 use Carbon\Carbon;
 use Inertia\Inertia;
@@ -78,6 +79,64 @@ class TransfersController extends Controller
             ->where('type', 'user_out')
             ->sum('amount');
         
+        // حساب المدفوع من الصندوق (المبلغ المدفوع من القاسة)
+        $totalPaidFromCashbox = Transactions::where('type', 'out')
+            ->whereHas('wallet.user', function($query) {
+                $query->where('email', 'out@account.com');
+            })->sum('amount');
+        
+        // حساب رأس المال المتبقي (رأس المال - المدفوع من الصندوق)
+        $remainingCapital = $totalCapital - $totalPaidFromCashbox;
+        
+        // حساب إجمالي المدفوعات من السيارات المباعة فقط
+        $totalCarPayments = Car::where('results', '!=', 0)->sum('paid_amount_pay');
+        
+        // حساب إجمالي تكلفة السيارات المباعة فقط
+        $totalSoldCarsCost = Car::where('results', '!=', 0)
+            ->selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
+            ->value('total') ?? 0;
+        
+        // حساب الربح الصحيح (المدفوعات من السيارات المباعة - تكلفة السيارات المباعة)
+        $totalProfit = $totalCarPayments - $totalSoldCarsCost;
+        
+        // جلب المستخدمين الذين لديهم محافظ
+        $usersWithWallets = User::whereHas('wallet')
+            ->where('show_wallet', true)
+            ->with(['wallet', 'userType'])
+            ->get();
+
+        // حساب الاستثمارات النشطة
+        $totalActiveInvestments = Investment::getTotalActiveInvestments();
+        $activeInvestors = Investment::getActiveInvestors();
+        
+        // تحديث النسب والأرباح للاستثمارات الموجودة
+        $this->updateInvestmentPercentagesAndProfits();
+        
+        // حساب رأس المال بعد الاستثمارات (رأس المال - الاستثمارات النشطة)
+        $capitalAfterInvestments = max(0, $totalCapital - $totalActiveInvestments);
+        
+        // حساب رأس المال المتبقي بعد الاستثمارات والمدفوعات
+        $finalRemainingCapital = max(0, $capitalAfterInvestments - $totalPaidFromCashbox);
+        
+        // حساب مؤشرات الألوان
+        $capitalStatus = $finalRemainingCapital > 0 ? 'needs_investment' : 'sufficient_investment';
+        $profitStatus = $totalProfit > 0 ? 'profit' : 'loss';
+        
+        // تجميع الاستثمارات حسب المستخدم
+        $allActiveInvestments = Investment::where('status', 'active')->with('user')->get();
+        $groupedInvestments = $allActiveInvestments->groupBy('user_id');
+        $groupedInvestors = $groupedInvestments->map(function ($investments) {
+            $firstInvestment = $investments->first();
+            return [
+                'user' => $firstInvestment->user,
+                'totalAmount' => $investments->sum('amount'),
+                'totalPercentage' => $investments->sum('percentage'),
+                'totalProfitShare' => $investments->sum('profit_share'),
+                'investments' => $investments,
+                'investmentCount' => $investments->count()
+            ];
+        })->values();
+        
         $data = [
             'totalIncome' => $totalIncome,
             'totalExpenses' => $totalExpenses,
@@ -87,6 +146,19 @@ class TransfersController extends Controller
             'totalCapital' => $totalCapital,
             'totalUserIn' => $totalUserIn,
             'totalUserOut' => $totalUserOut,
+            'totalPaidFromCashbox' => $totalPaidFromCashbox,
+            'remainingCapital' => $remainingCapital,
+            'totalCarPayments' => $totalCarPayments,
+            'totalProfit' => $totalProfit,
+            'totalSoldCarsCost' => $totalSoldCarsCost,
+            'usersWithWallets' => $usersWithWallets,
+            'totalActiveInvestments' => $totalActiveInvestments,
+            'activeInvestors' => $activeInvestors,
+            'groupedInvestors' => $groupedInvestors,
+            'capitalAfterInvestments' => $capitalAfterInvestments,
+            'finalRemainingCapital' => $finalRemainingCapital,
+            'capitalStatus' => $capitalStatus,
+            'profitStatus' => $profitStatus,
             'mainAccount' => $this->mainAccount,
             'inAccount' => $this->inAccount,
             'outAccount' => $this->outAccount,
@@ -213,6 +285,135 @@ class TransfersController extends Controller
         }
         return response()->json($countComp); 
     }
+
+    // إضافة استثمار جديد
+    public function addInvestment(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'amount' => 'required|numeric|min:0.01',
+            'note' => 'nullable|string|max:500'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $user = User::findOrFail($request->user_id);
+            $wallet = $user->getWalletOrCreate();
+
+            // التحقق من وجود رصيد كافي
+            if ($wallet->balance < $request->amount) {
+                return response()->json(['error' => 'الرصيد غير كافي في المحفظة'], 400);
+            }
+
+            // خصم المبلغ من المحفظة
+            $wallet->decrement('balance', $request->amount);
+
+            // إنشاء الاستثمار
+            $investment = Investment::create([
+                'user_id' => $request->user_id,
+                'amount' => $request->amount,
+                'note' => $request->note,
+                'status' => 'active'
+            ]);
+
+            // حساب النسبة المئوية
+            $totalCapital = Car::sum('purchase_price') + 
+                           Car::sum('erbil_exp') + 
+                           Car::sum('erbil_shipping') + 
+                           Car::sum('dubai_exp') + 
+                           Car::sum('dubai_shipping');
+            
+            $investment->calculatePercentage($totalCapital);
+            
+            // حساب نصيب الربح
+            $totalProfit = Car::sum('paid_amount_pay') - $totalCapital;
+            $investment->calculateProfitShare($totalProfit);
+
+            // تسجيل المعاملة
+            Transactions::create([
+                'wallet_id' => $wallet->id,
+                'amount' => $request->amount,
+                'type' => 'investment',
+                'description' => 'استثمار من المحفظة - ' . ($request->note ?? 'بدون ملاحظات'),
+                'user_id' => auth()->id(),
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم إضافة الاستثمار بنجاح',
+                'investment' => $investment->load('user')
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'حدث خطأ في إضافة الاستثمار: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // سحب استثمار
+    public function withdrawInvestment(Request $request, $id)
+    {
+        try {
+            DB::beginTransaction();
+
+            $investment = Investment::findOrFail($id);
+            
+            if ($investment->status !== 'active') {
+                return response()->json(['error' => 'الاستثمار غير نشط'], 400);
+            }
+
+            $user = $investment->user;
+            $wallet = $user->getWalletOrCreate();
+
+            // إرجاع المبلغ إلى المحفظة
+            $wallet->increment('balance', $investment->amount);
+
+            // تحديث حالة الاستثمار
+            $investment->update(['status' => 'withdrawn']);
+
+            // تسجيل المعاملة
+            Transactions::create([
+                'wallet_id' => $wallet->id,
+                'amount' => $investment->amount,
+                'type' => 'investment_withdrawal',
+                'description' => 'سحب استثمار - ' . ($investment->note ?? 'بدون ملاحظات'),
+                'user_id' => auth()->id(),
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم سحب الاستثمار بنجاح'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'حدث خطأ في سحب الاستثمار: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // تحديث النسب والأرباح للاستثمارات الموجودة
+    private function updateInvestmentPercentagesAndProfits()
+    {
+        $totalCapital = Car::sum('purchase_price') + 
+                       Car::sum('erbil_exp') + 
+                       Car::sum('erbil_shipping') + 
+                       Car::sum('dubai_exp') + 
+                       Car::sum('dubai_shipping');
+        
+        $totalProfit = Car::sum('paid_amount_pay') - $totalCapital;
+        
+        $activeInvestments = Investment::where('status', 'active')->get();
+        
+        foreach ($activeInvestments as $investment) {
+            $investment->calculatePercentage($totalCapital);
+            $investment->calculateProfitShare($totalProfit);
+        }
+    }
     public function addTransfers()
     {
         $maxNo = Transfers::max('no');
@@ -297,7 +498,7 @@ class TransfersController extends Controller
         if($type==0){
             $data =    $data->where('results', $type);
         }
-        $data =$data->paginate(10);
+        $data =$data->orderByRaw('CAST(no AS UNSIGNED) DESC')->paginate(10);
         return Response::json($data, 200);
     }
     

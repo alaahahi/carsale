@@ -98,6 +98,16 @@ class User extends Authenticatable
     {
         return $this->hasMany(Transaction::class);
     }
+
+    public function investments()
+    {
+        return $this->hasMany(Investment::class);
+    }
+
+    public function activeInvestments()
+    {
+        return $this->hasMany(Investment::class)->where('status', 'active');
+    }
     
     /**
      * إنشاء wallet للمستخدم إذا لم يكن موجوداً

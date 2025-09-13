@@ -187,6 +187,24 @@ return new class extends Migration
             });
         }
 
+        // جدول الاستثمارات
+        if (!Schema::hasTable('investments')) {
+            Schema::create('investments', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->decimal('amount', 10, 2);
+            $table->decimal('percentage', 5, 2)->default(0); // نسبة الاستثمار من رأس المال
+            $table->decimal('profit_share', 10, 2)->default(0); // نصيب المستثمر من الربح
+            $table->text('note')->nullable();
+            $table->enum('status', ['active', 'withdrawn'])->default('active');
+            $table->timestamps();
+            $table->softDeletes();
+            
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->index(['user_id', 'status']);
+            });
+        }
+
    
 
         // جدول إعدادات النظام

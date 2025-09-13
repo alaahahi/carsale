@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\User;
 use Inertia\Inertia;
 use App\Models\Transactions;
+use App\Models\Investment;
 
 class UserWalletController extends Controller
 {
@@ -86,11 +87,52 @@ class UserWalletController extends Controller
             ->selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
             ->value('total') ?? 0;
 
+        // حساب إجمالي الربح من مدفوعات السيارات
+        $totalCarPayments = DB::table('car')
+            ->whereNotNull('paid_amount_pay')
+            ->sum('paid_amount_pay') ?? 0;
+        $totalProfit = max(0, $totalCarPayments - $capital);
+
+        // جلب بيانات الاستثمارات للمستخدم - مجمعة حسب المستخدم
+        $allActiveInvestments = Investment::where('status', 'active')->with('user')->get();
+        $groupedInvestments = $allActiveInvestments->groupBy('user_id');
+        
+        $userInvestments = [
+            'totalAmount' => $user->activeInvestments()->sum('amount'),
+            'totalPercentage' => 0,
+            'totalProfitShare' => $user->activeInvestments()->sum('profit_share'),
+            'activeInvestments' => $user->activeInvestments()->with('user')->get(),
+            'groupedInvestments' => $groupedInvestments->map(function ($investments) {
+                $firstInvestment = $investments->first();
+                return [
+                    'user' => $firstInvestment->user,
+                    'totalAmount' => $investments->sum('amount'),
+                    'totalPercentage' => $investments->sum('percentage'),
+                    'totalProfitShare' => $investments->sum('profit_share'),
+                    'investments' => $investments,
+                    'investmentCount' => $investments->count()
+                ];
+            })->values()
+        ];
+
+        // حساب النسبة المئوية للاستثمارات
+        if ($capital > 0) {
+            $userInvestments['totalPercentage'] = ($userInvestments['totalAmount'] / $capital) * 100;
+        }
+
+        // حساب رأس المال - مبلغ الاستثمار
+        $capitalInvestmentDifference = $capital - $userInvestments['totalAmount'];
+        $suggestedInvestmentAmount = $capitalInvestmentDifference > 0 ? $capitalInvestmentDifference : 0;
+
         return Inertia::render('UserWallet', [
             'user' => $user,
             'userTransactions' => $userTransactions,
             'userWalletBalance' => $userWalletBalance,
-            'capital' => $capital
+            'capital' => $capital,
+            'totalProfit' => $totalProfit,
+            'userInvestments' => $userInvestments,
+            'capitalInvestmentDifference' => $capitalInvestmentDifference,
+            'suggestedInvestmentAmount' => $suggestedInvestmentAmount
         ]);
     }
 
@@ -112,8 +154,16 @@ class UserWalletController extends Controller
             $amount = $request->amount;
             $description = $request->description ?: 'إضافة إلى القاسة';
 
+            // الحصول على المستخدم وإنشاء wallet إذا لم يكن موجوداً
+            $user = User::findOrFail($userId);
+            $wallet = $user->getWalletOrCreate();
+
+            // زيادة رصيد المحفظة
+            $wallet->increment('balance', $amount);
+
             // إنشاء معاملة إدخال
             Transactions::create([
+                'wallet_id' => $wallet->id,
                 'type' => 'user_in',
                 'amount' => $amount,
                 'description' => $description,
@@ -126,21 +176,120 @@ class UserWalletController extends Controller
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'تم إضافة المبلغ بنجاح'
-            ]);
+        return response()->json([
+            'success' => true,
+            'message' => 'تم إضافة المبلغ بنجاح'
+        ]);
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-            \Log::error('Error adding to user wallet: ' . $e->getMessage());
-            
-            return response()->json([
-                'success' => false,
-                'message' => 'حدث خطأ أثناء إضافة المبلغ'
-            ], 500);
-        }
+    } catch (\Exception $e) {
+        DB::rollBack();
+        \Log::error('Error adding to user wallet: ' . $e->getMessage());
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'حدث خطأ أثناء إضافة المبلغ'
+        ], 500);
     }
+}
+
+/**
+ * إضافة استثمار مباشر (إضافة للقاسة ثم استثمار نفس المبلغ)
+ */
+public function addDirectInvestment(Request $request)
+{
+    $request->validate([
+        'amount' => 'required|numeric|min:0.01',
+        'note' => 'nullable|string|max:255',
+        'user_id' => 'nullable|exists:users,id'
+    ]);
+
+    try {
+        DB::beginTransaction();
+
+        $userId = $request->get('user_id') ?: Auth::id();
+        $amount = $request->amount;
+        $note = $request->note ?: 'استثمار مباشر';
+
+        // الحصول على المستخدم وإنشاء wallet إذا لم يكن موجوداً
+        $user = User::findOrFail($userId);
+        $wallet = $user->getWalletOrCreate();
+
+        // الخطوة 1: إضافة المبلغ للقاسة
+        $wallet->increment('balance', $amount);
+
+        // إنشاء معاملة إدخال للقاسة
+        Transactions::create([
+            'wallet_id' => $wallet->id,
+            'type' => 'user_in',
+            'amount' => $amount,
+            'description' => 'إضافة للقاسة قبل الاستثمار المباشر',
+            'morphed_type' => 'App\Models\User',
+            'morphed_id' => $userId,
+            'user_id' => Auth::id(),
+            'created_at' => now(),
+            'updated_at' => now()
+        ]);
+
+        // الخطوة 2: استثمار نفس المبلغ (خصم من الرصيد وإضافة للاستثمار)
+        $wallet->decrement('balance', $amount);
+
+        // إنشاء معاملة خروج للقاسة (للاستثمار)
+        Transactions::create([
+            'wallet_id' => $wallet->id,
+            'type' => 'user_out',
+            'amount' => $amount,
+            'description' => 'استثمار مباشر من القاسة',
+            'morphed_type' => 'App\Models\User',
+            'morphed_id' => $userId,
+            'user_id' => Auth::id(),
+            'created_at' => now(),
+            'updated_at' => now()
+        ]);
+
+        // حساب رأس المال الحالي
+        $totalCapital = DB::table('car')
+            ->selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
+            ->value('total') ?? 0;
+
+        // إنشاء الاستثمار
+        $investment = Investment::create([
+            'user_id' => $userId,
+            'amount' => $amount,
+            'note' => $note,
+            'status' => 'active'
+        ]);
+
+        // حساب النسبة المئوية
+        $investment->calculatePercentage($totalCapital);
+
+        // حساب نصيب الربح
+        $totalCarPayments = DB::table('car')
+            ->whereNotNull('paid_amount_pay')
+            ->sum('paid_amount_pay') ?? 0;
+        $totalSoldCarsCost = DB::table('car')
+            ->where('results', '!=', 0)
+            ->selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
+            ->value('total') ?? 0;
+        $totalProfit = max(0, $totalCarPayments - $totalSoldCarsCost);
+        $investment->calculateProfitShare($totalProfit);
+
+        DB::commit();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم إضافة الاستثمار المباشر بنجاح (تم إضافة المبلغ للقاسة ثم استثماره)'
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        \Log::error('Error adding direct investment: ' . $e->getMessage());
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'حدث خطأ أثناء إضافة الاستثمار المباشر'
+        ], 500);
+    }
+}
 
     /**
      * سحب مبلغ من قاسة المستخدم
@@ -160,23 +309,31 @@ class UserWalletController extends Controller
             $amount = $request->amount;
             $description = $request->description ?: 'سحب من القاسة';
 
+            // الحصول على المستخدم والمحفظة
+            $user = User::findOrFail($userId);
+            $wallet = $user->getWalletOrCreate();
+
             // التحقق من الرصيد المتاح
-            $currentBalance = $this->calculateUserWalletBalance($userId);
-            if ($amount > $currentBalance) {
+            if ($amount > $wallet->balance) {
                 return response()->json([
                     'success' => false,
                     'message' => 'المبلغ المطلوب أكبر من الرصيد المتاح'
                 ], 400);
             }
 
+            // تقليل رصيد المحفظة
+            $wallet->decrement('balance', $amount);
+
             // إنشاء معاملة سحب
             Transactions::create([
+                'wallet_id' => $wallet->id,
                 'type' => 'user_out',
                 'amount' => $amount,
                 'description' => $description,
                 'morphed_type' => 'App\Models\User',
                 'morphed_id' => $userId,
-                 'created_at' => now(),
+                'user_id' => Auth::id(),
+                'created_at' => now(),
                 'updated_at' => now()
             ]);
 
