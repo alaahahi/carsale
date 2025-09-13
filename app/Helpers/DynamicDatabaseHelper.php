@@ -9,6 +9,25 @@ use Illuminate\Support\Facades\Log;
 class DynamicDatabaseHelper
 {
     /**
+     * تطبيق إعدادات قاعدة البيانات الديناميكية مباشرة
+     */
+    public static function setConnection(TenantDatabaseConfig $config): string
+    {
+        $connectionName = 'dynamic_connection_' . $config->id;
+        $connectionInfo = $config->getConnectionInfo();
+        
+        // تحديث إعدادات الاتصال
+        config([
+            "database.connections.{$connectionName}" => $connectionInfo
+        ]);
+
+        // تعيين الاتصال الافتراضي للـ tenant
+        config(['database.default' => $connectionName]);
+
+        return $connectionName;
+    }
+
+    /**
      * الحصول على الاتصال الديناميكي بناءً على الـ subdomain
      */
     public static function getConnectionBySubdomain(string $subdomain): ?string
@@ -19,15 +38,7 @@ class DynamicDatabaseHelper
             return null;
         }
 
-        $connectionName = 'dynamic_connection_' . $config->id;
-        $connectionInfo = $config->getConnectionInfo();
-        
-        // تحديث إعدادات الاتصال
-        config([
-            "database.connections.{$connectionName}" => $connectionInfo
-        ]);
-
-        return $connectionName;
+        return self::setConnection($config);
     }
 
     /**
