@@ -27,19 +27,19 @@ class TransfersController extends Controller
 {
     public function __construct(AccountingController $accountingController)
     {
-        $this->accountingController = $accountingController;
-        $this->url = env('FRONTEND_URL');
-        $this->userAdmin =  UserType::where('name', 'admin')->first()->id;
-        $this->userSeles =  UserType::where('name', 'seles')->first()->id;
-        $this->userClient =  UserType::where('name', 'client')->first()->id;
-        $this->userAccount =  UserType::where('name', 'account')->first()->id;
+    $this->accountingController = $accountingController;
+    $this->url = env('FRONTEND_URL');
+    $this->userAdmin =  UserType::where('name', 'admin')->first()->id;
+    $this->userSeles =  UserType::where('name', 'seles')->first()->id;
+    $this->userClient =  UserType::where('name', 'client')->first()->id;
+    $this->userAccount =  UserType::where('name', 'account')->first()->id;
 
-        $this->mainAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','main@account.com')->first();
-        $this->inAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','in@account.com')->first();
-        $this->outAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','out@account.com')->first();
-        $this->transfersAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','transfers@account.com')->first();
-        $this->outSupplier= User::with('wallet')->where('type_id', $this->userAccount)->where('email','supplier-out')->first();
-        $this->debtSupplier= User::with('wallet')->where('type_id', $this->userAccount)->where('email','supplier-debt')->first();
+    $this->mainAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','main@account.com')->first();
+    $this->inAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','in@account.com')->first();
+    $this->outAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','out@account.com')->first();
+    $this->transfersAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','transfers@account.com')->first();
+    $this->outSupplier= User::with('wallet')->where('type_id', $this->userAccount)->where('email','supplier-out')->first();
+    $this->debtSupplier= User::with('wallet')->where('type_id', $this->userAccount)->where('email','supplier-debt')->first();
     }
     public function __invoke(Request $request)
     {
@@ -70,6 +70,14 @@ class TransfersController extends Controller
                        Car::sum('dubai_exp') + 
                        Car::sum('dubai_shipping');
         
+        // حساب إحصائيات المستخدمين
+        $totalUserIn = Transactions::where('morphed_type', 'App\Models\User')
+            ->where('type', 'user_in')
+            ->sum('amount');
+        $totalUserOut = Transactions::where('morphed_type', 'App\Models\User')
+            ->where('type', 'user_out')
+            ->sum('amount');
+        
         $data = [
             'totalIncome' => $totalIncome,
             'totalExpenses' => $totalExpenses,
@@ -77,6 +85,8 @@ class TransfersController extends Controller
             'totalFundIncome' => $totalFundIncome,
             'totalDebt' => $totalDebt,
             'totalCapital' => $totalCapital,
+            'totalUserIn' => $totalUserIn,
+            'totalUserOut' => $totalUserOut,
             'mainAccount' => $this->mainAccount,
             'inAccount' => $this->inAccount,
             'outAccount' => $this->outAccount,
@@ -94,7 +104,7 @@ class TransfersController extends Controller
         $dateFrom = $request->get('date_from');
         $dateTo = $request->get('date_to');
         
-        $query = Transactions::with(['wallet.user', 'morphed'])
+        $query = Transactions::with(['wallet.user', 'morphed', 'user'])
             ->orderBy('created_at', 'desc');
         
         if ($type) {
@@ -113,6 +123,11 @@ class TransfersController extends Controller
                 $transaction->car_name = $transaction->morphed->name ?? 'غير محدد';
                 $transaction->car_pin = $transaction->morphed->pin ?? 'غير محدد';
                 $transaction->client_name = $transaction->morphed->client->name ?? 'غير محدد';
+            }
+            
+            // إضافة معلومات المستخدم للمعاملات الشخصية
+            if (in_array($transaction->type, ['user_in', 'user_out']) && $transaction->morphed_type === 'App\Models\User' && $transaction->morphed) {
+                $transaction->user_name = $transaction->morphed->name ?? 'غير محدد';
             }
         }
         

@@ -15,7 +15,7 @@ use App\Http\Controllers\ResultsController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\TransfersController;
-use App\Http\Controllers\CarConfigController;
+use App\Http\Controllers\UserWalletController;
 
 use App\Models\SystemConfig;
 
@@ -123,5 +123,8 @@ Route::group(['middleware' => ['tenant']], function () {
     Route::get('car-payments', [DashboardController::class, 'getCarPayments']);
     Route::post('editSalePrice', [DashboardController::class, 'editSalePrice']);
     Route::post('editPaidAmount', [DashboardController::class, 'editPaidAmount']);
-    Route::delete('delete-payment/{paymentId}', [DashboardController::class, 'deletePayment']);
+    Route::post('user-wallet/add', [UserWalletController::class, 'addToWallet'])->name('user-wallet.add');
+    Route::post('user-wallet/withdraw', [UserWalletController::class, 'withdrawFromWallet'])->name('user-wallet.withdraw');
+    Route::delete('user-wallet/transactions/{transactionId}', [UserWalletController::class, 'deleteTransaction'])->name('user-wallet.delete-transaction');
+    Route::get('user-wallet/stats', [UserWalletController::class, 'getUserStats'])->name('user-wallet.stats');
 });

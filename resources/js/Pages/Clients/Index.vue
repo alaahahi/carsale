@@ -244,6 +244,11 @@ const getClientStatus = (debt) => {
 onMounted(() => {
     getClients();
 });
+
+// الانتقال إلى صفحة قاسة المستخدم
+const goToUserWallet = (userId) => {
+    window.location.href = `/user-wallet?user_id=${userId}`;
+};
 </script>
 
 <template>
@@ -251,9 +256,9 @@ onMounted(() => {
     <AuthenticatedLayout>
         <template #header>
             <div class="flex justify-between items-center">
-                <h2 class="font-semibold text-xl text-gray-800 leading-tight dark:text-gray-200">
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight dark:text-gray-200">
                     إدارة العملاء
-                </h2>
+            </h2>
                 <button
                     @click="showAddClientModal"
                     class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2">
@@ -265,8 +270,8 @@ onMounted(() => {
             </div>
         </template>
 
-        <div class="py-12">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <div class="py-12">
+                <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 <!-- إحصائيات إجمالية -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
                     <!-- إجمالي العملاء -->
@@ -373,7 +378,7 @@ onMounted(() => {
                 </div>
 
                 <!-- جدول العملاء -->
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6">
                         <div class="flex justify-between items-center mb-6">
                             <h3 class="text-lg font-medium text-gray-900">قائمة العملاء</h3>
@@ -402,7 +407,7 @@ onMounted(() => {
                             </svg>
                             <h3 class="mt-2 text-sm font-medium text-gray-900">لا يوجد عملاء</h3>
                             <p class="mt-1 text-sm text-gray-500">ابدأ بإضافة عميل جديد.</p>
-                        </div>
+                            </div>
 
                         <div v-else class="overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200">
@@ -447,11 +452,17 @@ onMounted(() => {
                                             <div class="flex items-center gap-2">
                                                 <button
                                                     v-if="client.email !== 'admin@admin.com'"
-                                                    @click="showClientEditModal(client)"
-                                                    class="text-blue-600 hover:text-blue-900 px-3 py-1 rounded-md bg-blue-50 hover:bg-blue-100 transition-colors duration-200">
-                                                    تعديل
+                                                    @click="goToUserWallet(client.id)"
+                                                    class="text-green-600 hover:text-green-900 px-3 py-1 rounded-md bg-green-50 hover:bg-green-100 transition-colors duration-200">
+                                                    قاسة
                                                 </button>
                                                 <button
+                                                    v-if="client.email !== 'admin@admin.com'"
+                                                    @click="showClientEditModal(client)"
+                                                    class="text-blue-600 hover:text-blue-900 px-3 py-1 rounded-md bg-blue-50 hover:bg-blue-100 transition-colors duration-200">
+                                                تعديل
+                                            </button>
+                                            <button 
                                                     v-if="client.email !== 'admin@admin.com'"
                                                     @click="destroy(client.id)"
                                                     class="text-red-600 hover:text-red-900 px-3 py-1 rounded-md bg-red-50 hover:bg-red-100 transition-colors duration-200">
@@ -463,10 +474,10 @@ onMounted(() => {
                                 </tbody>
                             </table>
                         </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
         <!-- نافذة تعديل العميل -->
         <Modal :show="isEditModalVisible" @close="hideClientEditModal">
@@ -627,5 +638,5 @@ onMounted(() => {
                 </form>
             </div>
         </Modal>
-    </AuthenticatedLayout>
+        </AuthenticatedLayout>
 </template>

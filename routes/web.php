@@ -8,8 +8,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\TransfersController;
 use App\Http\Controllers\CarConfigController;
-use App\Http\Controllers\InfoController;
-use App\Http\Controllers\MainController;
+use App\Http\Controllers\UserWalletController;
 
 use App\Models\SystemConfig;
 
@@ -781,8 +780,7 @@ Route::group(['middleware' => ['tenant']], function () {
     Route::get('addPaymentCar',[DashboardController::class, 'addPaymentCar'])->name('addPaymentCar');
 
     
-    Route::get('addToBox',[DashboardController::class, 'addToBox'])->name('addToBox');
-    Route::get('withDrawFromBox',[DashboardController::class, 'withDrawFromBox'])->name('withDrawFromBox');
+    Route::get('user-wallet', [UserWalletController::class, 'index'])->name('user-wallet');
 
 
     

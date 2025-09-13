@@ -39,22 +39,8 @@ const switchLocale = (locale) => {
                   {{ $t("home") }}
                 </NavLink>
               </div>
-              <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
-                <NavLink
-                  :href="route('users.index')"
-                  :active="route().current('users.index')"
-                >
-                  {{ $t("users") }}
-                </NavLink>
-              </div>
-              <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
-                <NavLink
-                  :href="route('getIndexCar')"
-                  :active="route().current('getIndexCar')"
-                >
-                  {{ $t("allCars") }}
-                </NavLink>
-              </div>
+     
+        
               <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
                 <NavLink
                   :href="route('clients')"
@@ -227,13 +213,25 @@ const switchLocale = (locale) => {
                 {{ $t("home") }}
               </ResponsiveNavLink>
 
+     
+
+         
+
               <ResponsiveNavLink
-                :href="route('users.index')"
-                :active="route().current('users.index')"
-                v-if="$page.props.auth.user.type_id == 1"
+                :href="route('clients')"
+                :active="route().current('clients')"
               >
-                {{ $t("users") }}
+                {{ $t("clients") }}
               </ResponsiveNavLink>
+
+              <ResponsiveNavLink
+                :href="route('transfers')"
+                :active="route().current('transfers')"
+              >
+                {{ $t("accounts") }}
+              </ResponsiveNavLink>
+
+             
 
               <ResponsiveNavLink
                 :href="route('logout')"

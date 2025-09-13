@@ -92,4 +92,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Car::class, 'client_id');
     }
+    
+    public function transactions()
+    {
+        return $this->hasMany(Transaction::class);
+    }
 }

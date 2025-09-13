@@ -172,7 +172,68 @@
               </div>
             </div>
 
-            <!-- Filters -->
+            <!-- User Statistics Section -->
+            <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
+              <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">إحصائيات الشراكة</h3>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- إجمالي إدخال المستخدمين -->
+                <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="ml-4">
+                      <p class="text-sm font-medium text-green-800 dark:text-green-200">إجمالي إدخال المستخدمين</p>
+                      <p class="text-2xl font-bold text-green-900 dark:text-green-100">
+                        ${{ Math.round(totalUserIn).toLocaleString() }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- إجمالي سحب المستخدمين -->
+                <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-4">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="ml-4">
+                      <p class="text-sm font-medium text-red-800 dark:text-red-200">إجمالي سحب المستخدمين</p>
+                      <p class="text-2xl font-bold text-red-900 dark:text-red-100">
+                        ${{ Math.round(totalUserOut).toLocaleString() }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- صافي رصيد المستخدمين -->
+                <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="ml-4">
+                      <p class="text-sm font-medium text-blue-800 dark:text-blue-200">صافي رصيد المستخدمين</p>
+                      <p class="text-2xl font-bold" :class="netUserBalance >= 0 ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'">
+                        ${{ Math.round(netUserBalance).toLocaleString() }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
               <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
@@ -181,6 +242,8 @@
                     <option value="">جميع المعاملات</option>
                     <option value="in">دخل</option>
                     <option value="out">خرج</option>
+                    <option value="user_in">إدخال المستخدمين</option>
+                    <option value="user_out">سحب المستخدمين</option>
                   </select>
                 </div>
                 
@@ -397,6 +460,8 @@ const props = defineProps({
   totalFundIncome: Number,
   totalDebt: Number,
   totalCapital: Number,
+  totalUserIn: Number,
+  totalUserOut: Number,
 })
 
 // Reactive data
@@ -422,6 +487,11 @@ const addToBoxForm = ref({
 const withdrawFromBoxForm = ref({
   amount: '',
   note: ''
+})
+
+// Computed
+const netUserBalance = computed(() => {
+  return (props.totalUserIn || 0) - (props.totalUserOut || 0)
 })
 
 // Methods
