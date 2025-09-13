@@ -65,11 +65,8 @@ class TransfersController extends Controller
                     Car::where('results', '!=', 0)->sum('paid_amount_pay');
         
         // حساب رأس المال (مجموع سعر الشراء + جميع المصاريف لجميع السيارات)
-        $totalCapital = Car::sum('purchase_price') + 
-                       Car::sum('erbil_exp') + 
-                       Car::sum('erbil_shipping') + 
-                       Car::sum('dubai_exp') + 
-                       Car::sum('dubai_shipping');
+        $totalCapital = Car::selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
+                       ->value('total') ?? 0;
         
         // حساب إحصائيات المستخدمين
         $totalUserIn = Transactions::where('morphed_type', 'App\Models\User')
@@ -318,16 +315,17 @@ class TransfersController extends Controller
             ]);
 
             // حساب النسبة المئوية
-            $totalCapital = Car::sum('purchase_price') + 
-                           Car::sum('erbil_exp') + 
-                           Car::sum('erbil_shipping') + 
-                           Car::sum('dubai_exp') + 
-                           Car::sum('dubai_shipping');
+            $totalCapital = Car::selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
+                           ->value('total') ?? 0;
             
             $investment->calculatePercentage($totalCapital);
             
-            // حساب نصيب الربح
-            $totalProfit = Car::sum('paid_amount_pay') - $totalCapital;
+            // حساب نصيب الربح (من السيارات المباعة فقط)
+            $totalCarPayments = Car::where('results', '!=', 0)->sum('paid_amount_pay');
+            $totalSoldCarsCost = Car::where('results', '!=', 0)
+                ->selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
+                ->value('total') ?? 0;
+            $totalProfit = max(0, $totalCarPayments - $totalSoldCarsCost);
             $investment->calculateProfitShare($totalProfit);
 
             // تسجيل المعاملة
@@ -399,13 +397,15 @@ class TransfersController extends Controller
     // تحديث النسب والأرباح للاستثمارات الموجودة
     private function updateInvestmentPercentagesAndProfits()
     {
-        $totalCapital = Car::sum('purchase_price') + 
-                       Car::sum('erbil_exp') + 
-                       Car::sum('erbil_shipping') + 
-                       Car::sum('dubai_exp') + 
-                       Car::sum('dubai_shipping');
+        $totalCapital = Car::selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
+                       ->value('total') ?? 0;
         
-        $totalProfit = Car::sum('paid_amount_pay') - $totalCapital;
+        // حساب الربح من السيارات المباعة فقط
+        $totalCarPayments = Car::where('results', '!=', 0)->sum('paid_amount_pay');
+        $totalSoldCarsCost = Car::where('results', '!=', 0)
+            ->selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
+            ->value('total') ?? 0;
+        $totalProfit = max(0, $totalCarPayments - $totalSoldCarsCost);
         
         $activeInvestments = Investment::where('status', 'active')->get();
         
