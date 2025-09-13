@@ -156,22 +156,47 @@ class DashboardController extends Controller
             ]);
             
             // إضافة دفعة من نوع out عند إضافة السيارة
-            if ($car->id && $this->outAccount && $this->outAccount->wallet) {
-                $totalCost = $car->purchase_price + $car->erbil_exp + $car->erbil_shipping + $car->dubai_exp + $car->dubai_shipping;
-                $description = 'شراء سيارة - ' . $car->name . ' - رقم: ' . $car->pin . ' - سنة: ' . $car->model . ' - لون: ' . $car->color;
+            if ($car->id) {
+                // الحصول على حساب الخرج أو إنشاء واحد جديد
+                $outAccount = User::where('email', 'out@account.com')->first();
                 
-                // إنشاء wallet إذا لم يكن موجوداً
-                $wallet = $this->outAccount->getWalletOrCreate();
+                if (!$outAccount) {
+                    // إنشاء حساب الخرج إذا لم يكن موجوداً
+                    $accountTypeId = UserType::where('name', 'account')->value('id');
+                    if ($accountTypeId) {
+                        $outAccount = User::create([
+                            'name' => 'حساب الخرج',
+                            'email' => 'out@account.com',
+                            'password' => bcrypt('password'),
+                            'type_id' => $accountTypeId,
+                            'show_wallet' => false,
+                        ]);
+                        
+                        // إنشاء wallet للحساب
+                        Wallet::create([
+                            'user_id' => $outAccount->id,
+                            'balance' => 0,
+                        ]);
+                    }
+                }
                 
-                Transactions::create([
-                    'amount' => $totalCost,
-                    'type' => 'out',
-                    'description' => $description,
-                    'wallet_id' => $wallet->id,
-                    'morphed_id' => $car->id,
-                    'morphed_type' => 'App\Models\Car',
-                    'user_id' => auth()->id(),
-                ]);
+                if ($outAccount) {
+                    $totalCost = $car->purchase_price + $car->erbil_exp + $car->erbil_shipping + $car->dubai_exp + $car->dubai_shipping;
+                    $description = 'شراء سيارة - ' . $car->name . ' - رقم: ' . $car->pin . ' - سنة: ' . $car->model . ' - لون: ' . $car->color;
+                    
+                    // إنشاء wallet إذا لم يكن موجوداً
+                    $wallet = $outAccount->getWalletOrCreate();
+                    
+                    Transactions::create([
+                        'amount' => $totalCost,
+                        'type' => 'out',
+                        'description' => $description,
+                        'wallet_id' => $wallet->id,
+                        'morphed_id' => $car->id,
+                        'morphed_type' => 'App\Models\Car',
+                        'user_id' => auth()->id(),
+                    ]);
+                }
             }
         } else {
             $car = Car::find($car_id);
