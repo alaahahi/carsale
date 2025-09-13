@@ -208,6 +208,9 @@ return new class extends Migration
         
         // إنشاء الحسابات المحاسبية الأساسية
         $this->createAccountingUsers();
+        
+        // إنشاء أنواع المصروفات الأساسية
+        $this->createExpensesTypes();
     }
 
     /**
