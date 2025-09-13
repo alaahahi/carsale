@@ -250,9 +250,8 @@ public function addDirectInvestment(Request $request)
         ]);
 
         // حساب رأس المال الحالي
-        $totalCapital = DB::table('car')
-            ->selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
-            ->value('total') ?? 0;
+        $totalCapital = Car::selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
+        ->value('total') ?? 0;
 
         // إنشاء الاستثمار
         $investment = Investment::create([
