@@ -338,4 +338,57 @@ return new class extends Migration
             }
         }
     }
+
+    /**
+     * إنشاء أنواع المصروفات الأساسية
+     */
+    private function createExpensesTypes()
+    {
+        $expensesTypes = [
+            [
+                'name_ar' => 'مصاريف دبي',
+                'name_en' => 'Dubai Expenses',
+                'name_kr' => 'مصاريف دبي',
+                'status' => 'active',
+            ],
+            [
+                'name_ar' => 'مصاريف أربيل',
+                'name_en' => 'Erbil Expenses',
+                'name_kr' => 'مصاريف أربيل',
+                'status' => 'active',
+            ],
+            [
+                'name_ar' => 'شحن أربيل',
+                'name_en' => 'Erbil Shipping',
+                'name_kr' => 'شحن أربيل',
+                'status' => 'active',
+            ],
+            [
+                'name_ar' => 'شحن دبي',
+                'name_en' => 'Dubai Shipping',
+                'name_kr' => 'شحن دبي',
+                'status' => 'active',
+            ],
+            [
+                'name_ar' => 'دفعة شراء',
+                'name_en' => 'Purchase Payment',
+                'name_kr' => 'دفعة شراء',
+                'status' => 'active',
+            ],
+        ];
+
+        foreach ($expensesTypes as $type) {
+            DB::table('expenses_type')->updateOrInsert(
+                ['name_ar' => $type['name_ar']],
+                [
+                    'name_ar' => $type['name_ar'],
+                    'name_en' => $type['name_en'],
+                    'name_kr' => $type['name_kr'],
+                    'status' => $type['status'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+        }
+    }
 };
