@@ -687,16 +687,6 @@ class TenantDatabaseConfigController extends Controller
                     'updated_at' => '2023-06-10 08:24:53'
                 ],
                 [
-                    'id' => 5,
-                    'name' => 'دين',
-                    'email' => 'debt@account.com',
-                    'password' => '',
-                    'type_id' => 2, // account
-                    'is_band' => 0,
-                    'created_at' => '2023-06-10 08:29:06',
-                    'updated_at' => '2023-06-10 08:29:06'
-                ],
-                [
                     'id' => 6,
                     'name' => 'الحولات',
                     'email' => 'transfers@account.com',

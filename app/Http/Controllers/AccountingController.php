@@ -9,6 +9,7 @@ use Inertia\Inertia;
 use App\Models\User;
 use App\Models\SystemConfig;
 use App\Models\Wallet;
+use App\Models\Transactions;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Validator;
 use App\Http\Requests\Auth\LoginRequest;
@@ -72,7 +73,7 @@ class AccountingController extends Controller
                 'morphed_type' => $morphed_type,
                 'morphed_id' => $morphed_id,
                 'amount' => $amount,
-                'type' => 'increase',
+                'type' => 'in',
                 'description' => $desc,
                 'is_pay' => 0,
             ]);
@@ -90,7 +91,7 @@ class AccountingController extends Controller
                 'morphed_type' => $morphed_type,
                 'morphed_id' => $morphed_id,
                 'amount' => $amount,
-                'type' => 'decrease',
+                'type' => 'out',
                 'description' => $desc,
                 'is_pay' => 0,
             ]);

@@ -6,6 +6,8 @@ import { InertiaProgress } from '@inertiajs/progress';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy/dist/vue.m';
 import { createI18n } from 'vue-i18n';
+import Toast from 'vue-toastification';
+import 'vue-toastification/dist/index.css';
 
 const appName = window.document.getElementsByTagName('title')[0]?.innerText || 'Laravel';
 import en from './lang/en.json';
@@ -36,6 +38,21 @@ if (appElement && appElement.dataset.page) {
                         .use(plugin)
                         .use(i18n)
                         .use(ZiggyVue, Ziggy)
+                        .use(Toast, {
+                            position: "top-right",
+                            timeout: 5000,
+                            duration: 5000,
+                            closeOnClick: true,
+                            pauseOnFocusLoss: true,
+                            pauseOnHover: true,
+                            draggable: true,
+                            draggablePercent: 0.6,
+                            showCloseButtonOnHover: false,
+                            hideProgressBar: false,
+                            closeButton: "button",
+                            icon: true,
+                            rtl: true
+                        })
                         .mount(el);
                 },
             });

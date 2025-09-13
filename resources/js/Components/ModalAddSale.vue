@@ -14,6 +14,26 @@ const props = defineProps({
 });
 let showClient =  ref(false);
 
+// حساب مجموع المصاريف
+const totalExpenses = computed(() => {
+  const erbilExp = Number(props.formData.erbil_exp) || 0;
+  const erbilShipping = Number(props.formData.erbil_shipping) || 0;
+  const dubaiExp = Number(props.formData.dubai_exp) || 0;
+  const dubaiShipping = Number(props.formData.dubai_shipping) || 0;
+  
+  const total = erbilExp + erbilShipping + dubaiExp + dubaiShipping;
+  console.log('Total Expenses:', total, 'erbilExp:', erbilExp, 'erbilShipping:', erbilShipping, 'dubaiExp:', dubaiExp, 'dubaiShipping:', dubaiShipping);
+  return total;
+});
+
+// حساب المجموع الكامل للسيارة
+const totalCarCost = computed(() => {
+  const purchasePrice = Number(props.formData.purchase_price) || 0;
+  const total = purchasePrice + totalExpenses.value;
+  console.log('Total Car Cost:', total, 'purchasePrice:', purchasePrice, 'totalExpenses:', totalExpenses.value);
+  return total;
+});
+
 </script>
   <template>
     <Transition name="modal">
@@ -106,6 +126,24 @@ let showClient =  ref(false);
                           disabled
                           class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900 "
                           v-model="formData.purchase_price" />
+                        </div>
+                        <div className="mb-4 mx-5">
+                        <label  class="dark:text-gray-200" for="total_expenses" >مجموع المصاريف</label>
+                        <input
+                          id="total_expenses"
+                          type="text"
+                          disabled
+                          class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900 "
+                          :value="Math.round(totalExpenses).toLocaleString()" />
+                        </div>
+                        <div className="mb-4 mx-5">
+                        <label  class="dark:text-gray-200" for="total_car_cost" >المجموع الكامل للسيارة</label>
+                        <input
+                          id="total_car_cost"
+                          type="text"
+                          disabled
+                          class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900 "
+                          :value="Math.round(totalCarCost).toLocaleString()" />
                         </div>
                      
               

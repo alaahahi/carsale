@@ -27,7 +27,7 @@ return new class extends Migration
             Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('email')->unique();
+            $table->string('email')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->unsignedBigInteger('type_id')->nullable();
@@ -72,15 +72,10 @@ return new class extends Migration
             $table->string('model')->nullable();
             $table->json('image')->nullable();
             $table->string('pin')->nullable();
-            $table->decimal('price', 10, 2)->nullable();
-            $table->string('phone_number')->nullable();
-            $table->string('invoice_number')->nullable();
+            $table->decimal('price', 10, 2)->nullable(); // حقل قديم - غير مستخدم حالياً
             $table->decimal('paid_amount', 10, 2)->nullable();
             $table->decimal('paid_amount_pay', 10, 2)->nullable();
             $table->unsignedBigInteger('user_id')->nullable();
-            $table->unsignedBigInteger('user_purchase_id')->nullable();
-            $table->unsignedBigInteger('user_accepted')->nullable();
-            $table->unsignedBigInteger('user_rejected')->nullable();
             $table->decimal('purchase_price', 10, 2)->nullable();
             $table->date('purchase_data')->nullable();
             $table->date('pay_data')->nullable();
@@ -88,7 +83,7 @@ return new class extends Migration
             $table->text('note')->nullable();
             $table->text('note_pay')->nullable();
             $table->unsignedBigInteger('client_id')->nullable();
-            $table->text('results')->nullable();
+            $table->integer('results')->default(0);
             $table->decimal('erbil_exp', 10, 2)->nullable();
             $table->decimal('erbil_shipping', 10, 2)->nullable();
             $table->decimal('dubai_exp', 10, 2)->nullable();
@@ -101,6 +96,11 @@ return new class extends Migration
             $table->foreign('user_id')->references('id')->on('users')->onDelete('set null');
             $table->foreign('client_id')->references('id')->on('users')->onDelete('set null');
             // $table->foreign('tenant_id')->references('id')->on('tenants')->onDelete('cascade'); // جدول tenants غير موجود في قاعدة بيانات المستأجر
+            
+            // فهارس لتحسين الأداء
+            $table->index(['results', 'created_at']); // للبحث حسب الحالة والتاريخ
+            $table->index(['client_id', 'results']); // للبحث حسب العميل والحالة
+            $table->index(['pin']); // للبحث حسب رقم السيارة
             });
         }
 
@@ -113,10 +113,12 @@ return new class extends Migration
             $table->text('old_value')->nullable();
             $table->text('new_value')->nullable();
             $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('updated_by')->nullable(); // اسم المستخدم الذي قام بالتحديث
             $table->timestamps();
             
             $table->foreign('car_id')->references('id')->on('car')->onDelete('cascade');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('set null');
+            $table->index(['car_id', 'field']); // فهرس للبحث حسب السيارة والحقل
             });
         }
 
@@ -144,10 +146,13 @@ return new class extends Migration
             $table->string('type');
             $table->text('description')->nullable();
             $table->boolean('is_pay')->default(false);
+            $table->unsignedBigInteger('user_id')->nullable(); // المستخدم الذي قام بالمعاملة
             $table->timestamps();
             
             $table->foreign('wallet_id')->references('id')->on('wallets')->onDelete('cascade');
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('set null');
             $table->index(['morphed_type', 'morphed_id']);
+            $table->index(['type', 'created_at']); // فهرس للبحث حسب النوع والتاريخ
             });
         }
 
@@ -245,7 +250,7 @@ return new class extends Migration
             $table->string('third_title_ar')->nullable();
             $table->string('third_title_kr')->nullable();
             $table->timestamps();
-            });
+        });
         }
     }
 

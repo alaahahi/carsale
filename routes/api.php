@@ -71,6 +71,8 @@ Route::group(['middleware' => ['tenant']], function () {
 
     Route::get('addTransfers',[TransfersController::class, 'addTransfers'])->name('addTransfers');
     Route::get('transfers',[TransfersController::class, 'index'])->name('transfers');
+    Route::get('transfers/transactions',[TransfersController::class, 'getTransactions'])->name('transfers.transactions');
+    Route::delete('transfers/transaction/{transactionId}',[TransfersController::class, 'deleteTransaction'])->name('transfers.delete');
     Route::get('getIndexAccountsSelas',[TransfersController::class, 'getIndexAccountsSelas'])->name('getIndexAccountsSelas');
 
     Route::get('carConfig',[CarConfigController::class, 'index'])->name('carConfig');
@@ -115,4 +117,11 @@ Route::group(['middleware' => ['tenant']], function () {
 
     Route::get('car/{carId}/history', [DashboardController::class, 'getCarHistory']);
     Route::post('car/history/{historyId}/restore', [DashboardController::class, 'restoreCarHistory']);
+    
+    Route::put('clients/{id}/update', [UserController::class, 'updateClient'])->name('clients.update');
+    Route::post('clients/store', [UserController::class, 'storeClient'])->name('clients.store');
+    Route::get('car-payments', [DashboardController::class, 'getCarPayments']);
+    Route::post('editSalePrice', [DashboardController::class, 'editSalePrice']);
+    Route::post('editPaidAmount', [DashboardController::class, 'editPaidAmount']);
+    Route::delete('delete-payment/{paymentId}', [DashboardController::class, 'deletePayment']);
 });

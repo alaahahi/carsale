@@ -61,8 +61,39 @@ class UserController extends Controller
     }
     public function getIndexClients()
     {
-        $data = User::with('userType:id,name','wallet')->where('type_id', $this->userClient)->paginate(10);
-        return Response::json($data, 200);
+        $clients = User::with(['userType:id,name','wallet', 'cars' => function($query) {
+            $query->where('results', '!=', 0); // السيارات المباعة فقط
+        }])->where('type_id', $this->userClient)->get();
+        
+        // حساب المطلوب والمدفوع لكل عميل
+        $clients->each(function($client) {
+            $totalRequired = 0; // إجمالي المطلوب
+            $totalPaid = 0; // إجمالي المدفوع
+            
+            foreach($client->cars as $car) {
+                $totalRequired += $car->pay_price ?? 0;
+                $totalPaid += $car->paid_amount_pay ?? 0;
+            }
+            
+            $client->total_required = $totalRequired;
+            $client->total_paid = $totalPaid;
+            $client->remaining_debt = $totalRequired - $totalPaid;
+        });
+        
+        // إحصائيات إجمالية
+        $stats = [
+            'total_clients' => $clients->count(),
+            'total_required' => $clients->sum('total_required'),
+            'total_paid' => $clients->sum('total_paid'),
+            'total_debt' => $clients->sum('remaining_debt'),
+            'clients_with_debt' => $clients->where('remaining_debt', '>', 0)->count(),
+            'clients_paid_off' => $clients->where('remaining_debt', '<=', 0)->count()
+        ];
+        
+        return Response::json([
+            'data' => $clients,
+            'stats' => $stats
+        ], 200);
     }
     public function addClients()
     {
@@ -145,6 +176,95 @@ class UserController extends Controller
      *
      * @return Response
      */
+    public function storeClient(Request $request)
+    {
+        try {
+            // التحقق من صحة البيانات
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'phone' => 'nullable|string|max:20'
+            ]);
+
+            // إنشاء العميل الجديد
+            $user = User::create([
+                'name' => trim($request->name),
+                'phone' => $request->phone ? trim($request->phone) : null,
+                'type_id' => $this->userClient,
+                'email' => 'client_' . time() . '@temp.com', // إيميل مؤقت
+                'password' => bcrypt('123456') // كلمة مرور افتراضية
+            ]);
+
+            // إنشاء محفظة للعميل
+            Wallet::create(['user_id' => $user->id]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم إضافة العميل بنجاح',
+                'user' => $user->fresh()
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'خطأ في التحقق من البيانات',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error creating client: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'حدث خطأ في إضافة العميل'
+            ], 500);
+        }
+    }
+
+    public function updateClient(Request $request, $id)
+    {
+        try {
+            // التحقق من صحة البيانات
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'phone' => 'nullable|string|max:20'
+            ]);
+
+            // البحث عن العميل
+            $user = User::findOrFail($id);
+            
+            // التحقق من أن المستخدم هو عميل
+            if ($user->type_id != $this->userClient) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'هذا المستخدم ليس عميلاً'
+                ], 400);
+            }
+
+            // تحديث البيانات
+            $user->update([
+                'name' => trim($request->name),
+                'phone' => $request->phone ? trim($request->phone) : null
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم تحديث بيانات العميل بنجاح',
+                'user' => $user->fresh()
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'خطأ في التحقق من البيانات',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error updating client: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'حدث خطأ في تحديث بيانات العميل'
+            ], 500);
+        }
+    }
+    
     public function update($id, Request $request)
     {
         $username = User::where('id', $id)->first()->email;

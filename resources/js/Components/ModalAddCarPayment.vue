@@ -1,5 +1,10 @@
 <script setup>
 import { ref, computed } from 'vue';
+import { useToast } from 'vue-toastification';
+
+const toast = useToast();
+
+const emit = defineEmits(['close', 'a', 'deletePayment', 'printReceipt']);
 
 const props = defineProps({
   show: Boolean,
@@ -13,6 +18,88 @@ const props = defineProps({
   formData:Object
 });
 let showClient =  ref(false);
+
+// حساب الدين المتبقي
+const remainingDebt = computed(() => {
+  return Math.round(props.formData.pay_price - props.formData.paid_amount_pay);
+});
+
+// مراقبة تغيير المبلغ المدخل
+function handleAmountChange() {
+  const maxAmount = remainingDebt.value;
+  
+  if (props.formData.amountPayment > maxAmount) {
+    // إعطاء تحذير
+    toast.warning(`المبلغ المدخل (${props.formData.amountPayment.toLocaleString()}) أكبر من الدين المتبقي (${maxAmount.toLocaleString()}). سيتم تعديل المبلغ للحد الأقصى المسموح.`);
+    
+    // تعديل المبلغ للحد الأقصى
+    props.formData.amountPayment = maxAmount;
+  }
+}
+
+// دوال لتحديد نوع الدفعة والألوان
+function getPaymentTypeText(pay) {
+  if (pay.type === 'in') {
+    // التحقق من نوع الحساب حسب wallet_id أو user email
+    if (pay.wallet?.user?.email === 'main@account.com') {
+      return 'دخل للصندوق';
+    } else if (pay.wallet?.user?.email === 'in@account.com') {
+      return 'دخل';
+    } else if (pay.wallet?.user?.email === 'debt@account.com') {
+      return 'دفع دين';
+    } else {
+      return 'دخل';
+    }
+  } else if (pay.type === 'out') {
+    return 'خرج';
+  }
+  return pay.type;
+}
+
+function getPaymentTypeClass(pay) {
+  if (pay.type === 'in') {
+    if (pay.wallet?.user?.email === 'main@account.com') {
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+    } else if (pay.wallet?.user?.email === 'in@account.com') {
+      return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200';
+    } else if (pay.wallet?.user?.email === 'debt@account.com') {
+      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+    } else {
+      return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200';
+    }
+  } else if (pay.type === 'out') {
+    return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+  }
+  return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+}
+
+function getPaymentRowClass(pay) {
+  if (pay.type === 'in') {
+    if (pay.wallet?.user?.email === 'main@account.com') {
+      return 'bg-blue-50 dark:bg-blue-900/20';
+    } else if (pay.wallet?.user?.email === 'in@account.com') {
+      return 'bg-emerald-50 dark:bg-emerald-900/20';
+    } else if (pay.wallet?.user?.email === 'debt@account.com') {
+      return 'bg-green-50 dark:bg-green-900/20';
+    } else {
+      return 'bg-emerald-50 dark:bg-emerald-900/20';
+    }
+  } else if (pay.type === 'out') {
+    return 'bg-red-50 dark:bg-red-900/20';
+  }
+  return 'bg-white dark:bg-gray-800';
+}
+
+// دالة حذف الدفعة
+function deletePayment(paymentId) {
+     emit('deletePayment', paymentId);
+ 
+}
+
+// دالة طباعة الوصل
+function printPaymentReceipt(payment) {
+  emit('printReceipt', payment);
+}
 
 </script>
   <template>
@@ -39,7 +126,7 @@ let showClient =  ref(false);
                   id="id"
                   type="text"
                   class=" mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900 "
-                  v-model="formData.pay_price" />
+                  :value="Math.round(formData.pay_price).toLocaleString()" />
                 </div>
                 <div className="mb-4 mx-5">
                   <label  class="dark:text-gray-200" for="user_id" >{{ $t('paid_amount') }}</label>
@@ -48,7 +135,7 @@ let showClient =  ref(false);
                   type="text"
                   disabled
                   class=" mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900 "
-                  v-model="formData.paid_amount_pay" />
+                  :value="Math.round(formData.paid_amount_pay).toLocaleString()" />
                 </div>
                 <div className="mb-4 mx-5">
                   <label  class="dark:text-gray-200" :for="userId">{{ $t('debtRemaining') }}</label>
@@ -56,7 +143,7 @@ let showClient =  ref(false);
                   id="id"
                   type="text"
                   disabled
-                  :value="formData.pay_price-formData.paid_amount_pay"
+                  :value="Math.round(formData.pay_price - formData.paid_amount_pay).toLocaleString()"
                   class=" mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900 "
                    />
                 </div>
@@ -69,16 +156,50 @@ let showClient =  ref(false);
                                   <th scope="col" class="px-1 py-3">{{ $t('date') }}</th>
                                   <th scope="col" class="px-1 py-3">{{ $t('amount') }}</th>
                                   <th scope="col" class="px-1 py-3">{{ $t('description') }}</th>
-                                </tr>
+                                  <th scope="col" class="px-1 py-3">النوع</th>
+                                  <th scope="col" class="px-1 py-3">العمليات</th>
+                                 </tr>
                               </thead>
                               <tbody>
                                 <template  v-for="(pay, index) in formData?.transactions" :key="index" >
-                                <tr  v-if="pay.type=='in'&pay.wallet_id=='27'"  class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                <tr v-if="getPaymentTypeText(pay) == 'دخل'" :class="getPaymentRowClass(pay)" class="border-b hover:bg-gray-50 dark:hover:bg-gray-600">
                                     <td className="px-4 py-2 border dark:border-gray-900">{{ (pay.created_at).substring(0, 10)  }}</td>
-                                    <td className="px-4 py-2 border dark:border-gray-900 td">{{ pay.amount }}</td>
+                                    <td className="px-4 py-2 border dark:border-gray-900 td">{{ Math.round(pay.amount).toLocaleString() }}</td>
                                     <td className="px-4 py-2 border dark:border-gray-900 td">{{ pay.description }}</td>
+                                    <td className="px-4 py-2 border dark:border-gray-900 td">
+                                        <span :class="getPaymentTypeClass(pay)" class="px-2 py-1 rounded-full text-xs font-medium">
+                                            {{ getPaymentTypeText(pay) }}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-2 border dark:border-gray-900 td">
+                                        <div class="flex space-x-2">
+                                            <button
+                                                @click="printPaymentReceipt(pay)"
+                                                class="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                                                title="طباعة وصل"
+                                            >
+                                                <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                                                </svg>
+                                            </button>
+                                            <button
+                                                @click="deletePayment(pay.id)"
+                                                class="px-3 py-2 bg-red-500 text-white text-sm rounded hover:bg-red-600"
+                                                title="حذف الدفعة"
+                                            >
+                                                <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
                                 </template>
+                                <tr v-if="!formData?.transactions || formData.transactions.length === 0">
+                                    <td colspan="5" class="px-4 py-2 text-center text-gray-500 dark:text-gray-400">
+                                        لا توجد دفعات مسجلة
+                                    </td>
+                                </tr>
                               </tbody>
                           </table>
 
@@ -100,7 +221,12 @@ let showClient =  ref(false);
                 id="amountPayment"
                 type="number"
                 class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900 "
-                v-model="formData.amountPayment" />
+                v-model="formData.amountPayment"
+                @input="handleAmountChange"
+                :max="remainingDebt" />
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                الحد الأقصى المسموح: {{ remainingDebt.toLocaleString() }}
+              </p>
               </div>
               <div className="mb-4 mx-5">
               <label  class="dark:text-gray-200" for="notePayment" >{{ $t('note') }} </label>
@@ -120,7 +246,7 @@ let showClient =  ref(false);
                     @click="$emit('close');">{{ $t('cancel') }}</button>
                   </div>
                 <div class="basis-1/2 px-4">
-                <button class="modal-default-button py-3  bg-rose-500 rounded col-6"  @click="$emit('a',formData);formData=''" >{{ $t('yes') }}</button>
+                <button class="modal-default-button py-3  bg-rose-500 rounded col-6"  @click="$emit('a',formData);formData=''" :disabled="!formData.amountPayment || formData.amountPayment <= 0">{{ $t('yes') }}</button>
                 </div>
 
             </div>

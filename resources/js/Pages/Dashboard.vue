@@ -2,6 +2,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head } from '@inertiajs/inertia-vue3';
 import VueTailwindDatepicker from 'vue-tailwind-datepicker'
+import { useToast } from 'vue-toastification'
 import ModalAddCar from "@/Components/ModalAddCar.vue";
 import ModalAddSale from "@/Components/ModalAddSale.vue";
 import ModalAddExpenses from "@/Components/ModalAddExpenses.vue";
@@ -24,6 +25,9 @@ import axios from 'axios';
 
 
 import { ref, onMounted } from 'vue';
+
+const toast = useToast();
+
 onMounted(() => {
   const table = document.querySelector('.table-container');
   const thead = table.querySelector('thead');
@@ -44,10 +48,141 @@ let showModalAddTransfers =  ref(false);
 let showModalAddCarPayment =  ref(false);
 let showModalCarHistory =  ref(false);
 let showModalDelCar =  ref(false);
+let showModalCarPayments =  ref(false);
+let carPayments = ref([]);
+let selectedCar = ref(null);
+let showModalEditSalePrice = ref(false);
+let showModalEditPaidAmount = ref(false);
 
 function openModalDelCar(form={}) {
   formData.value=form
   showModalDelCar.value = true;
+}
+
+function showCarPayments(car) {
+  selectedCar.value = car;
+  showModalCarPayments.value = true;
+  
+  // جلب الدفعات الخاصة بالسيارة
+  axios.get(`/api/car-payments?car_id=${car.id}`)
+    .then(response => {
+      carPayments.value = response.data;
+    })
+    .catch(error => {
+      console.error('Error fetching car payments:', error);
+      toast.error('حدث خطأ في جلب الدفعات');
+    });
+}
+
+function openEditSalePrice(car) {
+  formData.value = car;
+  showModalEditSalePrice.value = true;
+}
+
+function openEditPaidAmount(car) {
+  formData.value = car;
+  showModalEditPaidAmount.value = true;
+}
+
+function confirmEditSalePrice(data) {
+  // إذا كان السعر الجديد صفر، إظهار تأكيد إضافي
+  if (data.newPayPrice == 0) {
+    if (!confirm('هل أنت متأكد من إلغاء بيع هذه السيارة؟ سيتم حذف العميل وإعادة السيارة لحالة غير مباعة.')) {
+      return;
+    }
+  }
+  
+  axios.post('/api/editSalePrice', data)
+    .then(response => {
+      showModalEditSalePrice.value = false;
+      toast.success(response.data.success || 'تم تعديل سعر البيع بنجاح');
+      window.location.reload();
+    })
+    .catch(error => {
+      console.error(error);
+      toast.error('حدث خطأ في تعديل سعر البيع');
+    });
+}
+
+function confirmEditPaidAmount(data) {
+  axios.post('/api/editPaidAmount', data)
+    .then(response => {
+      showModalEditPaidAmount.value = false;
+      toast.success(response.data.success || 'تم تعديل المبلغ المدفوع بنجاح');
+      window.location.reload();
+    })
+    .catch(error => {
+      console.error(error);
+      toast.error('حدث خطأ في تعديل المبلغ المدفوع');
+    });
+}
+
+function deletePayment(paymentId) {
+  if (confirm('هل أنت متأكد من حذف هذه الدفعة؟')) {
+    axios.delete(`/api/delete-payment/${paymentId}`)
+      .then(response => {
+        toast.success('تم حذف الدفعة وتحديث المبلغ المدفوع وإنشاء معاملة معاكسة بنجاح');
+        // إعادة جلب الدفعات
+        if (selectedCar.value) {
+          showCarPayments(selectedCar.value);
+        }
+        // إعادة تحميل الصفحة لتحديث البيانات
+        window.location.reload();
+      })
+      .catch(error => {
+        console.error(error);
+        toast.error('حدث خطأ في حذف الدفعة');
+      });
+  }
+}
+
+function printPaymentReceipt(payment) {
+  // إنشاء محتوى الوصل
+  const receiptContent = `
+    <div style="text-align: center; font-family: Arial, sans-serif; padding: 20px;">
+      <h2>وصل استلام دفعة</h2>
+      <hr>
+      <p><strong>رقم السيارة:</strong> ${selectedCar.value?.pin}</p>
+      <p><strong>اسم السيارة:</strong> ${selectedCar.value?.name}</p>
+      <p><strong>المبلغ:</strong> ${Number(payment.amount).toLocaleString()} دينار</p>
+      <p><strong>البيان:</strong> ${payment.description}</p>
+      <p><strong>التاريخ:</strong> ${new Date(payment.created_at).toLocaleDateString('ar-SA')}</p>
+      <p><strong>المستخدم:</strong> ${payment.wallet?.user?.name || 'غير محدد'}</p>
+      <hr>
+      <p style="margin-top: 30px;">شكراً لتعاملكم معنا</p>
+    </div>
+  `;
+  
+  // فتح نافذة الطباعة
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>وصل استلام دفعة</title>
+        <style>
+          @media print {
+            body { margin: 0; }
+            @page { margin: 1cm; }
+          }
+        </style>
+      </head>
+      <body>
+        ${receiptContent}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.print();
+}
+
+// معالجة حذف الدفعة من ModalAddCarPayment
+function handleDeletePaymentFromModal(paymentId) {
+  deletePayment(paymentId);
+}
+
+// معالجة طباعة الوصل من ModalAddCarPayment
+function handlePrintReceiptFromModal(payment) {
+  printPaymentReceipt(payment);
 }
 
 function openAddCar(form={}) {
@@ -107,6 +242,13 @@ showModalCarHistory.value = true;
 const formData = ref({});
 const formGenExpenses = ref({});
 const car = ref([]);
+const stats = ref({
+    totalIncome: 0,
+    totalExpenses: 0,
+    totalDebt: 0,
+    totalFundIncome: 0,
+    totalCapital: 0
+});
 
 
 const dateValue = ref({
@@ -120,7 +262,9 @@ const formatter = ref({
 })
 const getResultsCar = async (page = 1) => {
     const response = await fetch(`/getIndexCar?page=${page}`);
-    car.value = await response.json();
+    const result = await response.json();
+    car.value = result.data;
+    stats.value = result.stats;
 }
 const getResultsCarSearch = async (q='',page = 1) => {
     const response = await fetch(`/getIndexCarSearch?page=${page}&q=${q}`);
@@ -184,23 +328,30 @@ function confirmCar(V) {
 function confirmPayCar(V) {
   axios.post('/api/payCar',V)
   .then(response => {
+    toast.success('تم بيع السيارة بنجاح!');
     showModalCarSale.value = false;
-      window.location.reload();
+    window.location.reload();
   })
   .catch(error => {
     console.error(error);
+    toast.error('حدث خطأ في بيع السيارة');
   })
 }
 function conGenfirmExpenses(V) {
-  fetch(`/GenExpenses?user_id=${V.user_id}&amount=${V.amount??0}&reason=${V.reason??''}&note=${V.note??''}`)
-    .then(() => {
-      showModalAddGenExpenses.value = false;
-      window.location.reload();
-
+  fetch(`/GenExpenses?amount=${V.amount??0}&reason=${V.reason??''}&note=${V.note??''}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        toast.success(data.message);
+        showModalAddGenExpenses.value = false;
+        window.location.reload();
+      } else {
+        toast.error('حدث خطأ: ' + (data.error || 'خطأ غير معروف'));
+      }
     })
     .catch((error) => {
-      
       console.error(error);
+      toast.error('حدث خطأ في الاتصال');
     });
 }
 function conAddTransfers(V) {
@@ -214,36 +365,54 @@ function conAddTransfers(V) {
     });
 }
 function confirmAddToBox(V) {
-  fetch(`/addToBox?user_id=${V.user_id}&amount=${V.amount??0}&note=${V.note??''}`)
-    .then(() => {
-      showModalToBox.value = false;
-      window.location.reload();
-
+  fetch(`/addToBox?amount=${V.amount??0}&note=${V.note??''}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        toast.success(data.message);
+        showModalToBox.value = false;
+        window.location.reload();
+      } else {
+        toast.error('حدث خطأ: ' + (data.error || 'خطأ غير معروف'));
+      }
     })
     .catch((error) => {
       console.error(error);
+      toast.error('حدث خطأ في الاتصال');
     });
 }
 function confirmWithDrawFromBox(V) {
-  fetch(`/withDrawFromBox?user_id=${V.user_id}&amount=${V.amount??0}&note=${V.note??''}`)
-    .then(() => {
-      showModalFromBox.value = false;
-      window.location.reload();
-
+  fetch(`/withDrawFromBox?amount=${V.amount??0}&note=${V.note??''}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        toast.success(data.message);
+        showModalFromBox.value = false;
+        window.location.reload();
+      } else {
+        toast.error('حدث خطأ: ' + (data.error || 'خطأ غير معروف'));
+      }
     })
     .catch((error) => {
       console.error(error);
+      toast.error('حدث خطأ في الاتصال');
     });
 }
 function confirmAddPayment(V) {
-  fetch(`/addPaymentCar?car_id=${V.id}&user_id=${V.user_id}&pay_price=${V.pay_price??0}&amount=${V.amountPayment??0}&note=${V.notePayment??''}`)
-    .then(() => {
-      showModalFromBox.value = false;
-      window.location.reload();
-
+  fetch(`/addPaymentCar?car_id=${V.id}&pay_price=${V.pay_price??0}&amount=${V.amountPayment??0}&note=${V.notePayment??''}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        toast.success(data.message);
+        showModalFromBox.value = false;
+        window.location.reload();
+      } else {
+        toast.error('حدث خطأ: ' + (data.error || 'خطأ غير معروف'));
+      }
     })
     .catch((error) => {
       console.error(error);
+      toast.error('حدث خطأ في الاتصال');
     });
 }
 function confirmDelCar(V) {
@@ -357,6 +526,8 @@ getResultsCar();
             :user="user"
             @a="confirmAddPayment($event)"
             @close="showModalAddCarPayment = false"
+            @deletePayment="handleDeletePaymentFromModal"
+            @printReceipt="handlePrintReceiptFromModal"
             >
         <template #header>
           </template>
@@ -372,6 +543,195 @@ getResultsCar();
           ؟
           </template>
     </ModalDelCar>
+    
+    <!-- Modal لعرض دفعات السيارة -->
+    <div v-if="showModalCarPayments" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div class="mt-3">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                        دفعات السيارة: {{ selectedCar?.name }} - {{ selectedCar?.pin }}
+                    </h3>
+                    <button @click="showModalCarPayments = false" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-700">
+                            <tr>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    التاريخ
+                                </th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    المبلغ
+                                </th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    البيان
+                                </th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    المستخدم
+                                </th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    العمليات
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            <tr v-for="payment in carPayments" :key="payment.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                    {{ new Date(payment.created_at).toLocaleDateString('ar-SA') }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                    {{ Number(payment.amount).toLocaleString() }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                    {{ payment.description }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                    {{ payment.wallet?.user?.name || 'غير محدد' }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                    <div class="flex space-x-2">
+                                        <button
+                                            @click="printPaymentReceipt(payment)"
+                                            class="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                                            title="طباعة وصل"
+                                        >
+                                            <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                                            </svg>
+                                        </button>
+                                        <button
+                                            @click="deletePayment(payment.id)"
+                                            class="px-3 py-2 bg-red-500 text-white text-sm rounded hover:bg-red-600"
+                                            title="حذف الدفعة"
+                                        >
+                                            <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-if="!carPayments || carPayments.length === 0">
+                                <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                                    لا توجد دفعات مسجلة لهذه السيارة
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal لتعديل سعر البيع -->
+    <div v-if="showModalEditSalePrice" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div class="mt-3">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                        تعديل سعر البيع: {{ formData?.name }} - {{ formData?.pin }}
+                    </h3>
+                    <button @click="showModalEditSalePrice = false" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <!-- السعر الحالي -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            السعر الحالي
+                        </label>
+                        <input
+                            type="text"
+                            disabled
+                            :value="Math.round(formData?.pay_price || 0).toLocaleString()"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
+                        />
+                    </div>
+                    
+                    <!-- السعر الجديد -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            السعر الجديد
+                        </label>
+                        <input
+                            type="number"
+                            v-model="formData.newPayPrice"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-300"
+                            placeholder="أدخل السعر الجديد"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            ملاحظة: إدخال 0 سيؤدي إلى إلغاء بيع السيارة
+                        </p>
+                    </div>
+                    
+                    <!-- المبلغ المدفوع حالياً -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            المبلغ المدفوع حالياً
+                        </label>
+                        <input
+                            type="text"
+                            disabled
+                            :value="Math.round(formData?.paid_amount_pay || 0).toLocaleString()"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
+                        />
+                    </div>
+                    
+                    <!-- المبلغ المتبقي بعد التعديل -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            المبلغ المتبقي بعد التعديل
+                        </label>
+                        <input
+                            type="text"
+                            disabled
+                            :value="Math.round((formData?.newPayPrice || 0) - (formData?.paid_amount_pay || 0)).toLocaleString()"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
+                        />
+                    </div>
+                    
+                    <!-- ملاحظة -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            ملاحظة
+                        </label>
+                        <textarea
+                            v-model="formData.editNote"
+                            rows="3"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-300"
+                            placeholder="أدخل ملاحظة حول تعديل السعر"
+                        ></textarea>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button
+                        @click="showModalEditSalePrice = false"
+                        class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                    >
+                        إلغاء
+                    </button>
+                    <button
+                        @click="confirmEditSalePrice(formData)"
+                        :disabled="formData.newPayPrice === '' || formData.newPayPrice === null || formData.newPayPrice === undefined"
+                        class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-400"
+                    >
+                        تأكيد التعديل
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     
     <AuthenticatedLayout>
@@ -559,17 +919,17 @@ getResultsCar();
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.name}}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.color }}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.model }}</td>
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.purchase_price }}</td> 
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ Number(car.purchase_price || 0).toLocaleString() }}</td> 
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.source  }}</td>
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.dubai_shipping  }}</td> 
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.dubai_exp }}</td> 
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.erbil_shipping }}</td> 
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.erbil_exp }}</td> 
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.purchase_price + car.erbil_exp+car.erbil_shipping+car.dubai_exp+car.dubai_shipping }}</td>
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.pay_price }}</td> 
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ Number(car.dubai_shipping || 0).toLocaleString() }}</td> 
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ Number(car.dubai_exp || 0).toLocaleString() }}</td> 
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ Number(car.erbil_shipping || 0).toLocaleString() }}</td> 
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ Number(car.erbil_exp || 0).toLocaleString() }}</td> 
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ (Number(car.purchase_price) || 0) + (Number(car.erbil_exp) || 0) + (Number(car.erbil_shipping) || 0) + (Number(car.dubai_exp) || 0) + (Number(car.dubai_shipping) || 0) }}</td>
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ Number(car.pay_price || 0).toLocaleString() }}</td> 
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.client?.name }} </td>
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.results != 0 ? car.pay_price-car.paid_amount_pay :'' }}</td>
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.results != 0  ? car.pay_price -(car.purchase_price + car.erbil_exp+car.erbil_shipping+car.dubai_exp+car.dubai_shipping):''   }}</td>
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.results != 0 ? Number(car.pay_price - car.paid_amount_pay).toLocaleString() : '' }}</td>
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.results != 0 ? Number(car.pay_price - ((Number(car.purchase_price) || 0) + (Number(car.erbil_exp) || 0) + (Number(car.erbil_shipping) || 0) + (Number(car.dubai_exp) || 0) + (Number(car.dubai_shipping) || 0))).toLocaleString() : '' }}</td>
                                     <td className="border dark:border-gray-800 text-start px-2 py-2">
                                     <button
                                       tabIndex="1"
@@ -579,11 +939,11 @@ getResultsCar();
                                     >
                                       <edit />
                                     </button>
-          
+                                     
                                     <button
                                       tabIndex="1"
                                       class="px-2 py-1 text-base text-white mx-1 bg-purple-500 rounded"
-                                      v-if="car.results == 0"
+                                      v-if="car.results == 0 || car.results == ''"
                                       @click="openSaleCar(car)"
                                     >
                                       <pay />
@@ -605,6 +965,16 @@ getResultsCar();
                                     >
                                     <pay />
                                     </button>
+                                        <button
+                                            tabIndex="1"
+                                            class="px-2 py-1 text-base text-white mx-1 bg-yellow-700 rounded"
+                                            v-if="car.results != 0 "
+                                            @click="openEditSalePrice(car)"
+                                        >
+                                        <pay />
+
+                                       
+                                        </button>
 
                                     <button
                                       tabIndex="1"
@@ -614,6 +984,7 @@ getResultsCar();
                                     >
                                       <trash />
                                     </button>
+                                   
                                     <button
                                       tabIndex="1"
                                       
@@ -647,7 +1018,7 @@ getResultsCar();
                             </div>
                             <div class="mr-4" >
                               <h2 class="font-semibold ">{{ $t('capital') }}</h2>
-                              <p class="mt-2 text-sm text-gray-500 dark:text-gray-200">{{ mainAccount }}</p>
+                              <p class="mt-2 text-sm text-gray-500 dark:text-gray-200">{{ Math.round(stats.totalCapital).toLocaleString() }}</p>
                             </div>
                           </div>
                           <div class="flex items-start rounded-xl dark:bg-gray-600 dark:text-gray-300 bg-white p-4 shadow-lg">
@@ -659,7 +1030,7 @@ getResultsCar();
                       
                             <div class="mr-4">
                               <h2 class="font-semibold"> {{ $t('fundIncome') }} </h2>
-                              <p class="mt-2 text-sm text-gray-500 dark:text-gray-200">{{ inAccount.wallet?.balance }}</p>
+                              <p class="mt-2 text-sm text-gray-500 dark:text-gray-200">{{ Math.round(stats.totalFundIncome).toLocaleString() }}</p>
                             </div>
                           </div>
                           <div class="flex items-start rounded-xl dark:bg-gray-600 dark:text-gray-300 bg-white p-4 shadow-lg">
@@ -671,7 +1042,7 @@ getResultsCar();
                       
                             <div class="mr-4">
                               <h2 class="font-semibold">{{ $t('cash_out') }}</h2>
-                              <p class="mt-2 text-sm text-gray-500 dark:text-gray-200">{{ outAccount.wallet?.balance }}</p>
+                              <p class="mt-2 text-sm text-gray-500 dark:text-gray-200">{{ Math.round(stats.totalExpenses).toLocaleString() }}</p>
                             </div>
                           </div>
                           <div class="flex items-start rounded-xl dark:bg-gray-600 dark:text-gray-300 bg-white p-4 shadow-lg">
@@ -683,15 +1054,17 @@ getResultsCar();
                       
                             <div class="mr-4">
                               <h2 class="font-semibold">{{ $t('debt_to_fund') }}</h2>
-                              <p class="mt-2 text-sm text-gray-500 dark:text-gray-200">{{ debtAccount.wallet?.balance }}</p>
+                              <p class="mt-2 text-sm text-gray-500 dark:text-gray-200">{{ Math.round(stats.totalDebt).toLocaleString() }}</p>
                             </div>
                           </div>
                           <div class="flex items-start rounded-xl dark:bg-gray-600 dark:text-gray-300 bg-white p-4 shadow-lg">
-                            <div class="flex h-12 w-12 items-center justify-center rounded-full border border-red-100 bg-red-50">
-                              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            <div class="flex h-12 w-12 items-center justify-center rounded-full border border-purple-100 bg-purple-50">
+                              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                               </svg>
                             </div>
+                      
+                         
                       
                             <div class="mr-4">
                               <h2 class="font-semibold">{{ $t('transfer') }}</h2>
@@ -841,7 +1214,97 @@ getResultsCar();
                   </div>
                 </div>
                     </div> -->
+                    
     </div>   
+    
+    <!-- Modal لتعديل المبلغ المدفوع -->
+    <div v-if="showModalEditPaidAmount" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div class="mt-3">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                        تعديل المبلغ المدفوع: {{ formData?.name }} - {{ formData?.pin }}
+                    </h3>
+                    <button @click="showModalEditPaidAmount = false" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <!-- المبلغ المدفوع حالياً -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            المبلغ المدفوع حالياً
+                        </label>
+                        <input
+                            type="text"
+                            disabled
+                            :value="Math.round(formData?.paid_amount_pay || 0).toLocaleString()"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
+                        />
+                    </div>
+                    
+                    <!-- المبلغ الجديد -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            المبلغ الجديد
+                        </label>
+                        <input
+                            type="number"
+                            v-model="formData.newPaidAmount"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-300"
+                            placeholder="أدخل المبلغ الجديد"
+                        />
+                    </div>
+                    
+                    <!-- الفرق -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            الفرق
+                        </label>
+                        <input
+                            type="text"
+                            disabled
+                            :value="Math.round((formData?.newPaidAmount || 0) - (formData?.paid_amount_pay || 0)).toLocaleString()"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
+                        />
+                    </div>
+                    
+                    <!-- ملاحظة -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            ملاحظة
+                        </label>
+                        <textarea
+                            v-model="formData.editNote"
+                            rows="3"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-300"
+                            placeholder="أدخل ملاحظة حول التعديل"
+                        ></textarea>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button
+                        @click="showModalEditPaidAmount = false"
+                        class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                    >
+                        إلغاء
+                    </button>
+                    <button
+                        @click="confirmEditPaidAmount(formData)"
+                        :disabled="formData.newPaidAmount === '' || formData.newPaidAmount === null || formData.newPaidAmount === undefined"
+                        class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:bg-gray-400"
+                    >
+                        تأكيد التعديل
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     </AuthenticatedLayout>
 </template>
 <style scoped>

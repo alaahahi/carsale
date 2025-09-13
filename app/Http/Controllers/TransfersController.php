@@ -20,47 +20,147 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Transactions;
 use App\Models\Expenses;
 
-
-
 use Carbon\Carbon;
-
 use Inertia\Inertia;
 
 class TransfersController extends Controller
 {
     public function __construct(AccountingController $accountingController)
     {
-    $this->accountingController = $accountingController;
-    $this->url = env('FRONTEND_URL');
-    $this->userAdmin =  UserType::where('name', 'admin')->first()->id;
-    $this->userSeles =  UserType::where('name', 'seles')->first()->id;
-    $this->userClient =  UserType::where('name', 'client')->first()->id;
-    $this->userAccount =  UserType::where('name', 'account')->first()->id;
+        $this->accountingController = $accountingController;
+        $this->url = env('FRONTEND_URL');
+        $this->userAdmin =  UserType::where('name', 'admin')->first()->id;
+        $this->userSeles =  UserType::where('name', 'seles')->first()->id;
+        $this->userClient =  UserType::where('name', 'client')->first()->id;
+        $this->userAccount =  UserType::where('name', 'account')->first()->id;
 
-    $this->mainAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','main@account.com')->first();
-    $this->inAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','in@account.com')->first();
-    $this->outAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','out@account.com')->first();
-    $this->debtAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','debt@account.com')->first();
-    $this->transfersAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','transfers@account.com')->first();
-    $this->outSupplier= User::with('wallet')->where('type_id', $this->userAccount)->where('email','supplier-out')->first();
-    $this->debtSupplier= User::with('wallet')->where('type_id', $this->userAccount)->where('email','supplier-debt')->first();
-    
+        $this->mainAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','main@account.com')->first();
+        $this->inAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','in@account.com')->first();
+        $this->outAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','out@account.com')->first();
+        $this->transfersAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','transfers@account.com')->first();
+        $this->outSupplier= User::with('wallet')->where('type_id', $this->userAccount)->where('email','supplier-out')->first();
+        $this->debtSupplier= User::with('wallet')->where('type_id', $this->userAccount)->where('email','supplier-debt')->first();
     }
     public function __invoke(Request $request)
     {
-        $results = null;
-       // $client = new Client( $this->url, 'masterKey');
-       // $results = $client->stats();
-        //dd($results);
-        return Inertia::render('dashboard', ['url'=>$this->url]);   
-
+        return $this->index($request);
     }
+    
     public function index(Request $request)
     {
-        $users = User::where('type_id', $this->userAccount)->get();
-        return Inertia::render('FormRegistrationCourt', ['url'=>$this->url,'users'=>$users]);
-
+        // حساب إجمالي الدخل والخرج للصندوق
+        $totalIncome = Transactions::where('type', 'in')->sum('amount');
+        $totalExpenses = Transactions::where('type', 'out')->sum('amount');
+        $cashboxBalance = $totalIncome - $totalExpenses;
+        
+        // حساب دخل الصندوق فقط
+        $totalFundIncome = Transactions::where('type', 'in')
+            ->whereHas('wallet.user', function($query) {
+                $query->where('email', 'main@account.com');
+            })->sum('amount');
+        
+        // حساب الدين
+        $totalDebt = Car::where('results', '!=', 0)->sum('pay_price') - 
+                    Car::where('results', '!=', 0)->sum('paid_amount_pay');
+        
+        // حساب رأس المال (مجموع سعر الشراء + جميع المصاريف لجميع السيارات)
+        $totalCapital = Car::sum('purchase_price') + 
+                       Car::sum('erbil_exp') + 
+                       Car::sum('erbil_shipping') + 
+                       Car::sum('dubai_exp') + 
+                       Car::sum('dubai_shipping');
+        
+        $data = [
+            'totalIncome' => $totalIncome,
+            'totalExpenses' => $totalExpenses,
+            'cashboxBalance' => $cashboxBalance,
+            'totalFundIncome' => $totalFundIncome,
+            'totalDebt' => $totalDebt,
+            'totalCapital' => $totalCapital,
+            'mainAccount' => $this->mainAccount,
+            'inAccount' => $this->inAccount,
+            'outAccount' => $this->outAccount,
+            'transfersAccount' => $this->transfersAccount,
+            'outSupplier' => $this->outSupplier,
+            'debtSupplier' => $this->debtSupplier,
+        ];
+        
+        return Inertia::render('Transfers', $data);
     }
+    
+    public function getTransactions(Request $request)
+    {
+        $type = $request->get('type', ''); // 'in', 'out', or empty for all
+        $dateFrom = $request->get('date_from');
+        $dateTo = $request->get('date_to');
+        
+        $query = Transactions::with(['wallet.user', 'morphed'])
+            ->orderBy('created_at', 'desc');
+        
+        if ($type) {
+            $query->where('type', $type);
+        }
+        
+        if ($dateFrom && $dateTo) {
+            $query->whereBetween('created_at', [$dateFrom, $dateTo]);
+        }
+        
+        $transactions = $query->paginate(20);
+        
+        // إضافة معلومات السيارة والزبون للمعاملات المرتبطة بالسيارات
+        foreach ($transactions->items() as $transaction) {
+            if ($transaction->morphed_type === 'App\Models\Car' && $transaction->morphed) {
+                $transaction->car_name = $transaction->morphed->name ?? 'غير محدد';
+                $transaction->car_pin = $transaction->morphed->pin ?? 'غير محدد';
+                $transaction->client_name = $transaction->morphed->client->name ?? 'غير محدد';
+            }
+        }
+        
+        return Response::json([
+            'transactions' => $transactions,
+            'stats' => [
+                'total_income' => Transactions::where('type', 'in')->sum('amount'),
+                'total_expenses' => Transactions::where('type', 'out')->sum('amount'),
+                'balance' => Transactions::where('type', 'in')->sum('amount') - Transactions::where('type', 'out')->sum('amount')
+            ]
+        ], 200);
+    }
+    
+    public function deleteTransaction($transactionId)
+    {
+        $transaction = Transactions::find($transactionId);
+        if (!$transaction) {
+            return response()->json(['error' => 'المعاملة غير موجودة'], 404);
+        }
+        
+        // إذا كانت المعاملة مرتبطة بسيارة، نحتاج لتحديث السيارة
+        if ($transaction->morphed_type === 'App\Models\Car' && $transaction->morphed) {
+            $car = $transaction->morphed;
+            
+            if ($transaction->type === 'in') {
+                // إذا كانت دفعة دخول، نطرحها من المبلغ المدفوع
+                $car->paid_amount_pay = max(0, $car->paid_amount_pay - $transaction->amount);
+                
+                // إعادة حساب حالة السيارة
+                $totalCost = $car->purchase_price + $car->erbil_exp + $car->erbil_shipping + $car->dubai_exp + $car->dubai_shipping;
+                
+                if ($car->paid_amount_pay >= $totalCost && $car->pay_price) {
+                    $car->results = 2; // مدفوعة بالكامل
+                } else if ($car->paid_amount_pay > 0 && $car->pay_price) {
+                    $car->results = 1; // مدفوعة جزئياً
+                } else {
+                    $car->results = 0; // غير مدفوعة
+                }
+                
+                $car->save();
+            }
+        }
+        
+        $transaction->delete();
+        
+        return response()->json(['success' => 'تم حذف المعاملة بنجاح'], 200);
+    }
+    
     public function getIndexAccountsSelas()
     { 
         $user_id = $_GET['user_id'] ?? 0;
