@@ -120,8 +120,11 @@ class UserWalletController extends Controller
             $userInvestments['totalPercentage'] = ($userInvestments['totalAmount'] / $capital) * 100;
         }
 
-        // حساب رأس المال - مبلغ الاستثمار
-        $capitalInvestmentDifference = $capital - $userInvestments['totalAmount'];
+        // حساب جميع الاستثمارات النشطة (ليس فقط للمستخدم الحالي)
+        $totalActiveInvestments = Investment::where('status', 'active')->sum('amount');
+        
+        // حساب رأس المال - جميع الاستثمارات النشطة
+        $capitalInvestmentDifference = $capital - $totalActiveInvestments;
         $suggestedInvestmentAmount = $capitalInvestmentDifference > 0 ? $capitalInvestmentDifference : 0;
 
         return Inertia::render('UserWallet', [
