@@ -46,20 +46,7 @@ return new class extends Migration
             });
         }
 
-        // جدول الشركات
-        if (!Schema::hasTable('company')) {
-            Schema::create('company', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('name_en')->nullable();
-            $table->enum('status', ['active', 'inactive'])->default('active');
-            $table->string('tenant_id')->nullable();
-            $table->timestamps();
-            $table->softDeletes();
-            
-            // $table->foreign('tenant_id')->references('id')->on('tenants')->onDelete('cascade'); // جدول tenants غير موجود في قاعدة بيانات المستأجر
-            });
-        }
+     
 
         // جدول السيارات
         if (!Schema::hasTable('car')) {
@@ -128,8 +115,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('user_id');
             $table->decimal('balance', 10, 2)->default(0);
-            $table->string('card')->nullable();
-            $table->timestamps();
+             $table->timestamps();
             
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             });
@@ -199,45 +185,7 @@ return new class extends Migration
             });
         }
 
- 
-
-        // جدول أسماء السيارات
-        if (!Schema::hasTable('name')) {
-            Schema::create('name', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('name_en')->nullable();
-            $table->unsignedBigInteger('company_id')->nullable();
-            $table->enum('status', ['active', 'inactive'])->default('active');
-            $table->timestamps();
-            $table->softDeletes();
-            
-            $table->foreign('company_id')->references('id')->on('company')->onDelete('set null');
-            });
-        }
-
-        // جدول موديلات السيارات
-        if (!Schema::hasTable('car_model')) {
-            Schema::create('car_model', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->enum('status', ['active', 'inactive'])->default('active');
-            $table->timestamps();
-            $table->softDeletes();
-            });
-        }
-
-        // جدول ألوان السيارات
-        if (!Schema::hasTable('color')) {
-            Schema::create('color', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('name_en')->nullable();
-            $table->enum('status', ['active', 'inactive'])->default('active');
-            $table->timestamps();
-            $table->softDeletes();
-            });
-        }
+   
 
         // جدول إعدادات النظام
         if (!Schema::hasTable('system_config')) {
@@ -262,17 +210,13 @@ return new class extends Migration
     public function down()
     {
         Schema::dropIfExists('system_config');
-        Schema::dropIfExists('color');
-        Schema::dropIfExists('car_model');
-        Schema::dropIfExists('name');
-         Schema::dropIfExists('transfers');
+        Schema::dropIfExists('transfers');
         Schema::dropIfExists('expenses');
         Schema::dropIfExists('expenses_type');
         Schema::dropIfExists('transactions');
         Schema::dropIfExists('wallets');
         Schema::dropIfExists('car_field_histories');
         Schema::dropIfExists('car');
-        Schema::dropIfExists('company');
         Schema::dropIfExists('users');
         Schema::dropIfExists('user_type');
     }
