@@ -178,7 +178,7 @@
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                 <div class="flex items-center gap-2">
                                                     <button
-                                                        v-if="client.email !== 'admin@admin.com'"
+                                                        v-if="client.email !== 'admin@admin.com' && client.show_wallet"
                                                         @click="goToUserWallet(client.id)"
                                                         class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 px-3 py-1 rounded-md bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/30 transition-colors duration-200">
                                                         قاسة
