@@ -38,7 +38,8 @@ class SubdomainHelper
         $cacheKey = "tenant_subdomain_{$subdomain}";
         
         return Cache::store(self::getCacheStore())->remember($cacheKey, self::getCacheDuration(), function () use ($subdomain) {
-            $domain = Domain::where('domain', $subdomain)->with('tenant')->first();
+            // Find domain that contains this subdomain
+            $domain = Domain::where('domain', 'LIKE', $subdomain . '.%')->with('tenant')->first();
             return $domain ? $domain->tenant : null;
         });
     }
