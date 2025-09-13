@@ -30,9 +30,15 @@ class AccountingController extends Controller
         try {
             DB::beginTransaction();
             
-            // Perform your database operations with Eloquent
-            $user = User::with('wallet')->find($id);
-            $transactions = Transactions::where('wallet_id', $user?->wallet?->id)->where('is_pay', 0);
+            $user = User::find($id);
+            if (!$user) {
+                throw new \Exception("المستخدم غير موجود");
+            }
+            
+            // إنشاء wallet إذا لم يكن موجوداً
+            $wallet = $user->getWalletOrCreate();
+            
+            $transactions = Transactions::where('wallet_id', $wallet->id)->where('is_pay', 0);
             $amount = $transactions->sum('amount');
             $transactions->update(['is_pay' => 1]);
             
@@ -48,6 +54,7 @@ class AccountingController extends Controller
             // Something went wrong, rollback the transaction
             DB::rollBack();
             // Handle the exception or return an error response
+            return Response::json(['error' => $e->getMessage()], 500);
         }
         return Response::json('ok', 200);
     }
@@ -64,37 +71,47 @@ class AccountingController extends Controller
 
     public function increaseWallet(int $amount, $desc, $user_id, $morphed_id = '', $morphed_type = '', $user_added = 0)
     {
-        $user = User::with('wallet')->find($user_id);
-        if ($id = $user->wallet->id) {
-            $wallet = Wallet::find($id);
-            $wallet->increment('balance', $amount);
-            Transactions::create([
-                'wallet_id' => $id,
-                'morphed_type' => $morphed_type,
-                'morphed_id' => $morphed_id,
-                'amount' => $amount,
-                'type' => 'in',
-                'description' => $desc,
-                'is_pay' => 0,
-            ]);
+        $user = User::find($user_id);
+        if (!$user) {
+            throw new \Exception("المستخدم غير موجود");
         }
+        
+        // إنشاء wallet إذا لم يكن موجوداً
+        $wallet = $user->getWalletOrCreate();
+        
+        $wallet->increment('balance', $amount);
+        Transactions::create([
+            'wallet_id' => $wallet->id,
+            'morphed_type' => $morphed_type,
+            'morphed_id' => $morphed_id,
+            'amount' => $amount,
+            'type' => 'in',
+            'description' => $desc,
+            'is_pay' => 0,
+            'user_id' => $user_added ?: auth()->id(),
+        ]);
     }
 
     public function decreaseWallet(int $amount, $desc, $user_id, $morphed_id = '', $morphed_type = '', $user_added = 0)
     {
-        $user = User::with('wallet')->find($user_id);
-        if ($id = $user->wallet->id) {
-            $wallet = Wallet::find($id);
-            $wallet->decrement('balance', $amount);
-            Transactions::create([
-                'wallet_id' => $id,
-                'morphed_type' => $morphed_type,
-                'morphed_id' => $morphed_id,
-                'amount' => $amount,
-                'type' => 'out',
-                'description' => $desc,
-                'is_pay' => 0,
-            ]);
+        $user = User::find($user_id);
+        if (!$user) {
+            throw new \Exception("المستخدم غير موجود");
         }
+        
+        // إنشاء wallet إذا لم يكن موجوداً
+        $wallet = $user->getWalletOrCreate();
+        
+        $wallet->decrement('balance', $amount);
+        Transactions::create([
+            'wallet_id' => $wallet->id,
+            'morphed_type' => $morphed_type,
+            'morphed_id' => $morphed_id,
+            'amount' => $amount,
+            'type' => 'out',
+            'description' => $desc,
+            'is_pay' => 0,
+            'user_id' => $user_added ?: auth()->id(),
+        ]);
     }
 }

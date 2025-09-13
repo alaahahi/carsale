@@ -38,6 +38,7 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->string('device')->nullable();
             $table->string('tenant_id')->nullable();
+            $table->boolean('show_wallet')->default(false); // فلاغ لعرض قاسة المستخدم
             $table->rememberToken();
             $table->timestamps();
             

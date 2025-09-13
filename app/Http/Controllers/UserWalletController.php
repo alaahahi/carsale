@@ -23,7 +23,15 @@ class UserWalletController extends Controller
             $user = Auth::user();
         } else {
             $user = User::findOrFail($userId);
+            
+            // التحقق من أن المستخدم يملك صلاحية عرض القاسة
+            if (!$user->show_wallet) {
+                abort(403, 'ليس لديك صلاحية لعرض القاسة');
+            }
         }
+        
+        // إنشاء wallet إذا لم يكن موجوداً
+        $user->getWalletOrCreate();
         
         // جلب معاملات المستخدم الشخصية فقط
         $userTransactions = Transactions::where('morphed_type', 'App\Models\User')
@@ -54,6 +62,14 @@ class UserWalletController extends Controller
     public function show($userId)
     {
         $user = User::findOrFail($userId);
+        
+        // التحقق من أن المستخدم يملك صلاحية عرض القاسة
+        if (!$user->show_wallet) {
+            abort(403, 'ليس لديك صلاحية لعرض القاسة');
+        }
+        
+        // إنشاء wallet إذا لم يكن موجوداً
+        $user->getWalletOrCreate();
         
         // جلب معاملات المستخدم الشخصية فقط
         $userTransactions = Transactions::where('morphed_type', 'App\Models\User')

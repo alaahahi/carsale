@@ -33,6 +33,7 @@ class User extends Authenticatable
         'phone',
         'device',
         'tenant_id',
+        'show_wallet',
     ];
 
     /**
@@ -96,5 +97,26 @@ class User extends Authenticatable
     public function transactions()
     {
         return $this->hasMany(Transaction::class);
+    }
+    
+    /**
+     * إنشاء wallet للمستخدم إذا لم يكن موجوداً
+     */
+    public function createWalletIfNotExists()
+    {
+        if (!$this->wallet) {
+            return $this->wallet()->create([
+                'balance' => 0
+            ]);
+        }
+        return $this->wallet;
+    }
+    
+    /**
+     * الحصول على wallet المستخدم أو إنشاء واحد جديد
+     */
+    public function getWalletOrCreate()
+    {
+        return $this->wallet ?: $this->createWalletIfNotExists();
     }
 }
