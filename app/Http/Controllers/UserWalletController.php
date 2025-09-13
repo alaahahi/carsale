@@ -49,6 +49,36 @@ class UserWalletController extends Controller
     }
 
     /**
+     * عرض صفحة قاسة مستخدم محدد
+     */
+    public function show($userId)
+    {
+        $user = User::findOrFail($userId);
+        
+        // جلب معاملات المستخدم الشخصية فقط
+        $userTransactions = Transactions::where('morphed_type', 'App\Models\User')
+            ->where('morphed_id', $user->id)
+            ->whereIn('type', ['user_in', 'user_out'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // حساب رصيد المستخدم
+        $userWalletBalance = $this->calculateUserWalletBalance($user->id);
+
+        // حساب رأس المال (مجموع سعر الشراء + المصاريف لجميع السيارات)
+        $capital = DB::table('car')
+            ->selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
+            ->value('total') ?? 0;
+
+        return Inertia::render('UserWallet', [
+            'user' => $user,
+            'userTransactions' => $userTransactions,
+            'userWalletBalance' => $userWalletBalance,
+            'capital' => $capital
+        ]);
+    }
+
+    /**
      * إضافة مبلغ إلى قاسة المستخدم
      */
     public function addToWallet(Request $request)

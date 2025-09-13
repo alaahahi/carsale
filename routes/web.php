@@ -7,7 +7,9 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\TransfersController;
- use App\Http\Controllers\UserWalletController;
+use App\Http\Controllers\UserWalletController;
+use App\Http\Controllers\MainController;
+use App\Http\Controllers\InfoController;
 
 use App\Models\SystemConfig;
 
@@ -774,6 +776,7 @@ Route::group(['middleware' => ['tenant']], function () {
 
     
     Route::get('user-wallet', [UserWalletController::class, 'index'])->name('user-wallet');
+    Route::get('user-wallet/{userId}', [UserWalletController::class, 'show'])->name('user-wallet.show');
 
 
     
