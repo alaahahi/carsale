@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -201,6 +202,12 @@ return new class extends Migration
             $table->timestamps();
         });
         }
+
+        // إنشاء أنواع المستخدمين الأساسية
+        $this->createUserTypes();
+        
+        // إنشاء الحسابات المحاسبية الأساسية
+        $this->createAccountingUsers();
     }
 
     /**
@@ -220,5 +227,112 @@ return new class extends Migration
         Schema::dropIfExists('car');
         Schema::dropIfExists('users');
         Schema::dropIfExists('user_type');
+    }
+
+    /**
+     * إنشاء أنواع المستخدمين الأساسية
+     */
+    private function createUserTypes()
+    {
+        $userTypes = [
+            ['name' => 'admin'],
+            ['name' => 'seles'],
+            ['name' => 'client'],
+            ['name' => 'account'],
+        ];
+
+        foreach ($userTypes as $type) {
+            DB::table('user_type')->updateOrInsert(
+                ['name' => $type['name']],
+                [
+                    'name' => $type['name'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+        }
+    }
+
+    /**
+     * إنشاء الحسابات المحاسبية الأساسية
+     */
+    private function createAccountingUsers()
+    {
+        // التحقق من وجود أنواع المستخدمين أولاً
+        $accountTypeId = DB::table('user_type')->where('name', 'account')->value('id');
+        if (!$accountTypeId) {
+            return; // إذا لم يكن نوع المحاسبة موجود، لا ننشئ الحسابات
+        }
+
+        // الحسابات المحاسبية المطلوبة
+        $accountingUsers = [
+            [
+                'name' => 'حساب الخرج',
+                'email' => 'out@account.com',
+                'type_id' => $accountTypeId,
+            ],
+            [
+                'name' => 'حساب الدخل',
+                'email' => 'in@account.com',
+                'type_id' => $accountTypeId,
+            ],
+            [
+                'name' => 'حساب التحويلات',
+                'email' => 'transfers@account.com',
+                'type_id' => $accountTypeId,
+            ],
+        ];
+
+        foreach ($accountingUsers as $userData) {
+            // التحقق من عدم وجود المستخدم
+            $existingUser = DB::table('users')->where('email', $userData['email'])->first();
+            
+            if (!$existingUser) {
+                // إنشاء المستخدم
+                $userId = DB::table('users')->insertGetId([
+                    'name' => $userData['name'],
+                    'email' => $userData['email'],
+                    'password' => bcrypt('password'), // كلمة مرور افتراضية
+                    'type_id' => $userData['type_id'],
+                    'show_wallet' => false, // لا يحتاجون لعرض القاسة
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // إنشاء wallet للمستخدم
+                DB::table('wallets')->insert([
+                    'user_id' => $userId,
+                    'balance' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+
+        // إنشاء admin user إذا لم يكن موجوداً
+        $adminTypeId = DB::table('user_type')->where('name', 'admin')->value('id');
+        if ($adminTypeId) {
+            $existingAdmin = DB::table('users')->where('email', 'admin@admin.com')->first();
+            
+            if (!$existingAdmin) {
+                $adminId = DB::table('users')->insertGetId([
+                    'name' => 'مدير النظام',
+                    'email' => 'admin@admin.com',
+                    'password' => bcrypt('admin123'), // كلمة مرور افتراضية
+                    'type_id' => $adminTypeId,
+                    'show_wallet' => true, // المدير يحتاج لعرض القاسة
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // إنشاء wallet للمدير
+                DB::table('wallets')->insert([
+                    'user_id' => $adminId,
+                    'balance' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
     }
 };

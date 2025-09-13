@@ -92,9 +92,9 @@ class DashboardController extends Controller
         $car = Car::all();
 
         $data = [
-        'transfersAccount'=>$this->transfersAccount->wallet->balance,
-        'outAccount'=>$this->outAccount->wallet->balance,
-        'inAccount'=>$this->inAccount->wallet->balance,
+        'transfersAccount'=>$this->transfersAccount && $this->transfersAccount->wallet ? $this->transfersAccount->wallet->balance : 0,
+        'outAccount'=>$this->outAccount && $this->outAccount->wallet ? $this->outAccount->wallet->balance : 0,
+        'inAccount'=>$this->inAccount && $this->inAccount->wallet ? $this->inAccount->wallet->balance : 0,
         'allCars'=>$car->count(),
         'carsInStock'=>$car->where('client_id',null)->count()
         ];
@@ -156,15 +156,18 @@ class DashboardController extends Controller
             ]);
             
             // إضافة دفعة من نوع out عند إضافة السيارة
-            if ($car->id && $this->outAccount) {
+            if ($car->id && $this->outAccount && $this->outAccount->wallet) {
                 $totalCost = $car->purchase_price + $car->erbil_exp + $car->erbil_shipping + $car->dubai_exp + $car->dubai_shipping;
                 $description = 'شراء سيارة - ' . $car->name . ' - رقم: ' . $car->pin . ' - سنة: ' . $car->model . ' - لون: ' . $car->color;
+                
+                // إنشاء wallet إذا لم يكن موجوداً
+                $wallet = $this->outAccount->getWalletOrCreate();
                 
                 Transactions::create([
                     'amount' => $totalCost,
                     'type' => 'out',
                     'description' => $description,
-                    'wallet_id' => $this->outAccount->wallet->id,
+                    'wallet_id' => $wallet->id,
                     'morphed_id' => $car->id,
                     'morphed_type' => 'App\Models\Car',
                     'user_id' => auth()->id(),
@@ -300,25 +303,33 @@ class DashboardController extends Controller
             case 1:
                 $car->increment('dubai_exp',$expens_amount);
                 $desc=trans('text.expensesExpDubai').$expens_amount.'$ '.$car->company?->name.' '.$car->name?->name.' '.$note;
-                $this->accountingController->increaseWallet($expens_amount, $desc,$this->outAccount->id,$car_id,'App\Models\Car',$user_id);
+                if ($this->outAccount) {
+                    $this->accountingController->increaseWallet($expens_amount, $desc,$this->outAccount->id,$car_id,'App\Models\Car',$user_id);
+                }
                 break;
             
             case 2:
                 $car->increment('erbil_exp',$expens_amount);
                 $desc=trans('text.expensesExpErbil').$expens_amount.'$'.$car->company?->name.' '.$car->name?->name.' '.$note;
-                $this->accountingController->increaseWallet($expens_amount, $desc,$this->outAccount->id,$car_id,'App\Models\Car',$user_id);
+                if ($this->outAccount) {
+                    $this->accountingController->increaseWallet($expens_amount, $desc,$this->outAccount->id,$car_id,'App\Models\Car',$user_id);
+                }
                 break;
 
             case 3:
                 $car->increment('erbil_shipping',$expens_amount);
                 $desc=trans('text.expensesShippingErbil').$expens_amount.'$'.$car->company?->name.' '.$car->name?->name.' '.$note;
-                $this->accountingController->increaseWallet($expens_amount, $desc,$this->outAccount->id,$car_id,'App\Models\Car',$user_id);
+                if ($this->outAccount) {
+                    $this->accountingController->increaseWallet($expens_amount, $desc,$this->outAccount->id,$car_id,'App\Models\Car',$user_id);
+                }
                 break;
             
             case 4:
                 $car->increment('dubai_shipping',$expens_amount);
                 $desc=trans('text.expensesShippingDubai').$expens_amount.'$'.$car->company?->name.' '.$car->name?->name.' '.$note;
-                $this->accountingController->increaseWallet($expens_amount, $desc,$this->outAccount->id,$car_id,'App\Models\Car',$user_id);
+                if ($this->outAccount) {
+                    $this->accountingController->increaseWallet($expens_amount, $desc,$this->outAccount->id,$car_id,'App\Models\Car',$user_id);
+                }
                 break;
 
             case 5:
@@ -329,7 +340,9 @@ class DashboardController extends Controller
             
                     $car->increment('paid_amount',$expens_amount);
                     $desc=trans('text.expensesExpPay').$expens_amount.'$'.$car->company?->name.' '.$car->name?->name;
+                    if ($this->outAccount) {
                     $this->accountingController->increaseWallet($expens_amount, $desc,$this->outAccount->id,$car_id,'App\Models\Car',$user_id);
+                }
           
 
                 }
@@ -393,9 +406,13 @@ class DashboardController extends Controller
                 'results'=>1
                  ]);
                 $desc=trans('text.buyCar').' '.$car->pay_price.trans('text.payDone').$car->paid_amount_pay;
-                $this->accountingController->increaseWallet($car->paid_amount_pay, $desc,$this->inAccount->id,$car->id,'App\Models\Car');
-                if($pay_price-$paid_amount_pay >= 0){
-                    $this->accountingController->increaseWallet($pay_price-$paid_amount_pay, $desc,$this->debtAccount->id,$car->id,'App\Models\Car');
+                if ($this->inAccount) {
+                    $this->accountingController->increaseWallet($car->paid_amount_pay, $desc,$this->inAccount->id,$car->id,'App\Models\Car');
+                }
+                // استخدام outAccount لجميع المعاملات الخارجية بدلاً من debtAccount منفصل
+                if($pay_price-$paid_amount_pay > 0 && $this->outAccount){
+                    $debtDesc = 'دين عميل - ' . $desc;
+                    $this->accountingController->increaseWallet($pay_price-$paid_amount_pay, $debtDesc,$this->outAccount->id,$car->id,'App\Models\Car');
                 }
                 if($pay_price==$paid_amount_pay){
                     $car->increment('results'); 
