@@ -7,7 +7,7 @@
         <title inertia>Car Sale</title>
         <link rel="stylesheet" href="https://fonts.bunny.net/css2?family=Nunito:wght@400;600;700&display=swap">
         @routes
-        @vite('resources/js/app.js')
+        @vite(['resources/js/app.js', 'resources/css/app.css'])
         @inertiaHead
     </head>
     <body class="font-sans antialiased">
