@@ -29,8 +29,6 @@ class Car extends Model
         'paid_amount_pay',
         'user_id',
         'user_purchase_id',
-        'user_accepted',
-        'user_rejected',
         'created_at',
         'updated_at',
         'purchase_price',

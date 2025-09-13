@@ -543,7 +543,7 @@ const clearFilters = () => {
 }
 
 const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString('ar-SA')
+  return new Date(dateString).toLocaleDateString('en-US')
 }
 
 const confirmAddToBox = async () => {

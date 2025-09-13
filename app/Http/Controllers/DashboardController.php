@@ -112,10 +112,12 @@ class DashboardController extends Controller
         $start = $request->get('start');
         $end = $request->get('end');
         if($start && $end ){
-            $countComp =Car::whereBetween('created_at', [$start, $end])->where('user_accepted','!=',null)->count();
+            // عد السيارات المباعة (التي لها client_id)
+            $countComp =Car::whereBetween('created_at', [$start, $end])->where('client_id','!=',null)->count();
         }
         else{
-            $countComp =Car::where('user_accepted','!=',null)->count();  
+            // عد السيارات المباعة (التي لها client_id)
+            $countComp =Car::where('client_id','!=',null)->count();  
         }
         return response()->json($countComp); 
     }

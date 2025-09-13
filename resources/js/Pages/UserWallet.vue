@@ -424,7 +424,7 @@ const formatNumber = (number) => {
 }
 
 const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('ar-SA')
+    return new Date(date).toLocaleDateString('en-US')
 }
 
 const getTransactionTypeClass = (type) => {

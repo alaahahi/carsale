@@ -206,10 +206,10 @@ class TransfersController extends Controller
         $start = $request->get('start');
         $end = $request->get('end');
         if($start && $end ){
-            $countComp =Car::whereBetween('created_at', [$start, $end])->where('user_accepted','!=',null)->count();
+            $countComp =Car::whereBetween('created_at', [$start, $end])->where('client_id','!=',null)->count();
         }
         else{
-            $countComp =Car::where('user_accepted','!=',null)->count();  
+            $countComp =Car::where('client_id','!=',null)->count();  
         }
         return response()->json($countComp); 
     }
