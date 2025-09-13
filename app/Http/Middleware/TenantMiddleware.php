@@ -41,10 +41,8 @@ class TenantMiddleware
             abort(404, 'Tenant not found');
         }
         
-        // Initialize tenancy
-        $initializeTenancy = new InitializeTenancyByDomain();
-        
-        return $initializeTenancy->handle($request, $next);
+        // Initialize tenancy using the middleware directly
+        return app(InitializeTenancyByDomain::class)->handle($request, $next);
     }
     
     /**
