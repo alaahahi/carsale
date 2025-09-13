@@ -59,14 +59,17 @@ class UserController extends Controller
         $data = User::with('userType:id,name','wallet')->where('type_id', $this->userSeles)->paginate(10);
         return Response::json($data, 200);
     }
-    public function getIndexClients()
+    public function getIndexClients(Request $request)
     {
+        $perPage = $request->get('per_page', 10);
+        $page = $request->get('page', 1);
+        
         $clients = User::with(['userType:id,name','wallet', 'cars' => function($query) {
             $query->where('results', '!=', 0); // السيارات المباعة فقط
-        }])->where('type_id', $this->userClient)->get();
+        }])->where('type_id', $this->userClient)->paginate($perPage, ['*'], 'page', $page);
         
         // حساب المطلوب والمدفوع لكل عميل
-        $clients->each(function($client) {
+        $clients->getCollection()->each(function($client) {
             $totalRequired = 0; // إجمالي المطلوب
             $totalPaid = 0; // إجمالي المدفوع
             
@@ -80,18 +83,42 @@ class UserController extends Controller
             $client->remaining_debt = $totalRequired - $totalPaid;
         });
         
-        // إحصائيات إجمالية
+        // إحصائيات إجمالية (لجميع العملاء، ليس فقط الصفحة الحالية)
+        $allClients = User::with(['cars' => function($query) {
+            $query->where('results', '!=', 0);
+        }])->where('type_id', $this->userClient)->get();
+        
+        $allClients->each(function($client) {
+            $totalRequired = 0;
+            $totalPaid = 0;
+            
+            foreach($client->cars as $car) {
+                $totalRequired += $car->pay_price ?? 0;
+                $totalPaid += $car->paid_amount_pay ?? 0;
+            }
+            
+            $client->total_required = $totalRequired;
+            $client->total_paid = $totalPaid;
+            $client->remaining_debt = $totalRequired - $totalPaid;
+        });
+        
         $stats = [
-            'total_clients' => $clients->count(),
-            'total_required' => $clients->sum('total_required'),
-            'total_paid' => $clients->sum('total_paid'),
-            'total_debt' => $clients->sum('remaining_debt'),
-            'clients_with_debt' => $clients->where('remaining_debt', '>', 0)->count(),
-            'clients_paid_off' => $clients->where('remaining_debt', '<=', 0)->count()
+            'total_clients' => $allClients->count(),
+            'total_required' => $allClients->sum('total_required'),
+            'total_paid' => $allClients->sum('total_paid'),
+            'total_debt' => $allClients->sum('remaining_debt'),
+            'clients_with_debt' => $allClients->where('remaining_debt', '>', 0)->count(),
+            'clients_paid_off' => $allClients->where('remaining_debt', '<=', 0)->count()
         ];
         
         return Response::json([
-            'data' => $clients,
+            'data' => $clients->items(),
+            'current_page' => $clients->currentPage(),
+            'last_page' => $clients->lastPage(),
+            'per_page' => $clients->perPage(),
+            'total' => $clients->total(),
+            'from' => $clients->firstItem(),
+            'to' => $clients->lastItem(),
             'stats' => $stats
         ], 200);
     }
@@ -261,6 +288,49 @@ class UserController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'حدث خطأ في تحديث بيانات العميل'
+            ], 500);
+        }
+    }
+
+    public function destroyClient($id)
+    {
+        try {
+            // البحث عن العميل
+            $user = User::findOrFail($id);
+            
+            // التحقق من أن المستخدم هو عميل
+            if ($user->type_id != $this->userClient) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'هذا المستخدم ليس عميلاً'
+                ], 400);
+            }
+
+            // التحقق من وجود سيارات مرتبطة بالعميل
+            $hasCars = $user->cars()->exists();
+            if ($hasCars) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'لا يمكن حذف العميل لأنه مرتبط بسيارات'
+                ], 400);
+            }
+
+            // حذف المحفظة المرتبطة
+            $user->wallet()->delete();
+            
+            // حذف العميل
+            $user->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم حذف العميل بنجاح'
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Error deleting client: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'حدث خطأ في حذف العميل'
             ], 500);
         }
     }

@@ -26,4 +26,9 @@ class Transactions extends Model
     {
         return $this->morphTo('morphed', 'morphed_type', 'morphed_id');
     }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

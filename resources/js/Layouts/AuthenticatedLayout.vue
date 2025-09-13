@@ -57,7 +57,7 @@ const switchLocale = (locale) => {
                   {{ $t("accounts") }}
                 </NavLink>
               </div>
-          
+        
        
             </div>
             <div class="hidden sm:flex sm:items-center sm:ml-6">

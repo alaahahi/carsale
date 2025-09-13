@@ -118,8 +118,10 @@ Route::group(['middleware' => ['tenant']], function () {
     Route::get('car/{carId}/history', [DashboardController::class, 'getCarHistory']);
     Route::post('car/history/{historyId}/restore', [DashboardController::class, 'restoreCarHistory']);
     
-    Route::put('clients/{id}/update', [UserController::class, 'updateClient'])->name('clients.update');
+    Route::get('clients', [UserController::class, 'getIndexClients'])->name('clients.index');
+    Route::put('clients/{id}', [UserController::class, 'updateClient'])->name('clients.update');
     Route::post('clients/store', [UserController::class, 'storeClient'])->name('clients.store');
+    Route::delete('clients/{id}', [UserController::class, 'destroyClient'])->name('clients.destroy');
     Route::get('car-payments', [DashboardController::class, 'getCarPayments']);
     Route::post('editSalePrice', [DashboardController::class, 'editSalePrice']);
     Route::post('editPaidAmount', [DashboardController::class, 'editPaidAmount']);

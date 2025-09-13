@@ -7,8 +7,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\TransfersController;
-use App\Http\Controllers\CarConfigController;
-use App\Http\Controllers\UserWalletController;
+ use App\Http\Controllers\UserWalletController;
 
 use App\Models\SystemConfig;
 
@@ -763,13 +762,7 @@ Route::group(['middleware' => ['tenant']], function () {
     Route::get('addTransfers',[TransfersController::class, 'addTransfers'])->name('addTransfers');
     Route::get('transfers',[TransfersController::class, 'index'])->name('transfers');
     Route::get('getIndexAccountsSelas',[TransfersController::class, 'getIndexAccountsSelas'])->name('getIndexAccountsSelas');
-
-    Route::get('carConfig',[CarConfigController::class, 'index'])->name('carConfig');
-    Route::get('addCompany',[CarConfigController::class, 'create'])->name('addCompany');
-    Route::post('addCompany',[CarConfigController::class, 'store']);
-    Route::get('addName',[CarConfigController::class, 'storeName'])->name('addName');
-    Route::get('addCarModel',[CarConfigController::class, 'storeCarModel'])->name('addCarModel');
-    Route::get('addColor',[CarConfigController::class, 'storeColor'])->name('addColor');
+ 
     Route::get('addCar',[DashboardController::class, 'addCar'])->name('addCar');
     Route::get('payCar',[DashboardController::class, 'payCar'])->name('payCar');
     Route::get('getIndexCar',[DashboardController::class, 'getIndexCar'])->name('getIndexCar');
@@ -784,19 +777,7 @@ Route::group(['middleware' => ['tenant']], function () {
 
 
     
-    
-    Route::get('getIndexCompany',[CarConfigController::class, 'getIndex'])->name('getIndexCompany');
-    Route::get('getIndexName',[CarConfigController::class, 'getIndexName'])->name('getIndexName');
-    Route::get('getIndexModel',[CarConfigController::class, 'getIndexModel'])->name('getIndexModel');
-    Route::get('getIndexColor',[CarConfigController::class, 'getIndexColor'])->name('getIndexColor');
-    
-    Route::get('companyEdit/{id}',[CarConfigController::class, 'companyEdit'])->name('companyEdit');
-    Route::get('delCompany/{id}',[CarConfigController::class, 'companyDel'])->name('delCompany');
-    Route::get('delName/{id}',[CarConfigController::class, 'delName'])->name('delName');
-    Route::get('delModel/{id}',[CarConfigController::class, 'delModel'])->name('delModel');
-    Route::get('delColor/{id}',[CarConfigController::class, 'delColor'])->name('delColor');
-    Route::get('companyStoreEdit',[CarConfigController::class, 'index'])->name('companyStoreEdit');
-    Route::post('companyStoreEdit',[CarConfigController::class, 'storeEdit'])->name('companyStoreEdit');
+     
     
     
 
