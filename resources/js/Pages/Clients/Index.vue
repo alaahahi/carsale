@@ -11,14 +11,22 @@
                             <h1 class="text-3xl font-bold text-gray-900 dark:text-white">العملاء</h1>
                             <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">إدارة بيانات العملاء والمعاملات المالية</p>
                             
-                            <!-- Action Button -->
-                            <div class="mt-4">
+                            <!-- Action Buttons -->
+                            <div class="mt-4 flex gap-4">
                                 <button @click="showAddClientModal" 
                                         class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg flex items-center space-x-2">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                                     </svg>
                                     <span>إضافة عميل جديد</span>
+                                </button>
+                                
+                                <button @click="printClientsReport" 
+                                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg flex items-center space-x-2">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                                    </svg>
+                                    <span>طباعة التقرير</span>
                                 </button>
                             </div>
                         </div>
@@ -115,6 +123,51 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Search Filters -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            <!-- البحث بالاسم -->
+                            <div>
+                                <input
+                                    v-model="searchName"
+                                    @input="applyFilters"
+                                    type="text"
+                                    placeholder="البحث بالاسم..."
+                                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200">
+                            </div>
+                            
+                            <!-- البحث برقم الهاتف -->
+                            <div>
+                                <input
+                                    v-model="searchPhone"
+                                    @input="applyFilters"
+                                    type="text"
+                                    placeholder="البحث برقم الهاتف..."
+                                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200">
+                            </div>
+                            
+                            <!-- فلتر حالة العميل -->
+                            <div>
+                                <select v-model="statusFilter" @change="applyFilters" 
+                                        class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200">
+                                    <option value="">جميع الحالات</option>
+                                    <option value="debtor">مدين</option>
+                                    <option value="paid">مدفوع بالكامل</option>
+                                    <option value="credit">لديه رصيد</option>
+                                </select>
+                            </div>
+                            
+                            <!-- زر إعادة تعيين الفلاتر -->
+                            <div>
+                                <button @click="resetFilters" 
+                                        class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center space-x-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                    </svg>
+                                    <span>إعادة تعيين</span>
+                                </button>
                             </div>
                         </div>
 
@@ -456,6 +509,11 @@ const isAddModalVisible = ref(false)
 const editLoading = ref(false)
 const addLoading = ref(false)
 
+// Search filters
+const searchName = ref('')
+const searchPhone = ref('')
+const statusFilter = ref('')
+
 // Pagination
 const currentPage = ref(props.currentPage || 1)
 const perPage = ref(props.perPage || 10)
@@ -504,7 +562,11 @@ const visiblePages = computed(() => {
 
 // Methods
 const formatNumber = (number) => {
-    return Math.round(number).toLocaleString()
+    return Math.round(number).toLocaleString('en-US')
+}
+
+const formatNumberEnglish = (number) => {
+    return Math.round(number).toLocaleString('en-US')
 }
 
 const getDebtColor = (debt) => {
@@ -616,7 +678,15 @@ const destroy = async (id) => {
 const loadClients = async () => {
     loading.value = true
     try {
-        const response = await axios.get(`/api/clients?page=${currentPage.value}&per_page=${perPage.value}`)
+        const params = new URLSearchParams({
+            page: currentPage.value,
+            per_page: perPage.value,
+            name: searchName.value,
+            phone: searchPhone.value,
+            status: statusFilter.value
+        })
+        
+        const response = await axios.get(`/api/clients?${params}`)
         clientsData.value = response.data.data
         totalClients.value = response.data.total
         totalPages.value = response.data.last_page
@@ -627,6 +697,21 @@ const loadClients = async () => {
     } finally {
         loading.value = false
     }
+}
+
+// تطبيق الفلاتر
+const applyFilters = () => {
+    currentPage.value = 1 // العودة للصفحة الأولى عند الفلترة
+    loadClients()
+}
+
+// إعادة تعيين الفلاتر
+const resetFilters = () => {
+    searchName.value = ''
+    searchPhone.value = ''
+    statusFilter.value = ''
+    currentPage.value = 1
+    loadClients()
 }
 
 // Pagination methods
@@ -648,6 +733,143 @@ const nextPage = () => {
     if (currentPage.value < totalPages.value) {
         currentPage.value++
         loadClients()
+    }
+}
+
+// طباعة تقرير العملاء
+const printClientsReport = async () => {
+    try {
+        // جلب جميع البيانات مع الفلاتر الحالية
+        const params = new URLSearchParams({
+            per_page: 10000, // عدد كبير لجلب جميع البيانات
+            name: searchName.value,
+            phone: searchPhone.value,
+            status: statusFilter.value
+        })
+        
+        const response = await axios.get(`/api/clients?${params}`)
+        const allClients = response.data.data
+        
+        // حساب الإحصائيات من جميع البيانات
+        const totalClients = allClients.length
+        const totalRequired = allClients.reduce((sum, client) => sum + (client.total_required || 0), 0)
+        const totalPaid = allClients.reduce((sum, client) => sum + (client.total_paid || 0), 0)
+        const totalDebt = allClients.reduce((sum, client) => sum + (client.remaining_debt || 0), 0)
+        
+        // حساب عدد العملاء حسب الحالة
+        const clientsWithDebt = allClients.filter(client => client.remaining_debt > 0).length
+        const clientsPaid = allClients.filter(client => client.remaining_debt === 0).length
+        const clientsWithCredit = allClients.filter(client => client.remaining_debt < 0).length
+    
+    // إنشاء محتوى الطباعة
+    const printContent = `
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <!-- Header -->
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="margin-bottom: 10px; color: #2563eb;">Salam Jalal Ayoub Company</h1>
+                <h2 style="margin-bottom: 15px;">Clients Report</h2>
+                <p style="font-size: 14px; color: #666;">${new Date().toLocaleDateString('en-US')}</p>
+            </div>
+            
+            <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px;">
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Clients</h3>
+                    <p style="font-size: 16px; font-weight: bold; color: #1f2937;">${totalClients}</p>
+                </div>
+                
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Required</h3>
+                    <p style="font-size: 16px; font-weight: bold; color: #1f2937;">$${Math.round(totalRequired).toLocaleString('en-US')}</p>
+                </div>
+                
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Paid</h3>
+                    <p style="font-size: 16px; font-weight: bold; color: #059669;">$${Math.round(totalPaid).toLocaleString('en-US')}</p>
+                </div>
+                
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Debt</h3>
+                    <p style="font-size: 16px; font-weight: bold; color: #dc2626;">$${Math.round(totalDebt).toLocaleString('en-US')}</p>
+                </div>
+            </div>
+            
+            <!-- Client Status Summary -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px;">
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Clients with Debt</h3>
+                    <p style="font-size: 16px; font-weight: bold; color: #dc2626;">${clientsWithDebt}</p>
+                </div>
+                
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Fully Paid</h3>
+                    <p style="font-size: 16px; font-weight: bold; color: #059669;">${clientsPaid}</p>
+                </div>
+                
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">With Credit</h3>
+                    <p style="font-size: 16px; font-weight: bold; color: #2563eb;">${clientsWithCredit}</p>
+                </div>
+            </div>
+            
+            <!-- Detailed Table -->
+            <h3 style="margin-bottom: 15px; text-align: center; color: #374151;">Clients Details</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px;">
+                <thead>
+                    <tr style="background-color: #f8f9fa;">
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">ID</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Name</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Phone</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Required</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Paid</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Remaining</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${allClients.map(client => `
+                        <tr>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${client.id}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${client.name}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${client.phone || 'N/A'}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">$${Math.round(client.total_required || 0).toLocaleString('en-US')}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">$${Math.round(client.total_paid || 0).toLocaleString('en-US')}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center; color: ${client.remaining_debt === 0 ? '#059669' : client.remaining_debt > 0 ? '#dc2626' : '#2563eb'};">$${Math.round(client.remaining_debt || 0).toLocaleString('en-US')}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">
+                                ${client.remaining_debt === 0 ? 'Paid' : 
+                                  client.remaining_debt > 0 ? 'Debtor' : 
+                                  'With Credit'}
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    // فتح نافذة الطباعة
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>Clients Report</title>
+                <style>
+                    @media print {
+                        body { margin: 0; }
+                        @page { margin: 1cm; }
+                    }
+                </style>
+            </head>
+            <body>
+                ${printContent}
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+    } catch (error) {
+        toast.error('حدث خطأ أثناء تحميل البيانات للطباعة')
+        console.error(error)
     }
 }
 

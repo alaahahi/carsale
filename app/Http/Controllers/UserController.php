@@ -66,10 +66,22 @@ class UserController extends Controller
         
         $clients = User::with(['userType:id,name','wallet', 'cars' => function($query) {
             $query->where('results', '!=', 0); // السيارات المباعة فقط
-        }])->where('type_id', $this->userClient)->paginate($perPage, ['*'], 'page', $page);
+        }])->where('type_id', $this->userClient);
         
-        // حساب المطلوب والمدفوع لكل عميل
-        $clients->getCollection()->each(function($client) {
+        // البحث بالاسم
+        if ($request->has('name') && !empty($request->name)) {
+            $clients->where('name', 'LIKE', '%' . $request->name . '%');
+        }
+        
+        // البحث برقم الهاتف
+        if ($request->has('phone') && !empty($request->phone)) {
+            $clients->where('phone', 'LIKE', '%' . $request->phone . '%');
+        }
+        
+        // حساب المطلوب والمدفوع لكل عميل قبل الباجنيشن
+        $allClients = $clients->get();
+        
+        $allClients->each(function($client) {
             $totalRequired = 0; // إجمالي المطلوب
             $totalPaid = 0; // إجمالي المدفوع
             
@@ -83,24 +95,35 @@ class UserController extends Controller
             $client->remaining_debt = $totalRequired - $totalPaid;
         });
         
-        // إحصائيات إجمالية (لجميع العملاء، ليس فقط الصفحة الحالية)
-        $allClients = User::with(['cars' => function($query) {
-            $query->where('results', '!=', 0);
-        }])->where('type_id', $this->userClient)->get();
+        // فلتر حالة العميل
+        if ($request->has('status') && !empty($request->status)) {
+            $status = $request->status;
+            $allClients = $allClients->filter(function($client) use ($status) {
+                $debt = $client->remaining_debt;
+                
+                switch($status) {
+                    case 'debtor':
+                        return $debt > 0;
+                    case 'paid':
+                        return $debt === 0;
+                    case 'credit':
+                        return $debt < 0;
+                    default:
+                        return true;
+                }
+            });
+        }
         
-        $allClients->each(function($client) {
-            $totalRequired = 0;
-            $totalPaid = 0;
-            
-            foreach($client->cars as $car) {
-                $totalRequired += $car->pay_price ?? 0;
-                $totalPaid += $car->paid_amount_pay ?? 0;
-            }
-            
-            $client->total_required = $totalRequired;
-            $client->total_paid = $totalPaid;
-            $client->remaining_debt = $totalRequired - $totalPaid;
-        });
+        // تطبيق الباجنيشن بعد الفلترة
+        $clients = new \Illuminate\Pagination\LengthAwarePaginator(
+            $allClients->forPage($page, $perPage),
+            $allClients->count(),
+            $perPage,
+            $page,
+            ['path' => request()->url(), 'pageName' => 'page']
+        );
+        
+        // استخدام نفس البيانات المفلترة للإحصائيات
         
         $stats = [
             'total_clients' => $allClients->count(),

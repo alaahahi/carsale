@@ -662,14 +662,36 @@ class DashboardController extends Controller
     public function getIndexCar()
     {
         $data =  Car::with(['client', 'transactions.wallet.user']);
-        $type =$_GET['type'] ?? '';
-        if($type){
-            $data =    $data->where('results', $type);
+        
+        // فلتر حالة السيارة
+        $type = $_GET['type'] ?? '';
+        if($type !== ''){
+            $data = $data->where('results', $type);
         }
-        if($type==0){
-            $data =    $data->where('results', $type);
+        
+        // فلتر حالة الدفع
+        $paymentStatus = $_GET['payment_status'] ?? '';
+        if($paymentStatus){
+            switch($paymentStatus){
+                case 'unpaid':
+                    $data = $data->where('results', 0); // في المخزن
+                    break;
+                case 'partial':
+                    $data = $data->where('results', 1)->whereRaw('pay_price > paid_amount_pay'); // مباعة ولكن مدفوعة جزئياً
+                    break;
+                case 'paid':
+                    $data = $data->where('results', 2)->whereRaw('pay_price = paid_amount_pay'); // مباعة ومدفوعة بالكامل
+                    break;
+            }
         }
-        $data =$data->orderByRaw('CAST(no AS UNSIGNED) DESC')->paginate(100);
+        
+        // البحث بالرقم التسلسلي
+        $search = $_GET['q'] ?? '';
+        if($search){
+            $data = $data->where('pin', 'LIKE', '%'.$search.'%');
+        }
+        
+        $data = $data->orderByRaw('CAST(no AS UNSIGNED) DESC')->paginate(100);
         
         // حساب الأرقام من البيانات الفعلية
         $totalIncome = Transactions::where('type', 'in')->sum('amount');
@@ -697,16 +719,37 @@ class DashboardController extends Controller
     }
     public function getIndexCarSearch()
     {
-        $term = $_GET['q']??'';
-        $data =  Car::with(['client', 'transactions.wallet.user'])->orwhere('pin', 'LIKE','%'.$term.'%');
-        $type =$_GET['type'] ?? '';
-        if($type){
-        $data =    $data->where('results', $type);
+        $data = Car::with(['client', 'transactions.wallet.user']);
+        
+        // البحث بالرقم التسلسلي
+        $term = $_GET['q'] ?? '';
+        if($term){
+            $data = $data->where('pin', 'LIKE', '%'.$term.'%');
         }
-        if($type==0){
-            $data =    $data->where('results', $type);
+        
+        // فلتر حالة السيارة
+        $type = $_GET['type'] ?? '';
+        if($type !== ''){
+            $data = $data->where('results', $type);
         }
-        $data =$data->orderByRaw('CAST(no AS UNSIGNED) DESC')->paginate(10);
+        
+        // فلتر حالة الدفع
+        $paymentStatus = $_GET['payment_status'] ?? '';
+        if($paymentStatus){
+            switch($paymentStatus){
+                case 'unpaid':
+                    $data = $data->where('results', 0); // في المخزن
+                    break;
+                case 'partial':
+                    $data = $data->where('results', 1)->whereRaw('pay_price > paid_amount_pay'); // مباعة ولكن مدفوعة جزئياً
+                    break;
+                case 'paid':
+                    $data = $data->where('results', 2)->whereRaw('pay_price = paid_amount_pay'); // مباعة ومدفوعة بالكامل
+                    break;
+            }
+        }
+        
+        $data = $data->orderByRaw('CAST(no AS UNSIGNED) DESC')->paginate(10);
         return Response::json($data, 200);
     }
     public function addToBox()

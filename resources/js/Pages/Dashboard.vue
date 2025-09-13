@@ -38,6 +38,8 @@ onMounted(() => {
   });
 });
 let searchTerm = ref('');
+let carStatusFilter = ref('');
+let paymentStatusFilter = ref('');
 
 let showModalCar =  ref(false);
 let showModalCarSale =  ref(false);
@@ -146,7 +148,7 @@ function printPaymentReceipt(payment) {
       <p><strong>اسم السيارة:</strong> ${selectedCar.value?.name}</p>
       <p><strong>المبلغ:</strong> ${Number(payment.amount).toLocaleString()} دينار</p>
       <p><strong>البيان:</strong> ${payment.description}</p>
-      <p><strong>التاريخ:</strong> ${new Date(payment.created_at).toLocaleDateString('ar-SA')}</p>
+      <p><strong>التاريخ:</strong> ${new Date(payment.created_at).toLocaleDateString('en-US')}</p>
       <p><strong>المستخدم:</strong> ${payment.wallet?.user?.name || 'غير محدد'}</p>
       <hr>
       <p style="margin-top: 30px;">شكراً لتعاملكم معنا</p>
@@ -261,14 +263,189 @@ const formatter = ref({
   month: 'MM'
 })
 const getResultsCar = async (page = 1) => {
-    const response = await fetch(`/getIndexCar?page=${page}`);
+    const params = new URLSearchParams({
+        page: page,
+        type: carStatusFilter.value,
+        payment_status: paymentStatusFilter.value,
+        q: searchTerm.value
+    });
+    const response = await fetch(`/getIndexCar?${params}`);
     const result = await response.json();
     car.value = result.data;
     stats.value = result.stats;
 }
+
 const getResultsCarSearch = async (q='',page = 1) => {
-    const response = await fetch(`/getIndexCarSearch?page=${page}&q=${q}`);
+    const params = new URLSearchParams({
+        page: page,
+        q: q,
+        type: carStatusFilter.value,
+        payment_status: paymentStatusFilter.value
+    });
+    const response = await fetch(`/getIndexCarSearch?${params}`);
     car.value = await response.json();
+}
+
+// تطبيق الفلاتر
+const applyFilters = () => {
+    if (searchTerm.value) {
+        getResultsCarSearch(searchTerm.value);
+    } else {
+        getResultsCar();
+    }
+}
+
+// إعادة تعيين الفلاتر
+const resetFilters = () => {
+    searchTerm.value = '';
+    carStatusFilter.value = '';
+    paymentStatusFilter.value = '';
+    getResultsCar();
+}
+
+// طباعة جدول السيارات
+const printCarsTable = () => {
+    // حساب المجاميع
+    const totalPurchasePrice = car.value.data.reduce((sum, carItem) => sum + (Number(carItem.purchase_price) || 0), 0);
+    const totalCost = car.value.data.reduce((sum, carItem) => {
+        return sum + ((Number(carItem.purchase_price) || 0) + (Number(carItem.erbil_exp) || 0) + (Number(carItem.erbil_shipping) || 0) + (Number(carItem.dubai_exp) || 0) + (Number(carItem.dubai_shipping) || 0));
+    }, 0);
+    const totalSalePrice = car.value.data.reduce((sum, carItem) => sum + (Number(carItem.pay_price) || 0), 0);
+    const totalRemaining = car.value.data.reduce((sum, carItem) => {
+        return sum + (carItem.results != 0 ? (Number(carItem.pay_price) || 0) - (Number(carItem.paid_amount_pay) || 0) : 0);
+    }, 0);
+    const totalProfit = car.value.data.reduce((sum, carItem) => {
+        if (carItem.results != 0) {
+            const cost = (Number(carItem.purchase_price) || 0) + (Number(carItem.erbil_exp) || 0) + (Number(carItem.erbil_shipping) || 0) + (Number(carItem.dubai_exp) || 0) + (Number(carItem.dubai_shipping) || 0);
+            return sum + ((Number(carItem.pay_price) || 0) - cost);
+        }
+        return sum;
+    }, 0);
+    
+    const carsInStock = car.value.data.filter(c => c.results == 0).length;
+    const carsSold = car.value.data.filter(c => c.results != 0).length;
+    
+    // إنشاء محتوى الطباعة الشامل
+    const printContent = `
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <!-- Header -->
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="margin-bottom: 10px; color: #2563eb;">Salam Jalal Ayoub Company</h1>
+                <h2 style="margin-bottom: 15px;">Cars Report</h2>
+                <p style="font-size: 14px; color: #666;">${new Date().toLocaleDateString('en-US')}</p>
+            </div>
+            
+            <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px;">
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Cars</h3>
+                    <p style="font-size: 16px; font-weight: bold; color: #1f2937;">${car.value.total}</p>
+                </div>
+                
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Cars in Stock</h3>
+                    <p style="font-size: 16px; font-weight: bold; color: #059669;">${carsInStock}</p>
+                </div>
+                
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Cars Sold</h3>
+                    <p style="font-size: 16px; font-weight: bold; color: #dc2626;">${carsSold}</p>
+                </div>
+                
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Profit</h3>
+                    <p style="font-size: 16px; font-weight: bold; color: ${totalProfit >= 0 ? '#059669' : '#dc2626'};">$${totalProfit.toLocaleString()}</p>
+                </div>
+            </div>
+            
+            <!-- Financial Summary -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px;">
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Purchase Price</h3>
+                    <p style="font-size: 16px; font-weight: bold; color: #1f2937;">$${totalPurchasePrice.toLocaleString()}</p>
+                </div>
+                
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Cost</h3>
+                    <p style="font-size: 16px; font-weight: bold; color: #1f2937;">$${totalCost.toLocaleString()}</p>
+                </div>
+                
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Sale Price</h3>
+                    <p style="font-size: 16px; font-weight: bold; color: #1f2937;">$${totalSalePrice.toLocaleString()}</p>
+                </div>
+                
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Remaining</h3>
+                    <p style="font-size: 16px; font-weight: bold; color: #dc2626;">$${totalRemaining.toLocaleString()}</p>
+                </div>
+            </div>
+            
+            <!-- Detailed Table -->
+            <h3 style="margin-bottom: 15px; text-align: center; color: #374151;">Cars Details</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px;">
+                <thead>
+                    <tr style="background-color: #f8f9fa;">
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">No</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Serial</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Name</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Color</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Year</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Purchase Price</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Total Cost</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Sale Price</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Client</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Remaining</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Profit</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${car.value.data.map(carItem => `
+                        <tr>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.no}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.pin}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.name}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.color}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.model}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${Number(carItem.purchase_price || 0).toLocaleString()}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${((Number(carItem.purchase_price) || 0) + (Number(carItem.erbil_exp) || 0) + (Number(carItem.erbil_shipping) || 0) + (Number(carItem.dubai_exp) || 0) + (Number(carItem.dubai_shipping) || 0)).toLocaleString()}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${Number(carItem.pay_price || 0).toLocaleString()}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.client?.name || 'N/A'}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.results != 0 ? Number(carItem.pay_price - carItem.paid_amount_pay).toLocaleString() : ''}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.results != 0 ? Number(carItem.pay_price - ((Number(carItem.purchase_price) || 0) + (Number(carItem.erbil_exp) || 0) + (Number(carItem.erbil_shipping) || 0) + (Number(carItem.dubai_exp) || 0) + (Number(carItem.dubai_shipping) || 0))).toLocaleString() : ''}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">
+                                ${carItem.results == 0 ? 'In Stock' : 
+                                  carItem.results == 1 ? 'Sold (Partial)' : 
+                                  carItem.results == 2 ? 'Sold (Complete)' : 'N/A'}
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    // فتح نافذة الطباعة
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>تقرير السيارات</title>
+                <style>
+                    @media print {
+                        body { margin: 0; }
+                        @page { margin: 1cm; }
+                    }
+                </style>
+            </head>
+            <body>
+                ${printContent}
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
 }
 const options = ref({
   shortcuts: {
@@ -583,7 +760,7 @@ getResultsCar();
                         <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                             <tr v-for="payment in carPayments" :key="payment.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                    {{ new Date(payment.created_at).toLocaleDateString('ar-SA') }}
+                                    {{ new Date(payment.created_at).toLocaleDateString('en-US') }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                     {{ Number(payment.amount).toLocaleString() }}
@@ -740,7 +917,9 @@ getResultsCar();
             <div class="bg-white overflow-hidden shadow-sm ">
                 <div class="p-6  dark:bg-gray-900">
                     <div class="flex flex-col">
-                      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 lg:gap-1">
+                      <!-- فلاتر السيارات -->
+                      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+                        <!-- البحث -->
                         <div>
                           <form class="flex items-center max-w-5xl">
                             <label  class="dark:text-gray-200" for="simple-search"  ></label>
@@ -792,12 +971,59 @@ getResultsCar();
                                   dark:focus:ring-blue-500
                                   dark:focus:border-blue-500
                                 "
-                                placeholder="بحث"
+                                placeholder="بحث بالرقم التسلسلي"
                                 required
                               />
                             </div>
                           </form>
                         </div>
+                        
+                        <!-- فلتر حالة السيارة -->
+                        <div>
+                          <select v-model="carStatusFilter" @change="applyFilters" 
+                                  class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                            <option value="">جميع السيارات</option>
+                            <option value="0">في المخزن</option>
+                            <option value="1">مباعة (غير مكتملة)</option>
+                            <option value="2">مباعة (مكتملة)</option>
+                          </select>
+                        </div>
+                        
+                        <!-- فلتر حالة الدفع -->
+                        <div>
+                          <select v-model="paymentStatusFilter" @change="applyFilters" 
+                                  class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                            <option value="">جميع حالات الدفع</option>
+                            <option value="unpaid">غير مدفوع</option>
+                            <option value="partial">مدفوع جزئياً</option>
+                            <option value="paid">مدفوع بالكامل</option>
+                          </select>
+                        </div>
+                        
+                        <!-- زر طباعة -->
+                        <div>
+                          <button @click="printCarsTable" 
+                                  class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center space-x-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                            </svg>
+                            <span>طباعة</span>
+                          </button>
+                        </div>
+                        
+                        <!-- زر إعادة تعيين الفلاتر -->
+                        <div>
+                          <button @click="resetFilters" 
+                                  class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center space-x-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            <span>إعادة تعيين</span>
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 lg:gap-1">
                         <div>
                           <button
                             type="button"
