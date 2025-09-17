@@ -106,7 +106,22 @@ class User extends Authenticatable
 
     public function activeInvestments()
     {
-        return $this->hasMany(Investment::class)->where('status', 'active');
+        return $this->hasMany(Investment::class)->where('status', 'active')->with(['investmentCars.car']);
+    }
+    
+    // الحصول على إجمالي الربح من جميع السيارات المستثمرة للمستخدم
+    public function getTotalProfitFromCars()
+    {
+        return $this->activeInvestments()
+            ->with(['investmentCars.car'])
+            ->get()
+            ->sum(function($investment) {
+                return $investment->investmentCars
+                    ->filter(function($investmentCar) {
+                        return $investmentCar->car && $investmentCar->car->results != 0;
+                    })
+                    ->sum('profit_share');
+            });
     }
     
     /**

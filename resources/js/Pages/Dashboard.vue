@@ -55,6 +55,9 @@ let carPayments = ref([]);
 let selectedCar = ref(null);
 let showModalEditSalePrice = ref(false);
 let showModalEditPaidAmount = ref(false);
+let calculatingProfit = ref(false);
+let profitCalculationResult = ref(null);
+let showProfitModal = ref(false);
 
 function openModalDelCar(form={}) {
   formData.value=form
@@ -84,6 +87,30 @@ function openEditSalePrice(car) {
 function openEditPaidAmount(car) {
   formData.value = car;
   showModalEditPaidAmount.value = true;
+}
+
+function calculateCarProfit(car) {
+  calculatingProfit.value = true;
+  
+  axios.post(`/api/cars/${car.id}/distribute-profit`)
+    .then(response => {
+      if (response.data.success) {
+        profitCalculationResult.value = response.data;
+        showProfitModal.value = true;
+        toast.success('تم حساب وتوزيع الربح بنجاح');
+        // تحديث بيانات السيارات
+        getResultsCar();
+      } else {
+        toast.error(response.data.message || 'حدث خطأ في حساب الربح');
+      }
+    })
+    .catch(error => {
+      console.error('Error calculating profit:', error);
+      toast.error('حدث خطأ في حساب الربح');
+    })
+    .finally(() => {
+      calculatingProfit.value = false;
+    });
 }
 
 function confirmEditSalePrice(data) {
@@ -1219,6 +1246,8 @@ getResultsCar();
                                     >
                                       <show />
                                     </button>
+                                    
+                               
                                     </td>
                                 </tr>
                               </tbody>
@@ -1525,6 +1554,101 @@ getResultsCar();
                         class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:bg-gray-400"
                     >
                         تأكيد التعديل
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal لعرض نتائج حساب الربح -->
+    <div v-if="showProfitModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-10 mx-auto p-5 border w-11/12 md:w-4/5 lg:w-3/4 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div class="mt-3">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                        نتائج حساب وتوزيع الربح
+                    </h3>
+                    <button @click="showProfitModal = false" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div v-if="profitCalculationResult" class="space-y-6">
+                    <!-- معلومات السيارة -->
+                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                        <h4 class="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">معلومات السيارة</h4>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">رقم السيارة</label>
+                                <p class="text-sm text-gray-900 dark:text-white">{{ profitCalculationResult.car?.no }}</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">اسم السيارة</label>
+                                <p class="text-sm text-gray-900 dark:text-white">{{ profitCalculationResult.car?.name }}</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">التكلفة الإجمالية</label>
+                                <p class="text-sm text-gray-900 dark:text-white">${{ Number(profitCalculationResult.car?.total_cost || 0).toLocaleString() }}</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">سعر البيع</label>
+                                <p class="text-sm text-gray-900 dark:text-white">${{ Number(profitCalculationResult.car?.sale_price || 0).toLocaleString() }}</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">الربح الإجمالي</label>
+                                <p class="text-sm font-bold text-green-600 dark:text-green-400">${{ Number(profitCalculationResult.car?.profit || 0).toLocaleString() }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- تفاصيل المستثمرين -->
+                    <div v-if="profitCalculationResult.investors && profitCalculationResult.investors.length > 0">
+                        <h4 class="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">تفاصيل المستثمرين</h4>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                                <thead class="bg-gray-50 dark:bg-gray-700">
+                                    <tr>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">اسم المستثمر</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">المبلغ المستثمر</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">النسبة المئوية</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">نصيب الربح</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                    <tr v-for="investor in profitCalculationResult.investors" :key="investor.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        <td class="px-4 py-2 text-sm text-gray-900 dark:text-white">{{ investor.user_name }}</td>
+                                        <td class="px-4 py-2 text-sm text-gray-900 dark:text-white">${{ Number(investor.invested_amount || 0).toLocaleString() }}</td>
+                                        <td class="px-4 py-2 text-sm text-gray-900 dark:text-white">{{ Number(investor.percentage || 0).toFixed(2) }}%</td>
+                                        <td class="px-4 py-2 text-sm font-bold text-green-600 dark:text-green-400">${{ Number(investor.profit_share || 0).toLocaleString() }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- إجمالي الربح الموزع -->
+                        <div class="mt-4 bg-green-50 dark:bg-green-900 rounded-lg p-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-lg font-semibold text-green-800 dark:text-green-200">إجمالي الربح الموزع:</span>
+                                <span class="text-xl font-bold text-green-600 dark:text-green-400">
+                                    ${{ Number(profitCalculationResult.investors.reduce((sum, investor) => sum + (investor.profit_share || 0), 0)).toLocaleString() }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div v-else class="text-center py-8 text-gray-500 dark:text-gray-400">
+                        لا يوجد مستثمرين في هذه السيارة
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button
+                        @click="showProfitModal = false"
+                        class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                    >
+                        إغلاق
                     </button>
                 </div>
             </div>

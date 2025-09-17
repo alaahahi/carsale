@@ -76,8 +76,12 @@ Route::group(['middleware' => ['tenant']], function () {
     Route::get('getIndexAccountsSelas',[TransfersController::class, 'getIndexAccountsSelas'])->name('getIndexAccountsSelas');
     
     // Investment routes
-    Route::post('investments/add',[TransfersController::class, 'addInvestment'])->name('investments.add');
+    Route::post('investments/add',[TransfersController::class, 'addCarInvestment'])->name('investments.add');
     Route::post('investments/{id}/withdraw',[TransfersController::class, 'withdrawInvestment'])->name('investments.withdraw');
+    Route::post('investments/direct-car-investment', [UserWalletController::class, 'addDirectCarInvestment'])->name('investments.direct-car-investment');
+    Route::post('cars/{carId}/calculate-profit', [UserWalletController::class, 'calculateProfitOnCarSale'])->name('cars.calculate-profit');
+    Route::get('investors/{userId}/profit-report', [UserWalletController::class, 'getInvestorProfitReport'])->name('investors.profit-report');
+    Route::post('cars/{carId}/distribute-profit', [DashboardController::class, 'calculateProfitOnCarSale'])->name('cars.distribute-profit');
 
     // Route::get('carConfig',[CarConfigController::class, 'index'])->name('carConfig');
     // Route::get('addCompany',[CarConfigController::class, 'create'])->name('addCompany');
@@ -126,11 +130,22 @@ Route::group(['middleware' => ['tenant']], function () {
     Route::put('clients/{id}', [UserController::class, 'updateClient'])->name('clients.update');
     Route::post('clients/store', [UserController::class, 'storeClient'])->name('clients.store');
     Route::delete('clients/{id}', [UserController::class, 'destroyClient'])->name('clients.destroy');
+    
+    // Client investment profit management
+    Route::get('clients/{clientId}/investments', [UserController::class, 'getClientInvestments'])->name('clients.investments');
+    Route::post('clients/{clientId}/update-profit-shares', [UserController::class, 'updateClientProfitShares'])->name('clients.update-profit-shares');
     Route::get('car-payments', [DashboardController::class, 'getCarPayments']);
     Route::post('editSalePrice', [DashboardController::class, 'editSalePrice']);
     Route::post('editPaidAmount', [DashboardController::class, 'editPaidAmount']);
+    Route::get('main-fund-profit-from-investors', [DashboardController::class, 'getMainFundProfitFromInvestors'])->name('main-fund.profit-from-investors');
     Route::post('user-wallet/add', [UserWalletController::class, 'addToWallet'])->name('user-wallet.add');
-    Route::post('user-wallet/direct-investment', [UserWalletController::class, 'addDirectInvestment'])->name('user-wallet.direct-investment');
+    Route::post('user-wallet/direct-car-investment', [UserWalletController::class, 'addDirectCarInvestment'])->name('user-wallet.direct-car-investment');
+    Route::get('user-wallet/cars-needing-completion', [UserWalletController::class, 'getCarsNeedingCompletionForUser'])->name('user-wallet.cars-needing-completion');
+    Route::post('user-wallet/complete-car-investment', [UserWalletController::class, 'completeCarInvestment'])->name('user-wallet.complete-car-investment');
+// Car Investment Routes
+Route::get('cars/available-for-investment', [UserWalletController::class, 'getAvailableCarsForInvestment'])->name('cars.available-for-investment');
+Route::post('investments/car-investment', [UserWalletController::class, 'createCarInvestment'])->name('investments.car-investment');
+Route::get('investments/{id}/details', [UserWalletController::class, 'getInvestmentDetails'])->name('investments.details');
     Route::post('user-wallet/withdraw', [UserWalletController::class, 'withdrawFromWallet'])->name('user-wallet.withdraw');
     Route::delete('user-wallet/transactions/{transactionId}', [UserWalletController::class, 'deleteTransaction'])->name('user-wallet.delete-transaction');
     Route::get('user-wallet/stats', [UserWalletController::class, 'getUserStats'])->name('user-wallet.stats');

@@ -66,7 +66,7 @@ class UserController extends Controller
         
         $clients = User::with(['userType:id,name','wallet', 'cars' => function($query) {
             $query->where('results', '!=', 0); // السيارات المباعة فقط
-        }])->where('type_id', $this->userClient);
+        }, 'activeInvestments.investmentCars.car'])->where('type_id', $this->userClient);
         
         // البحث بالاسم
         if ($request->has('name') && !empty($request->name)) {
@@ -93,6 +93,22 @@ class UserController extends Controller
             $client->total_required = $totalRequired;
             $client->total_paid = $totalPaid;
             $client->remaining_debt = $totalRequired - $totalPaid;
+            
+            // حساب بيانات الربح
+            $totalProfitShare = 0;
+            $totalProfitPercentage = 0;
+            
+            foreach($client->activeInvestments as $investment) {
+                foreach($investment->investmentCars as $investmentCar) {
+                    if ($investmentCar->car && $investmentCar->car->results != 0) { // السيارات المباعة فقط
+                        $totalProfitShare += $investmentCar->profit_share ?? 0;
+                        $totalProfitPercentage += $investmentCar->percentage ?? 0;
+                    }
+                }
+            }
+            
+            $client->total_profit_share = $totalProfitShare;
+            $client->total_profit_percentage = $totalProfitPercentage;
         });
         
         // فلتر حالة العميل
@@ -548,5 +564,68 @@ class UserController extends Controller
         } catch (\Throwable $th) {
             return  Response::json(['status' => 401,'massage' => 'user not Authorize'],401);
         }
+    }
+
+    // جلب استثمارات العميل
+    public function getClientInvestments($clientId)
+    {
+        try {
+            $client = User::findOrFail($clientId);
+            
+            // جلب الاستثمارات النشطة مع العلاقات
+            $investments = $client->activeInvestments()
+                ->with(['investmentCars.car'])
+                ->get();
+            
+            return Response::json([
+                'success' => true,
+                'investments' => $investments
+            ], 200);
+            
+        } catch (\Exception $e) {
+            return Response::json([
+                'success' => false,
+                'message' => 'حدث خطأ أثناء جلب استثمارات العميل: ' . $e->getMessage()
+            ], 500);
         }
     }
+
+    // تحديث نسب الربح للعميل
+    public function updateClientProfitShares(Request $request, $clientId)
+    {
+        try {
+            $client = User::findOrFail($clientId);
+            
+            $request->validate([
+                'updates' => 'required|array',
+                'updates.*.id' => 'required|integer|exists:investment_cars,id',
+                'updates.*.profit_share' => 'required|numeric|min:0'
+            ]);
+            
+            $updates = $request->updates;
+            $updatedCount = 0;
+            
+            foreach ($updates as $update) {
+                $investmentCar = \App\Models\InvestmentCar::find($update['id']);
+                
+                // التحقق من أن الاستثمار يخص هذا العميل
+                if ($investmentCar && $investmentCar->investment->user_id == $clientId) {
+                    $investmentCar->update(['profit_share' => $update['profit_share']]);
+                    $updatedCount++;
+                }
+            }
+            
+            return Response::json([
+                'success' => true,
+                'message' => "تم تحديث {$updatedCount} استثمار بنجاح",
+                'updated_count' => $updatedCount
+            ], 200);
+            
+        } catch (\Exception $e) {
+            return Response::json([
+                'success' => false,
+                'message' => 'حدث خطأ أثناء تحديث نسب الربح: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+}

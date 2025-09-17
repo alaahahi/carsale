@@ -45,7 +45,50 @@ class DashboardController extends Controller
 
     
     }
-    public function __invoke(Request $request)
+    // حساب وتوزيع الربح عند بيع السيارة
+    public function calculateProfitOnCarSale(Request $request, $carId)
+    {
+        try {
+            $car = Car::findOrFail($carId);
+            
+            if ($car->results == 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'السيارة لم تباع بعد'
+                ], 400);
+            }
+
+            // توزيع الربح على المستثمرين
+            $car->distributeProfitToInvestors();
+
+            // الحصول على تفاصيل المستثمرين
+            $investorDetails = $car->getInvestorDetails();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم حساب وتوزيع الربح بنجاح',
+                'car' => [
+                    'id' => $car->id,
+                    'no' => $car->no,
+                    'name' => $car->name,
+                    'total_cost' => $car->total_cost,
+                    'sale_price' => $car->pay_price,
+                    'profit' => $car->profit
+                ],
+                'investors' => $investorDetails
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error calculating profit on car sale: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'حدث خطأ أثناء حساب الربح: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    public function stats()
     {
         $results = null;
        // $client = new Client( $this->url, 'masterKey');
@@ -148,8 +191,7 @@ class DashboardController extends Controller
                 'purchase_price' => $request->purchase_price,
                 'note' => $request->note ?? '',
                 'image' => $images ? json_encode($images) : null,
-                'user_id' => auth()->id(),
-                'erbil_exp' => $request->erbil_exp,
+                 'erbil_exp' => $request->erbil_exp,
                 'erbil_shipping' => $request->erbil_shipping,
                 'dubai_exp' => $request->dubai_exp,
                 'dubai_shipping' => $request->dubai_shipping,
@@ -213,8 +255,7 @@ class DashboardController extends Controller
                         'field' => $field,
                         'old_value' => $car->$field,
                         'new_value' => $request->$field,
-                        'user_id' => auth()->id(),
-                        'created_at' => now(),
+                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
                 }
@@ -443,6 +484,23 @@ class DashboardController extends Controller
                 }
                 if($pay_price==$paid_amount_pay){
                     $car->increment('results'); 
+                    
+                    // حساب وتوزيع الربح تلقائياً عند بيع السيارة
+                    try {
+                        $car->refresh(); // تحديث بيانات السيارة
+                        $car->distributeProfitToInvestors();
+                        \Log::info('Profit distributed automatically for car', [
+                            'car_id' => $car->id,
+                            'car_no' => $car->no,
+                            'pay_price' => $pay_price,
+                            'total_cost' => $car->total_cost
+                        ]);
+                    } catch (\Exception $e) {
+                        \Log::error('Error distributing profit automatically', [
+                            'car_id' => $car->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
                 }
             }
             return Response::json('ok', 200);    
@@ -517,6 +575,33 @@ class DashboardController extends Controller
         // إعادة حساب حالة السيارة
         if ($car->paid_amount_pay >= $newPayPrice) {
             $car->results = 2; // مدفوعة بالكامل
+            
+            // حساب وتوزيع الربح تلقائياً فقط عند الدفع الكامل
+            if ($car->paid_amount_pay == $newPayPrice) {
+                try {
+                    $car->refresh(); // تحديث بيانات السيارة
+                    $car->distributeProfitToInvestors();
+                    \Log::info('Profit distributed automatically after sale price update - FULL PAYMENT', [
+                        'car_id' => $car->id,
+                        'car_no' => $car->no,
+                        'pay_price' => $newPayPrice,
+                        'paid_amount' => $car->paid_amount_pay,
+                        'total_cost' => $car->total_cost
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('Error distributing profit after sale price update', [
+                        'car_id' => $car->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            } else {
+                \Log::info('Car marked as fully paid but profit not distributed - payment amount mismatch', [
+                    'car_id' => $car->id,
+                    'car_no' => $car->no,
+                    'pay_price' => $newPayPrice,
+                    'paid_amount' => $car->paid_amount_pay
+                ]);
+            }
         } else if ($car->paid_amount_pay > 0) {
             $car->results = 1; // مدفوعة جزئياً
         } else {
@@ -857,6 +942,23 @@ class DashboardController extends Controller
         
         if($car->pay_price-$car->paid_amount_pay==0){
             $car->increment('results'); 
+            
+            // حساب وتوزيع الربح تلقائياً عند اكتمال دفع السيارة
+            try {
+                $car->refresh(); // تحديث بيانات السيارة
+                $car->distributeProfitToInvestors();
+                \Log::info('Profit distributed automatically after payment completion', [
+                    'car_id' => $car->id,
+                    'car_no' => $car->no,
+                    'pay_price' => $car->pay_price,
+                    'total_cost' => $car->total_cost
+                ]);
+            } catch (\Exception $e) {
+                \Log::error('Error distributing profit after payment completion', [
+                    'car_id' => $car->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
         }
         
         return Response::json([
@@ -865,6 +967,78 @@ class DashboardController extends Controller
             'amount' => $amount,
             'remaining' => $car->pay_price - $car->paid_amount_pay
         ], 200);
+    }
+
+    // حساب ربح الصندوق من المستثمرين
+    public function getMainFundProfitFromInvestors()
+    {
+        try {
+            // الحصول على جميع السيارات المباعة والمدفوعة بالكامل
+            $soldCars = Car::where('results', 2)
+                ->whereRaw('pay_price = paid_amount_pay')
+                ->where('pay_price', '>', 0)
+                ->get();
+
+            $totalIncome = 0;
+            $totalInvestments = 0;
+            $totalProfitDistributed = 0;
+            $mainFundNetProfit = 0;
+
+            foreach ($soldCars as $car) {
+                $carIncome = $car->pay_price ?? 0;
+                $carCost = $car->total_cost;
+                $carProfit = $carIncome - $carCost;
+
+                // حساب إجمالي الاستثمارات في هذه السيارة
+                $carInvestments = $car->investmentCars()
+                    ->whereHas('investment', function($query) {
+                        $query->where('status', 'active');
+                    })
+                    ->sum('invested_amount');
+
+                // حساب إجمالي الربح الموزع للمستثمرين
+                $carProfitDistributed = $car->investmentCars()
+                    ->whereHas('investment', function($query) {
+                        $query->where('status', 'active');
+                    })
+                    ->sum('profit_share');
+
+                $totalIncome += $carIncome;
+                $totalInvestments += $carInvestments;
+                $totalProfitDistributed += $carProfitDistributed;
+            }
+
+            // حساب الربح الصافي للصندوق
+            $mainFundNetProfit = $totalIncome - $totalInvestments - $totalProfitDistributed;
+
+            return Response::json([
+                'success' => true,
+                'data' => [
+                    'total_income_from_sales' => $totalIncome,
+                    'total_investments_returned' => $totalInvestments,
+                    'total_profit_distributed' => $totalProfitDistributed,
+                    'main_fund_net_profit' => $mainFundNetProfit,
+                    'sold_cars_count' => $soldCars->count(),
+                    'breakdown' => [
+                        'income' => $totalIncome,
+                        'investments_returned' => $totalInvestments,
+                        'profit_distributed' => $totalProfitDistributed,
+                        'net_profit_for_main_fund' => $mainFundNetProfit
+                    ]
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Error calculating main fund profit from investors', [
+                'error' => $e->getMessage()
+            ]);
+
+            return Response::json([
+                'success' => false,
+                'message' => 'حدث خطأ أثناء حساب ربح الصندوق من المستثمرين',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
     public function DelCar(Request $request){
         $car=Car::find($request->id);

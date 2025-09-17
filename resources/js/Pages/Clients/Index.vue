@@ -200,6 +200,7 @@
                                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">المدفوع</th>
                                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">المتبقي</th>
                                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">الحالة</th>
+                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">نسبة الربح</th>
                                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">العمليات</th>
                                         </tr>
                                     </thead>
@@ -229,12 +230,34 @@
                                                 </span>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <div v-if="client.show_wallet && client.total_profit_share > 0" class="flex items-center gap-2">
+                                                    <span class="text-green-600 dark:text-green-400 font-bold">
+                                                        ${{ formatNumber(client.total_profit_share) }}
+                                                    </span>
+                                                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                                                        ({{ client.total_profit_percentage?.toFixed(2) || '0.00' }}%)
+                                                    </span>
+                                                </div>
+                                                <span v-else-if="client.show_wallet" class="text-gray-400 dark:text-gray-500 text-xs">
+                                                    لا يوجد ربح
+                                                </span>
+                                                <span v-else class="text-gray-400 dark:text-gray-500 text-xs">
+                                                    غير متاح
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                 <div class="flex items-center gap-2">
                                                     <button
                                                         v-if="client.email !== 'admin@admin.com' && client.show_wallet"
                                                         @click="goToUserWallet(client.id)"
                                                         class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 px-3 py-1 rounded-md bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/30 transition-colors duration-200">
                                                         قاسة
+                                                    </button>
+                                                    <button
+                                                        v-if="client.email !== 'admin@admin.com' && client.show_wallet && client.total_profit_share > 0"
+                                                        @click="showProfitEditModal(client)"
+                                                        class="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300 px-3 py-1 rounded-md bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 transition-colors duration-200">
+                                                        تعديل الربح
                                                     </button>
                                                     <button
                                                         v-if="client.email !== 'admin@admin.com'"
@@ -478,6 +501,111 @@
                 </form>
             </div>
         </Modal>
+
+        <!-- Profit Edit Modal -->
+        <Modal :show="showProfitEdit" @close="hideProfitEditModal">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">تعديل نسبة الربح</h3>
+                    <button @click="hideProfitEditModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div v-if="selectedClient" class="space-y-6">
+                    <!-- Client Info -->
+                    <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                        <h4 class="font-medium text-gray-900 dark:text-white mb-2">معلومات العميل</h4>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-500 dark:text-gray-400">الاسم:</span>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ selectedClient.name }}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500 dark:text-gray-400">إجمالي الربح الحالي:</span>
+                                <span class="font-bold text-green-600 dark:text-green-400">${{ formatNumber(selectedClient.total_profit_share) }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Investment Details -->
+                    <div v-if="clientInvestments.length > 0">
+                        <h4 class="font-medium text-gray-900 dark:text-white mb-3">تفاصيل الاستثمارات</h4>
+                        <div class="space-y-3">
+                            <div v-for="investment in clientInvestments" :key="investment.id" 
+                                 class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <p class="font-medium text-gray-900 dark:text-white">استثمار #{{ investment.id }}</p>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">{{ investment.note || 'بدون ملاحظات' }}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="font-bold text-lg text-gray-900 dark:text-white">${{ formatNumber(investment.amount) }}</p>
+                                    </div>
+                                </div>
+
+                                <!-- Car Investments -->
+                                <div v-if="investment.investment_cars && investment.investment_cars.length > 0" class="space-y-2">
+                                    <div v-for="carInvestment in investment.investment_cars" :key="carInvestment.id" 
+                                         class="bg-gray-50 dark:bg-gray-600 rounded-lg p-3">
+                                        <div class="flex justify-between items-center">
+                                            <div>
+                                                <p class="font-medium text-gray-900 dark:text-white">{{ carInvestment.car?.name || 'سيارة غير معروفة' }}</p>
+                                                <p class="text-sm text-gray-600 dark:text-gray-400">رقم: {{ carInvestment.car?.no || 'غير محدد' }}</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="font-bold text-gray-900 dark:text-white">المستثمر: ${{ formatNumber(carInvestment.invested_amount) }}</p>
+                                                <p class="text-sm text-gray-600 dark:text-gray-400">{{ carInvestment.percentage }}%</p>
+                                                <div class="flex items-center gap-2 mt-1">
+                                                    <span class="text-sm text-gray-500 dark:text-gray-400">نصيب الربح:</span>
+                                                    <input 
+                                                        v-model="carInvestment.profit_share"
+                                                        type="number"
+                                                        step="0.01"
+                                                        min="0"
+                                                        class="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-right">
+                                                    <span class="text-sm text-gray-500 dark:text-gray-400">$</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-else class="text-center py-8 text-gray-500 dark:text-gray-400">
+                        لا توجد استثمارات لهذا العميل
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex justify-end gap-4 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <button
+                        type="button"
+                        @click="hideProfitEditModal"
+                        class="px-6 py-3 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200 font-medium">
+                        إلغاء
+                    </button>
+                    <button
+                        type="button"
+                        @click="saveProfitChanges"
+                        :disabled="profitEditLoading"
+                        class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium">
+                        <svg v-if="profitEditLoading" class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <svg v-else class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                        </svg>
+                        {{ profitEditLoading ? 'جاري الحفظ...' : 'حفظ التغييرات' }}
+                    </button>
+                </div>
+            </div>
+        </Modal>
     </AuthenticatedLayout>
 </template>
 
@@ -508,6 +636,12 @@ const isEditModalVisible = ref(false)
 const isAddModalVisible = ref(false)
 const editLoading = ref(false)
 const addLoading = ref(false)
+
+// Profit edit modal
+const showProfitEdit = ref(false)
+const selectedClient = ref(null)
+const clientInvestments = ref([])
+const profitEditLoading = ref(false)
 
 // Search filters
 const searchName = ref('')
@@ -870,6 +1004,66 @@ const printClientsReport = async () => {
     } catch (error) {
         toast.error('حدث خطأ أثناء تحميل البيانات للطباعة')
         console.error(error)
+    }
+}
+
+// Profit edit functions
+const showProfitEditModal = async (client) => {
+    selectedClient.value = client
+    showProfitEdit.value = true
+    
+    try {
+        // جلب استثمارات العميل
+        const response = await axios.get(`/api/clients/${client.id}/investments`)
+        clientInvestments.value = response.data.investments || []
+    } catch (error) {
+        console.error('Error loading client investments:', error)
+        toast.error('حدث خطأ أثناء جلب استثمارات العميل')
+        clientInvestments.value = []
+    }
+}
+
+const hideProfitEditModal = () => {
+    showProfitEdit.value = false
+    selectedClient.value = null
+    clientInvestments.value = []
+}
+
+const saveProfitChanges = async () => {
+    if (!selectedClient.value) return
+    
+    profitEditLoading.value = true
+    
+    try {
+        // تحضير البيانات للتحديث
+        const updates = []
+        clientInvestments.value.forEach(investment => {
+            investment.investment_cars.forEach(carInvestment => {
+                updates.push({
+                    id: carInvestment.id,
+                    profit_share: parseFloat(carInvestment.profit_share) || 0
+                })
+            })
+        })
+        
+        // إرسال التحديثات
+        const response = await axios.post(`/api/clients/${selectedClient.value.id}/update-profit-shares`, {
+            updates: updates
+        })
+        
+        if (response.data.success) {
+            toast.success('تم تحديث نسب الربح بنجاح')
+            hideProfitEditModal()
+            // إعادة تحميل بيانات العملاء
+            loadClients()
+        } else {
+            toast.error(response.data.message || 'حدث خطأ أثناء تحديث نسب الربح')
+        }
+    } catch (error) {
+        console.error('Error updating profit shares:', error)
+        toast.error('حدث خطأ أثناء تحديث نسب الربح')
+    } finally {
+        profitEditLoading.value = false
     }
 }
 

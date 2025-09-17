@@ -96,6 +96,41 @@ class TransfersController extends Controller
         // حساب الربح الصحيح (المدفوعات من السيارات المباعة - تكلفة السيارات المباعة)
         $totalProfit = $totalCarPayments - $totalSoldCarsCost;
         
+        // حساب ربح الصندوق من المستثمرين
+        $mainFundProfitFromInvestors = 0;
+        $totalInvestmentsReturned = 0;
+        $totalProfitDistributed = 0;
+        
+        // الحصول على جميع السيارات المباعة والمدفوعة بالكامل
+        $soldCars = Car::where('results', 2)
+            ->whereRaw('pay_price = paid_amount_pay')
+            ->where('pay_price', '>', 0)
+            ->get();
+        
+        foreach ($soldCars as $car) {
+            $carIncome = $car->pay_price ?? 0;
+            
+            // حساب إجمالي الاستثمارات في هذه السيارة
+            $carInvestments = $car->investmentCars()
+                ->whereHas('investment', function($query) {
+                    $query->where('status', 'active');
+                })
+                ->sum('invested_amount');
+            
+            // حساب إجمالي الربح الموزع للمستثمرين
+            $carProfitDistributed = $car->investmentCars()
+                ->whereHas('investment', function($query) {
+                    $query->where('status', 'active');
+                })
+                ->sum('profit_share');
+            
+            $totalInvestmentsReturned += $carInvestments;
+            $totalProfitDistributed += $carProfitDistributed;
+        }
+        
+        // حساب الربح الصافي للصندوق من المستثمرين
+        $mainFundProfitFromInvestors = $totalCarPayments - $totalInvestmentsReturned - $totalProfitDistributed;
+        
         // جلب المستخدمين الذين لديهم محافظ
         $usersWithWallets = User::whereHas('wallet')
             ->where('show_wallet', true)
@@ -112,6 +147,15 @@ class TransfersController extends Controller
         // حساب رأس المال بعد الاستثمارات (رأس المال - الاستثمارات النشطة)
         $capitalAfterInvestments = max(0, $totalCapital - $totalActiveInvestments);
         
+        // حساب ربح المستثمرين فقط (بدون رأس المال)
+        $totalInvestorProfit = $this->calculateInvestorProfitOnly();
+        
+        // حساب ربح السيارات بدون استثمار
+        $nonInvestedCarsProfit = $this->calculateNonInvestedCarsProfit();
+        
+        // حساب ربح الصندوق من السيارات المستثمر فيها
+        $investedCarsProfit = $this->calculateInvestedCarsFundProfit();
+        
         // حساب رأس المال المتبقي بعد الاستثمارات والمدفوعات
         $finalRemainingCapital = max(0, $capitalAfterInvestments - $totalPaidFromCashbox);
         
@@ -127,8 +171,8 @@ class TransfersController extends Controller
             return [
                 'user' => $firstInvestment->user,
                 'totalAmount' => $investments->sum('amount'),
-                'totalPercentage' => $investments->sum('percentage'),
-                'totalProfitShare' => $investments->sum('profit_share'),
+                'totalPercentage' => 0, // سيتم حسابها من investment_cars
+                'totalProfitShare' => $firstInvestment->getTotalProfitFromCars(),
                 'investments' => $investments,
                 'investmentCount' => $investments->count()
             ];
@@ -148,6 +192,9 @@ class TransfersController extends Controller
             'totalCarPayments' => $totalCarPayments,
             'totalProfit' => $totalProfit,
             'totalSoldCarsCost' => $totalSoldCarsCost,
+            'mainFundProfitFromInvestors' => $mainFundProfitFromInvestors,
+            'totalInvestmentsReturned' => $totalInvestmentsReturned,
+            'totalProfitDistributed' => $totalProfitDistributed,
             'usersWithWallets' => $usersWithWallets,
             'totalActiveInvestments' => $totalActiveInvestments,
             'activeInvestors' => $activeInvestors,
@@ -156,6 +203,9 @@ class TransfersController extends Controller
             'finalRemainingCapital' => $finalRemainingCapital,
             'capitalStatus' => $capitalStatus,
             'profitStatus' => $profitStatus,
+            'totalInvestorProfit' => $totalInvestorProfit,
+            'nonInvestedCarsProfit' => $nonInvestedCarsProfit,
+            'investedCarsProfit' => $investedCarsProfit,
             'mainAccount' => $this->mainAccount,
             'inAccount' => $this->inAccount,
             'outAccount' => $this->outAccount,
@@ -306,12 +356,35 @@ class TransfersController extends Controller
             // خصم المبلغ من المحفظة
             $wallet->decrement('balance', $request->amount);
 
+            // تسجيل معاملة السحب من القاسة
+            Transactions::create([
+                'wallet_id' => $wallet->id,
+                'amount' => $request->amount,
+                'type' => 'investment',
+                'description' => 'سحب للاستثمار - ' . ($request->note ?? 'بدون ملاحظات'),
+                'morphed_id' => null, // سيتم تحديثها بعد إنشاء الاستثمار
+                'morphed_type' => null,
+                'user_id' => auth()->id(),
+            ]);
+
             // إنشاء الاستثمار
             $investment = Investment::create([
                 'user_id' => $request->user_id,
                 'amount' => $request->amount,
                 'note' => $request->note,
                 'status' => 'active'
+            ]);
+
+            // تحديث معاملة السحب بربطها بالاستثمار
+            Transactions::where('wallet_id', $wallet->id)
+                ->where('type', 'investment')
+                ->where('description', 'LIKE', '%سحب للاستثمار%')
+                ->whereNull('morphed_id')
+                ->latest()
+                ->first()
+                ->update([
+                    'morphed_id' => $investment->id,
+                    'morphed_type' => 'App\Models\Investment'
             ]);
 
             // حساب النسبة المئوية
@@ -328,20 +401,14 @@ class TransfersController extends Controller
             $totalProfit = max(0, $totalCarPayments - $totalSoldCarsCost);
             $investment->calculateProfitShare($totalProfit);
 
-            // تسجيل المعاملة
-            Transactions::create([
-                'wallet_id' => $wallet->id,
-                'amount' => $request->amount,
-                'type' => 'investment',
-                'description' => 'استثمار من المحفظة - ' . ($request->note ?? 'بدون ملاحظات'),
-                'user_id' => auth()->id(),
-            ]);
+            // تسجيل المعاملة - إيداع في الصندوق الرئيسي
+            $this->accountingController->increaseWallet($request->amount, 'إيداع استثمار في الصندوق - ' . ($request->note ?? 'بدون ملاحظات'), $this->mainAccount->id, $investment->id, 'App\Models\Investment');
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'تم إضافة الاستثمار بنجاح',
+                'message' => 'تم إنشاء الاستثمار بنجاح - تم سحب المبلغ من القاسة وإيداعه في الصندوق',
                 'investment' => $investment->load('user')
             ]);
 
@@ -465,12 +532,15 @@ class TransfersController extends Controller
     }
     public function payCar(Request $request)
     {   
+        try {
+            DB::beginTransaction();
+            
         if( $_GET['client_name']){
             $client = new User;
             $client->name = $_GET['client_name'];
             $client->phone = $_GET['client_phone'];
             $client->save();
-            Wallet::create(['user_id' => $user->id]);
+                Wallet::create(['user_id' => $client->id]);
         }
 
         $car=Car::updateOrCreate(['id' => $_GET['id']],[
@@ -481,13 +551,219 @@ class TransfersController extends Controller
             'paid_amount_pay' =>  $_GET['paid_amount_pay'],
             'results'=>1
              ]);
+                 
         if($car->id){
+                // التحقق من وجود استثمارات في السيارة
+                $hasInvestments = $car->investmentCars()
+                    ->whereHas('investment', function($query) {
+                        $query->where('status', 'active');
+                    })
+                    ->exists();
+                
+                if ($hasInvestments) {
+                    // إنشاء المعاملات الثلاث للسيارة المستثمر فيها
+                    $this->createInvestmentCarTransactions($car);
+                } else {
+                    // النظام القديم للسيارات غير المستثمر فيها
                 $desc=trans('text.buyCar').' '.$car->pay_price.trans('text.payDone').$car->paid_amount_pay;
                 $this->accountingController->decreaseWallet($car->paid_amount_pay, $desc,$this->mainAccount->id);
                 $this->accountingController->increaseWallet($car->paid_amount_pay, $desc,$this->inAccount->id);
             }
-            return Response::json('ok', 200);    
+            }
+            
+            DB::commit();
+        return Response::json('ok', 200);    
+        
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return Response::json(['error' => 'حدث خطأ في بيع السيارة: ' . $e->getMessage()], 500);
     }
+}
+
+/**
+ * حساب ربح السيارات بدون استثمار
+ */
+private function calculateNonInvestedCarsProfit()
+{
+    // السيارات المباعة بدون استثمار
+    $nonInvestedSoldCars = Car::where('results', '!=', 0)
+        ->whereDoesntHave('investmentCars')
+        ->get();
+
+    $totalProfit = 0;
+
+    foreach ($nonInvestedSoldCars as $car) {
+        $carTotalCost = $car->purchase_price + 
+                       ($car->erbil_exp ?? 0) + 
+                       ($car->erbil_shipping ?? 0) + 
+                       ($car->dubai_exp ?? 0) + 
+                       ($car->dubai_shipping ?? 0);
+        
+        $carProfit = $car->pay_price - $carTotalCost;
+        $totalProfit += max(0, $carProfit);
+    }
+
+    return $totalProfit;
+}
+
+/**
+ * حساب ربح الصندوق من السيارات المستثمر فيها
+ */
+private function calculateInvestedCarsFundProfit()
+{
+    // السيارات المباعة المستثمر فيها
+    $investedSoldCars = Car::where('results', '!=', 0)
+        ->whereHas('investmentCars')
+        ->get();
+
+    $totalFundProfit = 0;
+
+    foreach ($investedSoldCars as $car) {
+        $carTotalCost = $car->purchase_price + 
+                       ($car->erbil_exp ?? 0) + 
+                       ($car->erbil_shipping ?? 0) + 
+                       ($car->dubai_exp ?? 0) + 
+                       ($car->dubai_shipping ?? 0);
+        
+        $carProfit = $car->pay_price - $carTotalCost;
+        
+        // حساب إجمالي الربح الموزع للمستثمرين
+        $totalProfitDistributed = $car->investmentCars()
+            ->whereHas('investment', function($query) {
+                $query->where('status', 'active');
+            })
+            ->sum('profit_share');
+        
+        // ربح الصندوق = ربح السيارة - الربح الموزع للمستثمرين
+        $fundProfit = max(0, $carProfit - $totalProfitDistributed);
+        $totalFundProfit += $fundProfit;
+    }
+
+    return $totalFundProfit;
+}
+
+/**
+ * حساب ربح المستثمرين فقط (بدون رأس المال)
+ */
+private function calculateInvestorProfitOnly()
+{
+    // السيارات المباعة المستثمر فيها
+    $investedSoldCars = Car::where('results', '!=', 0)
+        ->whereHas('investmentCars')
+        ->get();
+
+    $totalProfitOnly = 0;
+
+    foreach ($investedSoldCars as $car) {
+        // حساب إجمالي الربح الموزع للمستثمرين فقط (بدون رأس المال)
+        $totalProfitDistributed = $car->investmentCars()
+            ->whereHas('investment', function($query) {
+                $query->where('status', 'active');
+            })
+            ->sum('profit_share');
+        
+        $totalProfitOnly += $totalProfitDistributed;
+    }
+
+    return $totalProfitOnly;
+}
+
+/**
+ * إنشاء المعاملات المحسنة عند بيع سيارة مستثمر فيها
+     * النظام الجديد المبسط:
+     * 1. إيداع سعر السيارة + الربح للمستثمر (القاعدة المستثمر)
+     * 2. إيداع نسبة الربح للصندوق
+     */
+    private function createInvestmentCarTransactions($car)
+    {
+        // حساب التكلفة الإجمالية للسيارة
+        $carTotalCost = $car->purchase_price + 
+                       ($car->erbil_exp ?? 0) + 
+                       ($car->erbil_shipping ?? 0) + 
+                       ($car->dubai_exp ?? 0) + 
+                       ($car->dubai_shipping ?? 0);
+        
+        // حساب ربح السيارة
+        $carProfit = $car->pay_price - $carTotalCost;
+        
+        // الحصول على جميع الاستثمارات النشطة في هذه السيارة
+        $investmentCars = $car->investmentCars()
+            ->whereHas('investment', function($query) {
+                $query->where('status', 'active');
+            })
+            ->with('investment.user')
+            ->get();
+        
+        $totalInvestedAmount = $investmentCars->sum('invested_amount');
+        $totalProfitDistributed = 0;
+        
+        // المعاملة الأولى: إيداع سعر السيارة + الربح للمستثمرين
+        foreach ($investmentCars as $investmentCar) {
+            $investor = $investmentCar->investment->user;
+            $investorWallet = $investor->getWalletOrCreate();
+            
+            // حساب نصيب المستثمر من الربح (50% حسب النظام الحالي)
+            $investorProfitShare = ($investmentCar->percentage / 100) * $carProfit;
+            
+            // تحديث نصيب الربح في investment_cars
+            $investmentCar->update(['profit_share' => $investorProfitShare]);
+            
+            // حساب المبلغ الكامل للمستثمر (رأس المال المستثمر + نصيبه من الربح)
+            $investorTotalAmount = $investmentCar->invested_amount + $investorProfitShare; // رأس المال المستثمر + نصيبه من الربح
+            
+            // إنشاء معاملة إيداع للمستثمر
+            $investorDesc = "إيداع رأس المال + ربح المستثمر من بيع السيارة - " . $car->name . " (PIN: " . $car->pin . ") - المستثمر: " . $investor->name;
+            
+            $transaction = Transactions::create([
+                'wallet_id' => $investorWallet->id,
+                'amount' => $investorTotalAmount,
+                'type' => 'investor_profit',
+                'description' => $investorDesc,
+                'morphed_id' => $car->id,
+                'morphed_type' => 'App\Models\Car',
+                'user_id' => auth()->id(),
+            ]);
+            
+            // تسجيل المعاملة في السجلات للتأكد
+            \Log::info('Investor profit transaction created', [
+                'transaction_id' => $transaction->id,
+                'investor_id' => $investor->id,
+                'investor_name' => $investor->name,
+                'wallet_id' => $investorWallet->id,
+                'amount' => $investorTotalAmount,
+                'type' => 'investor_profit',
+                'car_id' => $car->id,
+                'car_name' => $car->name
+            ]);
+            
+            $totalProfitDistributed += $investorProfitShare;
+        }
+        
+        // المعاملة الثانية: إيداع نسبة الربح للصندوق
+        $fundProfit = $carProfit - $totalProfitDistributed;
+        if ($fundProfit > 0) {
+            $fundDesc = "إيداع ربح الصندوق من بيع السيارة - " . $car->name . " (PIN: " . $car->pin . ")";
+            
+            // إيداع ربح الصندوق في الحساب الداخل
+            $this->accountingController->increaseWallet($fundProfit, $fundDesc, $this->inAccount->id, $car->id, 'App\Models\Car');
+        }
+        
+        // تسجيل تفاصيل المعاملات في السجلات
+        \Log::info('Simplified investment car sale transactions created', [
+            'car_id' => $car->id,
+            'car_pin' => $car->pin,
+            'car_name' => $car->name,
+            'sale_price' => $car->pay_price,
+            'car_total_cost' => $carTotalCost,
+            'car_profit' => $carProfit,
+            'total_invested_amount' => $totalInvestedAmount,
+            'total_profit_distributed' => $totalProfitDistributed,
+            'total_returned_to_investors' => $totalInvestedAmount + $totalProfitDistributed, // رأس المال + الربح
+            'fund_profit' => $fundProfit,
+            'investors_count' => $investmentCars->count()
+        ]);
+    }
+    
     public function getIndexCar()
     {
         $data =  Car::with('carmodel')->with('name')->with('color')->with('company')->with('client');
@@ -500,6 +776,84 @@ class TransfersController extends Controller
         }
         $data =$data->orderByRaw('CAST(no AS UNSIGNED) DESC')->paginate(10);
         return Response::json($data, 200);
+    }
+
+    /**
+     * جلب السيارات التي تحتاج إكمال استثمار
+     */
+    public function getCarsNeedingInvestmentCompletion()
+    {
+        \Log::info('=== بدء جلب السيارات التي تحتاج إكمال استثمار ===');
+        
+        // جلب السيارات غير المباعة التي لها استثمارات
+        $carsWithInvestments = Car::where('results', 0)
+            ->whereHas('investmentCars')
+            ->with(['investmentCars.investment.user', 'client'])
+            ->get();
+            
+        \Log::info('عدد السيارات غير المباعة التي لها استثمارات: ' . $carsWithInvestments->count());
+        
+        $carsNeedingCompletion = $carsWithInvestments->map(function ($car) {
+            $carTotalCost = $car->purchase_price + 
+                           ($car->erbil_exp ?? 0) + 
+                           ($car->erbil_shipping ?? 0) + 
+                           ($car->dubai_exp ?? 0) + 
+                           ($car->dubai_shipping ?? 0);
+            
+            $totalInvestedAmount = $car->investmentCars()
+                ->whereHas('investment', function($query) {
+                    $query->where('status', 'active');
+                })
+                ->sum('invested_amount');
+            
+            $remainingAmount = max(0, $carTotalCost - $totalInvestedAmount);
+            $needsCompletion = $remainingAmount > 0;
+            
+            \Log::info("السيارة رقم {$car->no}: التكلفة الإجمالية = {$carTotalCost}, المستثمر = {$totalInvestedAmount}, المتبقي = {$remainingAmount}, يحتاج إكمال = " . ($needsCompletion ? 'نعم' : 'لا'));
+            
+            return [
+                'id' => $car->id,
+                'no' => $car->no,
+                'name' => $car->name,
+                'pin' => $car->pin,
+                'purchase_price' => $car->purchase_price,
+                'total_cost' => $carTotalCost,
+                'total_invested' => $totalInvestedAmount,
+                'remaining_amount' => $remainingAmount,
+                'investment_percentage' => $carTotalCost > 0 ? ($totalInvestedAmount / $carTotalCost) * 100 : 0,
+                'needs_completion' => $needsCompletion,
+                'client_name' => $car->client->name ?? 'غير محدد',
+                'investors' => $car->investmentCars()
+                    ->whereHas('investment', function($query) {
+                        $query->where('status', 'active');
+                    })
+                    ->with('investment.user')
+                    ->get()
+                    ->map(function ($investmentCar) {
+                        return [
+                            'investor_name' => $investmentCar->investment->user->name,
+                            'invested_amount' => $investmentCar->invested_amount,
+                            'percentage' => $investmentCar->percentage,
+                        ];
+                    })
+            ];
+        })
+        ->filter(function ($car) {
+            return $car['needs_completion']; // فقط السيارات التي تحتاج إكمال
+        })
+        ->values();
+
+        \Log::info('عدد السيارات التي تحتاج إكمال استثمار: ' . $carsNeedingCompletion->count());
+        \Log::info('=== انتهاء جلب السيارات التي تحتاج إكمال استثمار ===');
+
+        return response()->json([
+            'success' => true,
+            'cars' => $carsNeedingCompletion,
+            'debug_info' => [
+                'total_cars_with_investments' => $carsWithInvestments->count(),
+                'cars_needing_completion' => $carsNeedingCompletion->count()
+            ]
+        ]);
     }
     
 }

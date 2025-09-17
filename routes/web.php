@@ -764,6 +764,7 @@ Route::group(['middleware' => ['tenant']], function () {
     Route::get('addTransfers',[TransfersController::class, 'addTransfers'])->name('addTransfers');
     Route::get('transfers',[TransfersController::class, 'index'])->name('transfers');
     Route::get('getIndexAccountsSelas',[TransfersController::class, 'getIndexAccountsSelas'])->name('getIndexAccountsSelas');
+    Route::get('getCarsNeedingInvestmentCompletion',[TransfersController::class, 'getCarsNeedingInvestmentCompletion'])->name('getCarsNeedingInvestmentCompletion');
  
     Route::get('addCar',[DashboardController::class, 'addCar'])->name('addCar');
     Route::get('payCar',[DashboardController::class, 'payCar'])->name('payCar');
@@ -777,6 +778,7 @@ Route::group(['middleware' => ['tenant']], function () {
     
     Route::get('user-wallet', [UserWalletController::class, 'index'])->name('user-wallet');
     Route::get('user-wallet/{userId}', [UserWalletController::class, 'show'])->name('user-wallet.show');
+   
 
 
     
