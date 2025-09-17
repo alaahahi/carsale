@@ -841,35 +841,39 @@ class DashboardController extends Controller
     }
     public function addToBox()
     {
-        $user_id = auth()->id(); // الحصول على المستخدم من الجلسة
-        
-        // فحص وجود الحسابات المطلوبة
-     
-        
         $amount = $_GET['amount'] ?? 0;
         $note = $_GET['note'] ?? '';
         
         $desc=trans('text.addToBox').' '.$amount.'$' .(($note)?' البيان : '.$note:'');
         
-        // التحقق من وجود حساب الدخل ومحفظته
+        // التحقق من وجود حساب الدخل (in@account.com)
         if (!$this->inAccount) {
-            throw new \Exception('حساب الدخل غير موجود');
+            return Response::json([
+                'success' => false,
+                'message' => 'حساب الدخل (in@account.com) غير موجود'
+            ], 500);
         }
         
         $inWallet = $this->inAccount->getWalletOrCreate();
         if (!$inWallet || !$inWallet->id) {
-            throw new \Exception('فشل في إنشاء محفظة حساب الدخل');
+            return Response::json([
+                'success' => false,
+                'message' => 'فشل في إنشاء محفظة حساب الدخل'
+            ], 500);
         }
         
-        // إنشاء معاملة دخول مباشرة
+        // إنشاء معاملة دخول للصندوق (حساب الدخل)
         Transactions::create([
             'amount' => $amount,
             'type' => 'in',
             'description' => $desc,
             'wallet_id' => $inWallet->id,
-            'morphed_id' => $user_id,
+            'morphed_id' => $this->inAccount->id,
             'morphed_type' => 'App\Models\User',
-            'user_id' => $user_id,
+            'user_id' => $this->inAccount->id, // استخدام حساب الدخل
+            'is_pay' => 0,
+            'created_at' => now(),
+            'updated_at' => now()
         ]);
         
         return Response::json([
@@ -881,34 +885,39 @@ class DashboardController extends Controller
     }
     public function withDrawFromBox()
     {
-        $user_id = auth()->id(); // الحصول على المستخدم من الجلسة
-        
-     
-        
         $amount = $_GET['amount'] ?? 0;
         $note = $_GET['note'] ?? '';
         
         $desc=trans('text.withDrawFromBox').' '.$amount.'$' .(($note)?' البيان : '.$note:'');
         
-        // التحقق من وجود حساب الخرج ومحفظته
+        // التحقق من وجود حساب الخرج (out@account.com)
         if (!$this->outAccount) {
-            throw new \Exception('حساب الخرج غير موجود');
+            return Response::json([
+                'success' => false,
+                'message' => 'حساب الخرج (out@account.com) غير موجود'
+            ], 500);
         }
         
         $outWallet = $this->outAccount->getWalletOrCreate();
         if (!$outWallet || !$outWallet->id) {
-            throw new \Exception('فشل في إنشاء محفظة حساب الخرج');
+            return Response::json([
+                'success' => false,
+                'message' => 'فشل في إنشاء محفظة حساب الخرج'
+            ], 500);
         }
         
-        // إنشاء معاملة خرج مباشرة
+        // إنشاء معاملة خرج من الصندوق (حساب الخرج)
         Transactions::create([
             'amount' => $amount,
             'type' => 'out',
             'description' => $desc,
             'wallet_id' => $outWallet->id,
-            'morphed_id' => $user_id,
+            'morphed_id' => $this->outAccount->id,
             'morphed_type' => 'App\Models\User',
-            'user_id' => $user_id,
+            'user_id' => $this->outAccount->id, // استخدام حساب الخرج
+            'is_pay' => 0,
+            'created_at' => now(),
+            'updated_at' => now()
         ]);
 
         return Response::json([
