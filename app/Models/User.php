@@ -142,18 +142,43 @@ class User extends Authenticatable
     public function createWalletIfNotExists()
     {
         if (!$this->wallet) {
-            return $this->wallet()->create([
-                'balance' => 0
-            ]);
+            try {
+                $wallet = $this->wallet()->create([
+                    'balance' => 0,
+                    'card' => null
+                ]);
+                
+                \Log::info("Wallet created for user", [
+                    'user_id' => $this->id,
+                    'user_name' => $this->name,
+                    'wallet_id' => $wallet->id
+                ]);
+                
+                return $wallet;
+            } catch (\Exception $e) {
+                \Log::error("Failed to create wallet for user", [
+                    'user_id' => $this->id,
+                    'user_name' => $this->name,
+                    'error' => $e->getMessage()
+                ]);
+                throw $e;
+            }
         }
         return $this->wallet;
     }
     
     /**
-     * الحصول على wallet المستخدم أو إنشاء واحد جديد
+     * الحصول على wallet المستخدم أو إنشاء واحد جديد (محسن)
      */
     public function getWalletOrCreate()
     {
-        return $this->wallet ?: $this->createWalletIfNotExists();
+        // إعادة تحميل العلاقة للتأكد من أحدث البيانات
+        $this->load('wallet');
+        
+        if (!$this->wallet) {
+            return $this->createWalletIfNotExists();
+        }
+        
+        return $this->wallet;
     }
 }

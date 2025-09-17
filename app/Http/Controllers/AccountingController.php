@@ -73,13 +73,18 @@ class AccountingController extends Controller
     {
         $user = User::find($user_id);
         if (!$user) {
-            throw new \Exception("المستخدم غير موجود");
+            throw new \Exception("المستخدم غير موجود (ID: {$user_id})");
         }
         
         // إنشاء wallet إذا لم يكن موجوداً
         $wallet = $user->getWalletOrCreate();
         
-        $wallet->increment('balance', $amount);
+        // التحقق من وجود المحفظة
+        if (!$wallet || !$wallet->id) {
+            throw new \Exception("فشل في إنشاء أو العثور على محفظة للمستخدم {$user->name} (ID: {$user_id})");
+        }
+        
+        // لا حاجة لتحديث حقل balance - الرصيد سيحسب من المعاملات
         Transactions::create([
             'wallet_id' => $wallet->id,
             'morphed_type' => $morphed_type,
@@ -90,19 +95,31 @@ class AccountingController extends Controller
             'is_pay' => 0,
             'user_id' => $user_added ?: auth()->id(),
         ]);
+        
+        \Log::info("Wallet transaction created successfully", [
+            'user_id' => $user_id,
+            'wallet_id' => $wallet->id,
+            'amount' => $amount,
+            'type' => 'in'
+        ]);
     }
 
     public function decreaseWallet(int $amount, $desc, $user_id, $morphed_id = '', $morphed_type = '', $user_added = 0)
     {
         $user = User::find($user_id);
         if (!$user) {
-            throw new \Exception("المستخدم غير موجود");
+            throw new \Exception("المستخدم غير موجود (ID: {$user_id})");
         }
         
         // إنشاء wallet إذا لم يكن موجوداً
         $wallet = $user->getWalletOrCreate();
         
-        $wallet->decrement('balance', $amount);
+        // التحقق من وجود المحفظة
+        if (!$wallet || !$wallet->id) {
+            throw new \Exception("فشل في إنشاء أو العثور على محفظة للمستخدم {$user->name} (ID: {$user_id})");
+        }
+        
+        // لا حاجة لتحديث حقل balance - الرصيد سيحسب من المعاملات
         Transactions::create([
             'wallet_id' => $wallet->id,
             'morphed_type' => $morphed_type,
@@ -112,6 +129,13 @@ class AccountingController extends Controller
             'description' => $desc,
             'is_pay' => 0,
             'user_id' => $user_added ?: auth()->id(),
+        ]);
+        
+        \Log::info("Wallet decrease transaction created successfully", [
+            'user_id' => $user_id,
+            'wallet_id' => $wallet->id,
+            'amount' => $amount,
+            'type' => 'out'
         ]);
     }
 }

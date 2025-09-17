@@ -662,10 +662,12 @@ class DashboardController extends Controller
             // إنشاء معاملة جديدة
             // استخدام محفظة الدخل للمعاملات الإيجابية ومحفظة الخرج للمعاملات السلبية
             $walletId = null;
-            if ($difference > 0 && $this->inAccount && $this->inAccount->wallet) {
-                $walletId = $this->inAccount->wallet->id;
-            } elseif ($difference < 0 && $this->outAccount && $this->outAccount->wallet) {
-                $walletId = $this->outAccount->wallet->id;
+            if ($difference > 0 && $this->inAccount) {
+                $inWallet = $this->inAccount->getWalletOrCreate();
+                $walletId = $inWallet ? $inWallet->id : null;
+            } elseif ($difference < 0 && $this->outAccount) {
+                $outWallet = $this->outAccount->getWalletOrCreate();
+                $walletId = $outWallet ? $outWallet->id : null;
             }
             
             if ($walletId) {
@@ -849,12 +851,22 @@ class DashboardController extends Controller
         
         $desc=trans('text.addToBox').' '.$amount.'$' .(($note)?' البيان : '.$note:'');
         
+        // التحقق من وجود حساب الدخل ومحفظته
+        if (!$this->inAccount) {
+            throw new \Exception('حساب الدخل غير موجود');
+        }
+        
+        $inWallet = $this->inAccount->getWalletOrCreate();
+        if (!$inWallet || !$inWallet->id) {
+            throw new \Exception('فشل في إنشاء محفظة حساب الدخل');
+        }
+        
         // إنشاء معاملة دخول مباشرة
         Transactions::create([
             'amount' => $amount,
             'type' => 'in',
             'description' => $desc,
-            'wallet_id' => $this->inAccount->wallet->id,
+            'wallet_id' => $inWallet->id,
             'morphed_id' => $user_id,
             'morphed_type' => 'App\Models\User',
             'user_id' => $user_id,
@@ -878,12 +890,22 @@ class DashboardController extends Controller
         
         $desc=trans('text.withDrawFromBox').' '.$amount.'$' .(($note)?' البيان : '.$note:'');
         
+        // التحقق من وجود حساب الخرج ومحفظته
+        if (!$this->outAccount) {
+            throw new \Exception('حساب الخرج غير موجود');
+        }
+        
+        $outWallet = $this->outAccount->getWalletOrCreate();
+        if (!$outWallet || !$outWallet->id) {
+            throw new \Exception('فشل في إنشاء محفظة حساب الخرج');
+        }
+        
         // إنشاء معاملة خرج مباشرة
         Transactions::create([
             'amount' => $amount,
             'type' => 'out',
             'description' => $desc,
-            'wallet_id' => $this->outAccount->wallet->id,
+            'wallet_id' => $outWallet->id,
             'morphed_id' => $user_id,
             'morphed_type' => 'App\Models\User',
             'user_id' => $user_id,
