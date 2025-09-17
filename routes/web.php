@@ -778,6 +778,8 @@ Route::group(['middleware' => ['tenant']], function () {
     
     Route::get('user-wallet', [UserWalletController::class, 'index'])->name('user-wallet');
     Route::get('user-wallet/{userId}', [UserWalletController::class, 'show'])->name('user-wallet.show');
+    Route::get('cars-needing-completion-investment', [UserWalletController::class, 'getCarsNeedingCompletionInvestment'])
+        ->name('cars-needing-completion-investment');
    
 
 

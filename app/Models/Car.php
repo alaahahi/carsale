@@ -12,6 +12,22 @@ use Illuminate\Support\Str;
 class Car extends Model
 {
     use HasFactory, SoftDeletes;
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Event listener لأرشفة الاستثمارات عند تحديث السيارة
+        static::updated(function ($car) {
+            // فحص إذا تم تحديث حالة السيارة إلى مباعة ومدفوعة بالكامل
+            if ($car->results == 2 && $car->pay_price && $car->paid_amount_pay >= $car->pay_price) {
+           
+                
+                // أرشفة الاستثمارات تلقائياً
+                $car->archiveInvestmentsAfterSale();
+            }
+        });
+    }
     protected $table = 'car';
     protected $fillable = [
         'id',
@@ -157,6 +173,9 @@ class Car extends Model
             // إنشاء المعاملات المالية للمستثمر
             $this->createProfitTransactions($investmentCar, $profitShare);
         }
+
+        // أرشفة الاستثمارات بعد توزيع الربح
+        $this->archiveInvestmentsAfterSale();
 
         \Log::info('Profit distribution completed successfully', [
             'car_id' => $this->id,
@@ -315,6 +334,45 @@ class Car extends Model
             'new_value' => $newValue,
             'user_id' => $userId,
         ]);
+    }
+
+    /**
+     * أرشفة الاستثمارات بعد بيع السيارة وتوزيع الربح
+     */
+    public function archiveInvestmentsAfterSale()
+    {
+        if ($this->results == 0) {
+            return false; // السيارة لم تباع بعد
+        }
+
+        // أرشفة جميع الاستثمارات النشطة في هذه السيارة
+        $activeInvestments = $this->investmentCars()
+            ->whereHas('investment', function($query) {
+                $query->where('status', 'active');
+            })
+            ->get();
+
+        foreach ($activeInvestments as $investmentCar) {
+            $investment = $investmentCar->investment;
+            
+            // تغيير حالة الاستثمار إلى مؤرشف
+            $investment->update([
+                'status' => 'archived',
+                'note' => ($investment->note ?? '') . " - مؤرشف بعد بيع السيارة رقم {$this->no} بتاريخ " . now()->format('Y-m-d')
+            ]);
+            
+            \Log::info('Investment archived after car sale', [
+                'investment_id' => $investment->id,
+                'car_id' => $this->id,
+                'car_no' => $this->no,
+                'investor_id' => $investment->user_id,
+                'investor_name' => $investment->user->name,
+                'invested_amount' => $investmentCar->invested_amount,
+                'profit_share' => $investmentCar->profit_share
+            ]);
+        }
+
+        return true;
     }
 
   }

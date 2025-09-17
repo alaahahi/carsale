@@ -140,7 +140,7 @@ Route::group(['middleware' => ['tenant']], function () {
     Route::get('main-fund-profit-from-investors', [DashboardController::class, 'getMainFundProfitFromInvestors'])->name('main-fund.profit-from-investors');
     Route::post('user-wallet/add', [UserWalletController::class, 'addToWallet'])->name('user-wallet.add');
     Route::post('user-wallet/direct-car-investment', [UserWalletController::class, 'addDirectCarInvestment'])->name('user-wallet.direct-car-investment');
-    Route::get('user-wallet/cars-needing-completion', [UserWalletController::class, 'getCarsNeedingCompletionForUser'])->name('user-wallet.cars-needing-completion');
+    Route::get('user-wallet/cars-needing-completion/{userId?}', [UserWalletController::class, 'getCarsNeedingCompletionInvestment'])->name('user-wallet.cars-needing-completion');
     Route::post('user-wallet/complete-car-investment', [UserWalletController::class, 'completeCarInvestment'])->name('user-wallet.complete-car-investment');
 // Car Investment Routes
 Route::get('cars/available-for-investment', [UserWalletController::class, 'getAvailableCarsForInvestment'])->name('cars.available-for-investment');

@@ -130,11 +130,13 @@ class UserWalletController extends Controller
         $allActiveInvestments = Investment::where('status', 'active')->with('user')->get();
         $groupedInvestments = $allActiveInvestments->groupBy('user_id');
         
-        // جلب الاستثمارات مع إعادة تحميل البيانات للتأكد من أحدث المعلومات
+        // جلب جميع الاستثمارات (نشطة ومؤرشفة) مع إعادة تحميل البيانات
         $activeInvestments = $user->activeInvestments()->get();
+        $archivedInvestments = $user->archivedInvestments()->get();
+        $allInvestments = $user->allInvestments()->get();
         
         // إعادة تحميل كل استثمار للتأكد من أحدث البيانات
-        foreach ($activeInvestments as $investment) {
+        foreach ($allInvestments as $investment) {
             $investment->refresh();
             foreach ($investment->investmentCars as $investmentCar) {
                 $investmentCar->refresh();
@@ -144,9 +146,12 @@ class UserWalletController extends Controller
         
         $userInvestments = [
             'totalAmount' => $user->activeInvestments()->sum('amount'),
+            'totalArchivedAmount' => $user->archivedInvestments()->sum('amount'),
             'totalPercentage' => 0,
             'totalProfitShare' => $user->getTotalProfitFromCars(),
             'activeInvestments' => $activeInvestments,
+            'archivedInvestments' => $archivedInvestments,
+            'allInvestments' => $allInvestments,
             'groupedInvestments' => $groupedInvestments->map(function ($investments) {
                 $firstInvestment = $investments->first();
                 return [
@@ -213,8 +218,7 @@ class UserWalletController extends Controller
             }
             $wallet = $user->getWalletOrCreate();
 
-            // زيادة رصيد المحفظة
-            $wallet->increment('balance', $amount);
+            // لا حاجة لتحديث حقل balance - الرصيد سيحسب من المعاملات
 
             // إنشاء معاملة إدخال
             Transactions::create([
@@ -291,13 +295,14 @@ public function addDirectCarInvestment(Request $request)
             throw new \Exception('إجمالي مبالغ السيارات يجب أن يساوي المبلغ الإجمالي');
         }
 
-        // التحقق من وجود رصيد كافي في المحفظة
-        if ($wallet->balance < $amount) {
+        // التحقق من وجود رصيد كافي في المحفظة (من المعاملات)
+        $currentBalance = $wallet->getCalculatedBalance();
+        if ($currentBalance < $amount) {
             throw new \Exception('الرصيد غير كافي في المحفظة للاستثمار');
         }
 
-        // الخطوة 1: سحب المبلغ من المحفظة
-        $wallet->decrement('balance', $amount);
+        // الخطوة 1: إنشاء معاملة سحب (الرصيد سيحسب تلقائياً)
+        // لا حاجة لتحديث حقل balance
         
         // تسجيل معاملة السحب من القاسة
         Transactions::create([
@@ -318,7 +323,7 @@ public function addDirectCarInvestment(Request $request)
         })->first();
         
         if ($mainWallet) {
-            $mainWallet->increment('balance', $amount);
+            // لا حاجة لتحديث حقل balance - الرصيد سيحسب من المعاملات
             
             // إنشاء معاملة دخول للصندوق الأساسي
             Transactions::create([
@@ -427,16 +432,16 @@ public function addDirectCarInvestment(Request $request)
             $user = User::findOrFail($userId);
             $wallet = $user->getWalletOrCreate();
 
-            // التحقق من الرصيد المتاح
-            if ($amount > $wallet->balance) {
+            // التحقق من الرصيد المتاح (من المعاملات)
+            $currentBalance = $wallet->getCalculatedBalance();
+            if ($amount > $currentBalance) {
                 return response()->json([
                     'success' => false,
                     'message' => 'المبلغ المطلوب أكبر من الرصيد المتاح'
                 ], 400);
             }
 
-            // تقليل رصيد المحفظة
-            $wallet->decrement('balance', $amount);
+            // لا حاجة لتحديث حقل balance - الرصيد سيحسب من المعاملات
 
             // إنشاء معاملة سحب
             Transactions::create([
@@ -514,50 +519,23 @@ public function addDirectCarInvestment(Request $request)
     }
 
     /**
-     * حساب رصيد المستخدم
+     * حساب رصيد المستخدم من المعاملات
      */
     private function calculateUserWalletBalance($userId)
     {
-        // حساب المعاملات الداخلة (user_in + investor_profit)
-        $totalIn = Transactions::where(function($query) use ($userId) {
-            $query->where(function($subQuery) use ($userId) {
-                // معاملات المستخدم الشخصية
-                $subQuery->where('morphed_type', 'App\Models\User')
-                         ->where('morphed_id', $userId)
-                         ->where('type', 'user_in');
-            })->orWhere(function($subQuery) use ($userId) {
-                // معاملات ربح المستثمر
-                $subQuery->where('type', 'investor_profit')
-                         ->whereHas('wallet', function($walletQuery) use ($userId) {
-                             $walletQuery->where('user_id', $userId);
-                         });
-            });
-        })->sum('amount') ?? 0;
+        $user = User::find($userId);
+        if (!$user) {
+            return 0;
+        }
 
-        // حساب المعاملات الخارجة (user_out + investment)
-        $totalOut = Transactions::where(function($query) use ($userId) {
-            $query->where(function($subQuery) use ($userId) {
-                // معاملات المستخدم الشخصية
-                $subQuery->where('morphed_type', 'App\Models\User')
-                         ->where('morphed_id', $userId)
-                         ->where('type', 'user_out');
-            })->orWhere(function($subQuery) use ($userId) {
-                // معاملات الاستثمار
-                $subQuery->where('type', 'investment')
-                         ->whereHas('wallet', function($walletQuery) use ($userId) {
-                             $walletQuery->where('user_id', $userId);
-                         });
-            });
-        })->sum('amount') ?? 0;
-
-        $balance = $totalIn - $totalOut;
+        $wallet = $user->getWalletOrCreate();
+        $balance = $wallet->getCalculatedBalance();
         
         // تسجيل حساب الرصيد للتأكد
-        \Log::info('User wallet balance calculated', [
+        \Log::info('User wallet balance calculated from transactions', [
             'user_id' => $userId,
-            'total_in' => $totalIn,
-            'total_out' => $totalOut,
-            'balance' => $balance
+            'wallet_id' => $wallet->id,
+            'calculated_balance' => $balance
         ]);
 
         return $balance;
@@ -662,8 +640,9 @@ public function addDirectCarInvestment(Request $request)
             $user = User::findOrFail($request->user_id);
             $wallet = $user->getWalletOrCreate();
 
-            // التحقق من وجود رصيد كافي
-            if ($wallet->balance < $request->amount) {
+            // التحقق من وجود رصيد كافي (من المعاملات)
+            $currentBalance = $wallet->getCalculatedBalance();
+            if ($currentBalance < $request->amount) {
                 return response()->json(['error' => 'الرصيد غير كافي'], 400);
             }
 
@@ -718,8 +697,7 @@ public function addDirectCarInvestment(Request $request)
                 }
             }
 
-            // خصم المبلغ من المحفظة
-            $wallet->decrement('balance', $request->amount);
+            // لا حاجة لتحديث حقل balance - الرصيد سيحسب من المعاملات
 
             // إنشاء معاملة
             Transactions::create([
@@ -1011,16 +989,45 @@ public function addDirectCarInvestment(Request $request)
     }
 
     /**
-     * إكمال استثمار السيارة - تحويل المبلغ من الصندوق إلى قاسة المستثمر
+     * إكمال استثمار السيارة - سحب المبلغ من قاسة المستخدم المحدد وإضافته للاستثمار الموجود في السيارة
      */
     public function completeCarInvestment(Request $request)
     {
         try {
-            $userId = auth()->id();
+            // الحصول على معرف المستخدم المطلوب من الطلب أو المستخدم المسجل حالياً
+            $requestedUserId = $request->input('user_id');
+            $currentUserId = auth()->id();
+            
+            // إذا تم تمرير user_id في الطلب، استخدمه، وإلا استخدم المستخدم المسجل حالياً
+            if ($requestedUserId) {
+                $userId = $requestedUserId;
+                \Log::info("تم تحديد المستخدم من الطلب: {$userId}");
+            } else {
+                $userId = $currentUserId;
+                \Log::info("تم استخدام المستخدم المسجل حالياً: {$userId}");
+            }
+            
             $carId = $request->input('car_id');
             $amount = $request->input('amount');
             
-            \Log::info("إكمال استثمار السيارة: المستخدم = {$userId}, السيارة = {$carId}, المبلغ = {$amount}");
+            // التحقق من وجود معرف المستخدم
+            if (!$userId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'يجب تحديد المستخدم المطلوب إكمال الاستثمار'
+                ], 400);
+            }
+            
+            // التحقق من وجود المستخدم في قاعدة البيانات
+            $user = \App\Models\User::find($userId);
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'المستخدم غير موجود'
+                ], 404);
+            }
+            
+            \Log::info("إكمال استثمار السيارة: المستخدم = {$userId} ({$user->name}), السيارة = {$carId}, المبلغ = {$amount}");
             
             // التحقق من صحة البيانات
             if (!$carId || !$amount || $amount <= 0) {
@@ -1039,20 +1046,13 @@ public function addDirectCarInvestment(Request $request)
                 ], 404);
             }
             
-            // التحقق من أن المستخدم مستثمر في هذه السيارة
+            // التحقق من وجود استثمار للمستخدم في هذه السيارة (اختياري)
             $userInvestment = $car->investmentCars()
                 ->whereHas('investment', function($query) use ($userId) {
                     $query->where('user_id', $userId)
                           ->where('status', 'active');
                 })
                 ->first();
-                
-            if (!$userInvestment) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'أنت لست مستثمراً في هذه السيارة'
-                ], 403);
-            }
             
             // حساب المبلغ المتبقي المطلوب
             $carTotalCost = $car->purchase_price + 
@@ -1079,38 +1079,21 @@ public function addDirectCarInvestment(Request $request)
             DB::beginTransaction();
             
             try {
-                // 1. سحب المبلغ من الصندوق الرئيسي
-                $mainFundWallet = \App\Models\Wallet::where('type', 'main_fund')->first();
-                if (!$mainFundWallet) {
-                    throw new \Exception('محفظة الصندوق الرئيسي غير موجودة');
+                // 1. التحقق من رصيد المستخدم وسحب المبلغ من قاسته
+                $userWallet = $user->getWalletOrCreate();
+                
+                // التحقق من وجود رصيد كافي في قاسة المستخدم (حساب من المعاملات)
+                $currentBalance = $userWallet->getCalculatedBalance();
+                if ($currentBalance < $amount) {
+                    throw new \Exception("رصيد المستخدم غير كافي. المطلوب: {$amount}$, المتاح: {$currentBalance}$");
                 }
                 
-                // معاملة سحب من الصندوق
+                // معاملة سحب من قاسة المستخدم (الرصيد سيحسب تلقائياً من المعاملات)
                 $withdrawTransaction = \App\Models\Transactions::create([
-                    'wallet_id' => $mainFundWallet->id,
-                    'type' => 'fund_out',
-                    'amount' => $amount,
-                    'description' => "سحب لإكمال استثمار السيارة رقم {$car->no} - {$car->name} (PIN: {$car->pin}) - المستثمر: " . auth()->user()->name,
-                    'morphed_type' => 'App\Models\Car',
-                    'morphed_id' => $car->id,
-                    'user_id' => $userId,
-                    'is_pay' => 0,
-                    'created_at' => now(),
-                    'updated_at' => now()
-                ]);
-                
-                // 2. إضافة المبلغ إلى قاسة المستثمر
-                $userWallet = \App\Models\Wallet::where('user_id', $userId)->first();
-                if (!$userWallet) {
-                    throw new \Exception('محفظة المستخدم غير موجودة');
-                }
-                
-                // معاملة إضافة للقاسة
-                $depositTransaction = \App\Models\Transactions::create([
                     'wallet_id' => $userWallet->id,
-                    'type' => 'user_in',
+                    'type' => 'user_out',
                     'amount' => $amount,
-                    'description' => "إيداع لإكمال استثمار السيارة رقم {$car->no} - {$car->name} (PIN: {$car->pin})",
+                    'description' => "سحب لإكمال استثمار السيارة رقم {$car->no} - " . ($car->name ?? 'غير محدد') . " (PIN: " . ($car->pin ?? 'غير محدد') . ")",
                     'morphed_type' => 'App\Models\Car',
                     'morphed_id' => $car->id,
                     'user_id' => $userId,
@@ -1119,23 +1102,78 @@ public function addDirectCarInvestment(Request $request)
                     'updated_at' => now()
                 ]);
                 
-                // 3. تحديث استثمار المستثمر في السيارة
-                $userInvestment->invested_amount += $amount;
-                $userInvestment->save();
+                // لا حاجة لتحديث حقل balance - الرصيد سيحسب من المعاملات
+                
+                // 2. البحث عن استثمار المستخدم في هذه السيارة أو إنشاء واحد جديد
+                if ($userInvestment) {
+                    // المستخدم لديه استثمار في السيارة - زيادة المبلغ
+                    $oldAmount = $userInvestment->invested_amount;
+                    $userInvestment->invested_amount += $amount;
+                    $userInvestment->save();
+                    
+                    // إعادة حساب النسبة المئوية
+                    $userInvestment->calculatePercentage($carTotalCost);
+                    
+                    // تحديث مبلغ الاستثمار الأصلي أيضاً
+                    $originalInvestment = $userInvestment->investment;
+                    if ($originalInvestment) {
+                        $originalInvestment->increment('amount', $amount);
+                    }
+                    
+                    \Log::info("تم إضافة مبلغ للاستثمار الموجود", [
+                        'investment_car_id' => $userInvestment->id,
+                        'old_amount' => $oldAmount,
+                        'added_amount' => $amount,
+                        'new_amount' => $userInvestment->invested_amount,
+                        'car_id' => $car->id,
+                        'user_id' => $userId
+                    ]);
+                } else {
+                    // المستخدم ليس مستثمراً في السيارة - إنشاء استثمار جديد
+                    $newInvestment = \App\Models\Investment::create([
+                    'user_id' => $userId,
+                        'amount' => $amount,
+                        'status' => 'active',
+                        'investment_type' => 'specific_cars',
+                        'note' => "إكمال استثمار السيارة رقم " . ($car->no ?? 'غير محدد'),
+                    ]);
+                    
+                    // إنشاء استثمار السيارة
+                    $newInvestmentCar = \App\Models\InvestmentCar::create([
+                        'investment_id' => $newInvestment->id,
+                        'car_id' => $car->id,
+                        'invested_amount' => $amount,
+                        'percentage' => 50.0, // النسبة الافتراضية
+                        'profit_share' => 0
+                    ]);
+                    
+                    // حساب النسبة الصحيحة
+                    $newInvestmentCar->calculatePercentage($carTotalCost);
+                    
+                    \Log::info("تم إنشاء استثمار جديد لإكمال الاستثمار", [
+                        'investment_id' => $newInvestment->id,
+                        'investment_car_id' => $newInvestmentCar->id,
+                        'invested_amount' => $amount,
+                        'car_id' => $car->id,
+                        'user_id' => $userId
+                    ]);
+                }
                 
                 DB::commit();
                 
-                \Log::info("تم إكمال استثمار السيارة بنجاح: السيارة = {$car->no}, المبلغ = {$amount}");
+                \Log::info("تم إكمال استثمار السيارة بنجاح: السيارة = " . ($car->no ?? 'غير محدد') . ", المبلغ = {$amount}");
                 
                 return response()->json([
                     'success' => true,
-                    'message' => "تم إكمال استثمار السيارة رقم {$car->no} بنجاح - تم تحويل {$amount}$ من الصندوق إلى قاستك",
+                    'message' => "تم إكمال استثمار السيارة رقم " . ($car->no ?? 'غير محدد') . " بنجاح - تم سحب {$amount}$ من قاسة " . ($user->name ?? 'المستخدم') . " وإضافته للاستثمار",
                     'transaction_details' => [
                         'withdraw_transaction_id' => $withdrawTransaction->id,
-                        'deposit_transaction_id' => $depositTransaction->id,
                         'amount' => $amount,
-                        'car_no' => $car->no,
-                        'car_name' => $car->name
+                        'car_no' => $car->no ?? 'غير محدد',
+                        'car_name' => $car->name ?? 'غير محدد',
+                        'investor_name' => $user->name ?? 'غير محدد',
+                        'investor_id' => $userId,
+                        'wallet_balance_after' => $userWallet->getCalculatedBalance()
                     ]
                 ]);
                 
@@ -1150,6 +1188,129 @@ public function addDirectCarInvestment(Request $request)
             return response()->json([
                 'success' => false,
                 'message' => 'حدث خطأ أثناء إكمال الاستثمار: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * الحصول على السيارات التي تحتاج إكمال الاستثمار للمستخدم المحدد
+     */
+    public function getCarsNeedingCompletionInvestment(Request $request)
+    {
+        try {
+            // الحصول على معرف المستخدم المطلوب من URL parameter أو المستخدم المسجل
+            $requestedUserId = $request->route('userId') ?: $request->input('user_id');
+            $currentUserId = auth()->id();
+            
+            $userId = $requestedUserId ?: $currentUserId;
+            
+            
+            // السيارات التي لديها استثمارات جزئية (غير مكتملة) للمستخدم المحدد
+            $carsNeedingCompletion = Car::where('results', 0) // السيارات في المخزن فقط
+                ->whereHas('investmentCars', function($query) use ($userId) {
+                    $query->whereHas('investment', function($q) use ($userId) {
+                        $q->where('status', 'active')
+                          ->where('user_id', $userId); // فقط استثمارات هذا المستخدم
+                    });
+                })
+                ->with([
+                    'investmentCars.investment.user'
+                ])
+                ->get()
+                ->map(function($car) use ($userId) {
+                    $totalCost = ($car->purchase_price ?? 0) + 
+                                ($car->erbil_exp ?? 0) + 
+                                ($car->erbil_shipping ?? 0) + 
+                                ($car->dubai_exp ?? 0) + 
+                                ($car->dubai_shipping ?? 0);
+
+                    $totalInvestments = $car->investmentCars()
+                        ->whereHas('investment', function($query) {
+                            $query->where('status', 'active');
+                        })
+                        ->sum('invested_amount');
+
+                    $availableForInvestment = $totalCost - $totalInvestments;
+
+                    // فقط السيارات التي تحتاج استثمار إضافي
+                    if ($availableForInvestment <= 0) {
+                        return null;
+                    }
+
+                    // جمع معلومات المستثمرين الحاليين
+                    $currentInvestors = $car->investmentCars
+                        ->filter(function($ic) {
+                            return $ic->investment && $ic->investment->status === 'active';
+                        })
+                        ->map(function($ic) {
+                            return [
+                                'id' => $ic->investment->user->id,
+                                'name' => $ic->investment->user->name,
+                                'invested_amount' => $ic->invested_amount,
+                                'percentage' => $ic->percentage ?? 0,
+                            ];
+                        });
+
+                    // إعادة فحص استثمار المستخدم بطريقة مباشرة
+                    $userInvestment = \App\Models\InvestmentCar::where('car_id', $car->id)
+                        ->whereHas('investment', function($query) use ($userId) {
+                            $query->where('user_id', $userId)
+                                  ->where('status', 'active');
+                        })
+                        ->first();
+
+                    $userInvestedAmount = $userInvestment ? $userInvestment->invested_amount : 0;
+                    $isUserInvestor = $userInvestment !== null;
+                    
+
+                    return [
+                        'id' => $car->id,
+                        'no' => $car->no,
+                        'pin' => $car->pin,
+                        'name' => $car->name ?? '',
+                        'company' => $car->company ?? '',
+                        'color' => $car->color ?? '',
+                        'model' => $car->model ?? '',
+                        'source' => $car->source ?? '',
+                        'purchase_price' => $car->purchase_price ?? 0,
+                        'erbil_exp' => $car->erbil_exp ?? 0,
+                        'erbil_shipping' => $car->erbil_shipping ?? 0,
+                        'dubai_exp' => $car->dubai_exp ?? 0,
+                        'dubai_shipping' => $car->dubai_shipping ?? 0,
+                        'total_cost' => $totalCost,
+                        'total_investments' => $totalInvestments,
+                        'total_invested' => $totalInvestments, // Alias for compatibility
+                        'available_for_investment' => $availableForInvestment,
+                        'remaining_amount' => $availableForInvestment, // Alias for compatibility
+                        'investment_completion_percentage' => $totalCost > 0 ? ($totalInvestments / $totalCost) * 100 : 0,
+                        'investment_percentage' => $totalCost > 0 ? ($totalInvestments / $totalCost) * 100 : 0, // Alias for compatibility
+                        'user_invested' => $userInvestedAmount,
+                        'is_user_investor' => $isUserInvestor,
+                        'current_investors' => $currentInvestors,
+                        'all_investors' => $currentInvestors->map(function($investor) {
+                            return [
+                                'investor_name' => $investor['name'],
+                                'invested_amount' => $investor['invested_amount'],
+                                'percentage' => $investor['percentage']
+                            ];
+                        }),
+                        'results' => $car->results,
+                    ];
+                })
+                ->filter() // إزالة القيم null
+                ->values();
+
+            return response()->json([
+                'success' => true,
+                'cars' => $carsNeedingCompletion
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error getting cars needing completion investment: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'حدث خطأ في جلب السيارات: ' . $e->getMessage()
             ], 500);
         }
     }

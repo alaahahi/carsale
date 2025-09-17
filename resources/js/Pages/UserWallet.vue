@@ -8,7 +8,7 @@
                     <div class="p-6 dark:bg-gray-900">
                         <!-- Header -->
                         <div class="mb-6">
-                            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">قاسة {{ user.name }}</h1>
+                            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">قاسة {{ props.user.name }}</h1>
                             <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">إدارة المعاملات الشخصية والشراكة</p>
                             
                             <!-- Current Balance -->
@@ -156,12 +156,7 @@
                                             <p class="text-lg font-bold text-red-600 dark:text-red-400">
                                                 ${{ formatNumber(suggestedInvestmentAmount) }}
                                             </p>
-                                            <button @click="openDirectInvestmentModal" 
-                                                    :disabled="suggestedInvestmentAmount > userWalletBalance"
-                                                    :class="suggestedInvestmentAmount > userWalletBalance ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600'"
-                                                    class="text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 shadow-sm">
-                                                {{ suggestedInvestmentAmount > userWalletBalance ? 'أضف رصيد أولاً' : 'استثمر الآن' }}
-                                            </button>
+                                            
                                         </div>
                                     </div>
                                 </div>
@@ -239,6 +234,86 @@
                                 </svg>
                                 <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">لا توجد استثمارات نشطة</h3>
                                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">ابدأ استثمارك الأول من المحفظة</p>
+                            </div>
+
+                            <!-- قائمة الاستثمارات المؤرشفة (المباعة مع الربح) -->
+                            <div v-if="userInvestments.archivedInvestments && userInvestments.archivedInvestments.length > 0" class="mt-8">
+                                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                                    <span>الاستثمارات المؤرشفة (مباعة)</span>
+                                    <span class="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-1 rounded-full text-xs font-medium">
+                                        {{ userInvestments.archivedInvestments.length }}
+                                    </span>
+                                </h4>
+                                <div class="space-y-3">
+                                    <div v-for="investment in userInvestments.archivedInvestments" :key="'archived-' + investment.id"
+                                         class="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-600">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex-1">
+                                                <div class="flex justify-between items-center mb-2">
+                                                    <span class="text-sm font-medium text-gray-900 dark:text-white">
+                                                        استثمار مؤرشف #{{ investment.id }}
+                                                    </span>
+                                                    <span class="bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 px-2 py-1 rounded-full text-xs font-bold">
+                                                        مباع
+                                                    </span>
+                                                </div>
+                                                <div class="grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <span class="text-gray-600 dark:text-gray-400">المبلغ المستثمر:</span>
+                                                        <span class="font-bold text-gray-900 dark:text-white">${{ formatNumber(investment.amount) }}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span class="text-gray-600 dark:text-gray-400">إجمالي الربح:</span>
+                                                        <span class="font-bold text-green-600 dark:text-green-400">
+                                                            ${{ formatNumber(calculateInvestmentProfit(investment)) }}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div v-if="investment.note" class="text-xs text-gray-500 dark:text-gray-400 mt-2 italic">
+                                                    {{ investment.note }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Car Details for Archived Investment -->
+                                        <div v-if="investment.investment_cars && investment.investment_cars.length > 0" class="mt-4 pt-4 border-t border-green-200 dark:border-green-700">
+                                            <h5 class="text-sm font-medium text-gray-800 dark:text-gray-200 mb-3">السيارات المباعة:</h5>
+                                            <div class="grid grid-cols-1 gap-3">
+                                                <div v-for="carInvestment in investment.investment_cars" :key="'archived-car-' + carInvestment.id" 
+                                                     class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-green-200 dark:border-green-600">
+                                                    <div class="flex justify-between items-start">
+                                                        <div>
+                                                            <p class="font-medium text-gray-900 dark:text-white">
+                                                                السيارة رقم {{ carInvestment.car?.no || 'غير معروف' }}
+                                                            </p>
+                                                            <p class="text-sm text-gray-600 dark:text-gray-400">
+                                                                {{ carInvestment.car?.name || 'غير محدد' }}
+                                                            </p>
+                                                            <p class="text-xs text-green-600 dark:text-green-400">
+                                                                PIN: {{ carInvestment.car?.pin || 'غير محدد' }}
+                                                            </p>
+                                                        </div>
+                                                        <div class="text-right">
+                                                            <p class="text-sm">
+                                                                <span class="text-gray-600 dark:text-gray-400">المستثمر:</span>
+                                                                <span class="font-bold">${{ formatNumber(carInvestment.invested_amount) }}</span>
+                                                            </p>
+                                                            <p class="text-sm">
+                                                                <span class="text-gray-600 dark:text-gray-400">الربح:</span>
+                                                                <span class="font-bold text-green-600 dark:text-green-400">
+                                                                    ${{ formatNumber(carInvestment.profit_share || 0) }}
+                                                                </span>
+                                                            </p>
+                                                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                                                {{ carInvestment.percentage || 0 }}% نسبة
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                           
@@ -393,7 +468,6 @@
                                 </div>
                             </div>
                         </div>
-
                         <!-- Investment Completion Section -->
                         <div v-if="investmentCompletion" class="mb-6 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg p-6 text-white">
                             <div class="flex items-center justify-between">
@@ -427,11 +501,18 @@
                             </div>
                         </div>
 
+                     
+
                         <!-- Cars Needing Investment Completion Section -->
                         <div class="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden mb-8">
                             <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                                 <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
                                     <h3 class="text-lg font-medium text-gray-900 dark:text-white">السيارات التي تحتاج إكمال استثمار</h3>
+                                        <span v-if="carsNeedingCompletion.length > 0" class="bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-2 py-1 rounded-full text-xs font-medium">
+                                            {{ carsNeedingCompletion.length }}
+                                        </span>
+                                    </div>
                                     <button @click="loadCarsNeedingCompletion" 
                                             :disabled="loadingCarsCompletion"
                                             class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-3 py-1 rounded text-sm">
@@ -456,8 +537,9 @@
                                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                                 </svg>
-                                <p class="mt-2 font-medium">لا توجد سيارات متاحة للاستثمار حالياً</p>
-                                <p class="text-sm mt-1">جميع السيارات إما مباعة أو مكتملة التمويل</p>
+                                <p class="mt-2 font-medium">لا توجد سيارات تحتاج إكمال استثمار</p>
+                                <p class="text-sm mt-1">جميع استثماراتك مكتملة أو لا توجد استثمارات جزئية</p>
+                                <p class="text-xs mt-1 text-blue-600">المستخدم: {{ props.user.name }} ({{ props.user.id }})</p>
                                 <button @click="loadCarsNeedingCompletion" 
                                         class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm">
                                     إعادة التحميل
@@ -482,7 +564,7 @@
                                             </div>
                                             <div class="text-right">
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
-                                                    {{ car.investment_percentage.toFixed(1) }}% مستثمر
+                                                    {{ car.investment_percentage ? car.investment_percentage.toFixed(1) : 0 }}% مستثمر
                                                 </span>
                                                 <div v-if="car.is_user_investor" class="mt-1">
                                                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
@@ -495,40 +577,40 @@
                                         <div class="space-y-2 mb-4">
                                             <div class="flex justify-between text-sm">
                                                 <span class="text-gray-600 dark:text-gray-400">التكلفة الإجمالية:</span>
-                                                <span class="font-medium text-gray-900 dark:text-white">${{ car.total_cost.toLocaleString() }}</span>
+                                                <span class="font-medium text-gray-900 dark:text-white">${{ Number(car.total_cost || 0).toLocaleString() }}</span>
                                             </div>
                                             <div class="flex justify-between text-sm">
                                                 <span class="text-gray-600 dark:text-gray-400">إجمالي المستثمر:</span>
-                                                <span class="font-medium text-gray-900 dark:text-white">${{ car.total_invested.toLocaleString() }}</span>
+                                                <span class="font-medium text-gray-900 dark:text-white">${{ Number(car.total_invested || 0).toLocaleString() }}</span>
                                             </div>
                                             <div class="flex justify-between text-sm">
                                                 <span class="text-gray-600 dark:text-gray-400">استثمارك:</span>
-                                                <span class="font-medium text-blue-600 dark:text-blue-400">${{ car.user_invested.toLocaleString() }}</span>
+                                                <span class="font-medium text-blue-600 dark:text-blue-400">${{ Number(car.user_invested || 0).toLocaleString() }}</span>
                                             </div>
                                             <div class="flex justify-between text-sm font-semibold">
                                                 <span class="text-red-600 dark:text-red-400">المتبقي:</span>
-                                                <span class="text-red-600 dark:text-red-400">${{ car.remaining_amount.toLocaleString() }}</span>
+                                                <span class="text-red-600 dark:text-red-400">${{ Number(car.remaining_amount || 0).toLocaleString() }}</span>
                                             </div>
                                         </div>
                                         
                                         <!-- Progress Bar -->
                                         <div class="w-full bg-gray-200 rounded-full h-2 mb-3">
                                             <div class="bg-orange-500 h-2 rounded-full" 
-                                                 :style="{ width: car.investment_percentage + '%' }"></div>
+                                                 :style="{ width: (car.investment_percentage || 0) + '%' }"></div>
                                         </div>
                                         
                                         <!-- All Investors List -->
-                                        <div class="mb-3">
+                                        <div class="mb-3" v-if="car.all_investors && car.all_investors.length > 0">
                                             <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">جميع المستثمرين:</p>
                                             <div class="space-y-1">
                                                 <div v-for="investor in car.all_investors" :key="investor.investor_name" 
                                                      class="flex justify-between text-xs">
                                                     <span class="text-gray-600 dark:text-gray-400" 
-                                                          :class="{ 'font-semibold text-blue-600 dark:text-blue-400': investor.investor_name === user.name }">
+                                                          :class="{ 'font-semibold text-blue-600 dark:text-blue-400': investor.investor_name === props.user.name }">
                                                         {{ investor.investor_name }}
-                                                        <span v-if="investor.investor_name === user.name" class="text-blue-500">(أنت)</span>
+                                                        <span v-if="investor.investor_name === props.user.name" class="text-blue-500">(أنت)</span>
                                                     </span>
-                                                    <span class="text-gray-900 dark:text-white">${{ investor.invested_amount.toLocaleString() }}</span>
+                                                    <span class="text-gray-900 dark:text-white">${{ Number(investor.invested_amount || 0).toLocaleString() }}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -546,8 +628,8 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                                             </svg>
                                             <span v-if="completingInvestment">جاري المعالجة...</span>
-                                            <span v-else-if="car.is_user_investor">إكمال استثماري - ${{ car.remaining_amount.toLocaleString() }}</span>
-                                            <span v-else>استثمار جديد - ${{ car.remaining_amount.toLocaleString() }}</span>
+                                            <span v-else-if="car.is_user_investor">إكمال استثماري - ${{ Number(car.remaining_amount || 0).toLocaleString() }}</span>
+                                            <span v-else>استثمار جديد - ${{ Number(car.remaining_amount || 0).toLocaleString() }}</span>
                                         </button>
                                     </div>
                                 </div>
@@ -1231,6 +1313,15 @@ const formatNumber = (number) => {
     return Math.round(Number(number)).toLocaleString()
 }
 
+// حساب إجمالي الربح للاستثمار
+const calculateInvestmentProfit = (investment) => {
+    if (!investment.investment_cars) return 0
+    
+    return investment.investment_cars.reduce((total, carInvestment) => {
+        return total + (carInvestment.profit_share || 0)
+    }, 0)
+}
+
 const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-US')
 }
@@ -1731,17 +1822,14 @@ const loadCarsNeedingCompletion = async () => {
     console.log('=== بدء تحميل السيارات التي تحتاج إكمال استثمار ===')
     
     try {
-        const response = await axios.get('/api/user-wallet/cars-needing-completion')
+        const response = await axios.get(`/api/user-wallet/cars-needing-completion/${props.user.id}`)
         console.log('استجابة API:', response.data)
         
         if (response.data.success) {
             carsNeedingCompletion.value = response.data.cars
-            console.log('تم تحميل السيارات:', carsNeedingCompletion.value)
-            console.log('عدد السيارات المحملة:', carsNeedingCompletion.value.length)
+            // Force reactivity update
+            carsNeedingCompletion.value = [...response.data.cars]
             
-            if (response.data.debug_info) {
-                console.log('معلومات التشخيص:', response.data.debug_info)
-            }
         } else {
             console.error('فشل في جلب البيانات:', response.data)
             toast.error('فشل في جلب بيانات السيارات')
@@ -1770,7 +1858,8 @@ const completeCarInvestment = async (car) => {
     try {
         const response = await axios.post('/api/user-wallet/complete-car-investment', {
             car_id: car.id,
-            amount: car.remaining_amount
+            amount: car.remaining_amount,
+            user_id: props.user.id // إضافة معرف المستخدم من props
         })
         
         console.log('استجابة إكمال الاستثمار:', response.data)

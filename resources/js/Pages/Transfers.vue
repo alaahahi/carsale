@@ -695,13 +695,13 @@
                     </div>
                     
                     <!-- Action Button -->
-                    <button @click="completeInvestment(car)" 
+                    <a :href="route('user-wallet.show', groupedInvestors[0]?.user?.id)"
                             class="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                       </svg>
                       <span>إكمال الاستثمار</span>
-                    </button>
+                    </a>
                   </div>
                 </div>
               </div>

@@ -64,8 +64,7 @@ return new class extends Migration
             $table->decimal('price', 10, 2)->nullable(); // حقل قديم - غير مستخدم حالياً
             $table->decimal('paid_amount', 10, 2)->nullable();
             $table->decimal('paid_amount_pay', 10, 2)->nullable();
-            $table->unsignedBigInteger('user_id')->nullable();
-            $table->decimal('purchase_price', 10, 2)->nullable();
+             $table->decimal('purchase_price', 10, 2)->nullable();
             $table->date('purchase_data')->nullable();
             $table->date('pay_data')->nullable();
             $table->decimal('pay_price', 10, 2)->nullable();
@@ -196,12 +195,29 @@ return new class extends Migration
             $table->decimal('percentage', 5, 2)->default(0); // نسبة الاستثمار من رأس المال
             $table->decimal('profit_share', 10, 2)->default(0); // نصيب المستثمر من الربح
             $table->text('note')->nullable();
-            $table->enum('status', ['active', 'withdrawn'])->default('active');
+            $table->enum('status', ['active', 'withdrawn', 'archived'])->default('active');
+            $table->string('investment_type')->default('general'); // نوع الاستثمار
             $table->timestamps();
             $table->softDeletes();
             
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->index(['user_id', 'status']);
+            });
+        }
+
+        // جدول ربط الاستثمارات بالسيارات المحددة
+        if (!Schema::hasTable('investment_cars')) {
+            Schema::create('investment_cars', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('investment_id')->constrained('investments')->onDelete('cascade');
+            $table->foreignId('car_id')->constrained('car')->onDelete('cascade');
+            $table->decimal('invested_amount', 15, 2)->default(0);
+            $table->decimal('percentage', 5, 2)->default(0);
+            $table->decimal('profit_share', 15, 2)->default(0);
+            $table->timestamps();
+            
+            // فهرس فريد لمنع الاستثمار في نفس السيارة أكثر من مرة
+            $table->unique(['investment_id', 'car_id']);
             });
         }
 

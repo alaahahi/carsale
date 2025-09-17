@@ -23,4 +23,28 @@ class Wallet extends Model
     {
         return $this->hasMany(Transactions::class);
     }
+
+    /**
+     * حساب الرصيد الحقيقي من المعاملات
+     */
+    public function getCalculatedBalance()
+    {
+        $totalIn = $this->transactions()
+            ->whereIn('type', ['user_in', 'fund_in', 'investor_profit', 'in'])
+            ->sum('amount');
+
+        $totalOut = $this->transactions()
+            ->whereIn('type', ['user_out', 'fund_out', 'investment', 'out'])
+            ->sum('amount');
+
+        return $totalIn - $totalOut;
+    }
+
+    /**
+     * حساب الرصيد الحقيقي (accessor)
+     */
+    public function getRealBalanceAttribute()
+    {
+        return $this->getCalculatedBalance();
+    }
 }
