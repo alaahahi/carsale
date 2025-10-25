@@ -302,23 +302,62 @@ class DashboardController extends Controller
     }
     
     public function getIndexExpenses () {
-
-        $expenses = Expenses::with('user')->paginate(10);
+        $expenses = Expenses::with(['user'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
+            
+        // Add car information to expenses
+        $expenses->getCollection()->transform(function ($expense) {
+            // Try to extract car info from reason
+            if (strpos($expense->reason, 'مصروفات السيارة:') !== false) {
+                $expense->car_name = str_replace('مصروفات السيارة: ', '', $expense->reason);
+            } else {
+                $expense->car_name = null;
+            }
+            
+            // Add expense type name if available
+            $expense->expense_type_name = 'مصروفات عامة';
+            
+            return $expense;
+        });
+        
         return Response::json($expenses, 200);    
-
     }
     public function addGenExpenses (Request $request){
         $user_id = auth()->id();
         
+        // Get car name if car_id is provided
+        $car_name = '';
+        if ($request->car_id) {
+            $car = Car::find($request->car_id);
+            $car_name = $car ? $car->name . ' - رقم ' . $car->no : '';
+        }
+        
+        // Get customer name if customer_id is provided
+        $customer_name = '';
+        if ($request->customer_id) {
+            $customer = User::find($request->customer_id);
+            $customer_name = $customer ? $customer->name : '';
+        }
+        
+        $reason = $request->reason ?? 'مصروفات عامة';
+        if ($car_name) {
+            $reason = "مصروفات السيارة: " . $car_name;
+        }
+        if ($customer_name) {
+            $reason .= " - الزبون: " . $customer_name;
+        }
+        
         $expenses = Expenses::create([
             'user_id' => $user_id,
-            'reason' => $request->reason ?? '',
+            'reason' => $reason,
             'amount' => $request->amount ?? 0,
             'note' => $request->note ?? '',
         ]);
+        
         if($expenses->id){
-            $desc=trans('text.genExpenses');
-            $this->accountingController->increaseWallet($expenses->amount, $desc,$this->outAccount->id,$user_id,'App\Models\User', $user_id);
+            $desc = $reason;
+            $this->accountingController->increaseWallet($expenses->amount, $desc, $this->outAccount->id, $user_id, 'App\Models\User', $user_id);
         }
         return Response::json('ok', 200);    
 
@@ -843,8 +882,30 @@ class DashboardController extends Controller
     {
         $amount = $_GET['amount'] ?? 0;
         $note = $_GET['note'] ?? '';
+        $car_id = $_GET['car_id'] ?? '';
+        $customer_id = $_GET['customer_id'] ?? '';
         
-        $desc=trans('text.addToBox').' '.$amount.'$' .(($note)?' البيان : '.$note:'');
+        // Get car name if car_id is provided
+        $car_name = '';
+        if ($car_id) {
+            $car = Car::find($car_id);
+            $car_name = $car ? $car->name . ' - رقم ' . $car->no : '';
+        }
+        
+        // Get customer name if customer_id is provided
+        $customer_name = '';
+        if ($customer_id) {
+            $customer = User::find($customer_id);
+            $customer_name = $customer ? $customer->name : '';
+        }
+        
+        $desc = trans('text.addToBox').' '.$amount.'$' .(($note)?' البيان : '.$note:'');
+        if ($car_name) {
+            $desc .= ' - السيارة: ' . $car_name;
+        }
+        if ($customer_name) {
+            $desc .= ' - الزبون: ' . $customer_name;
+        }
         
         // التحقق من وجود حساب الدخل (in@account.com)
         if (!$this->inAccount) {
@@ -876,19 +937,65 @@ class DashboardController extends Controller
             'updated_at' => now()
         ]);
         
+        // إذا كان هناك customer_id، أضف معاملة لمحفظة الزبون
+        if ($customer_id) {
+            $customer = User::find($customer_id);
+            if ($customer) {
+                // استخدام getWalletOrCreate للتأكد من وجود المحفظة
+                $customerWallet = $customer->getWalletOrCreate();
+                if ($customerWallet) {
+                    Transactions::create([
+                        'amount' => $amount,
+                        'type' => 'in',
+                        'description' => $desc,
+                        'wallet_id' => $customerWallet->id,
+                        'morphed_id' => $customer->id,
+                        'morphed_type' => 'App\Models\User',
+                        'user_id' => $customer->id,
+                        'is_pay' => 0,
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+                }
+            }
+        }
+        
         return Response::json([
             'success' => true,
             'message' => 'تم إدخال المبلغ بنجاح!',
             'amount' => $amount,
-            'note' => $note
+            'note' => $note,
+            'car_name' => $car_name
         ], 200);    
     }
     public function withDrawFromBox()
     {
         $amount = $_GET['amount'] ?? 0;
         $note = $_GET['note'] ?? '';
+        $car_id = $_GET['car_id'] ?? '';
+        $customer_id = $_GET['customer_id'] ?? '';
         
-        $desc=trans('text.withDrawFromBox').' '.$amount.'$' .(($note)?' البيان : '.$note:'');
+        // Get car name if car_id is provided
+        $car_name = '';
+        if ($car_id) {
+            $car = Car::find($car_id);
+            $car_name = $car ? $car->name . ' - رقم ' . $car->no : '';
+        }
+        
+        // Get customer name if customer_id is provided
+        $customer_name = '';
+        if ($customer_id) {
+            $customer = User::find($customer_id);
+            $customer_name = $customer ? $customer->name : '';
+        }
+        
+        $desc = trans('text.withDrawFromBox').' '.$amount.'$' .(($note)?' البيان : '.$note:'');
+        if ($car_name) {
+            $desc .= ' - السيارة: ' . $car_name;
+        }
+        if ($customer_name) {
+            $desc .= ' - الزبون: ' . $customer_name;
+        }
         
         // التحقق من وجود حساب الخرج (out@account.com)
         if (!$this->outAccount) {
@@ -919,12 +1026,36 @@ class DashboardController extends Controller
             'created_at' => now(),
             'updated_at' => now()
         ]);
+        
+        // إذا كان هناك customer_id، أضف معاملة لمحفظة الزبون
+        if ($customer_id) {
+            $customer = User::find($customer_id);
+            if ($customer) {
+                // استخدام getWalletOrCreate للتأكد من وجود المحفظة
+                $customerWallet = $customer->getWalletOrCreate();
+                if ($customerWallet) {
+                    Transactions::create([
+                        'amount' => $amount,
+                        'type' => 'out',
+                        'description' => $desc,
+                        'wallet_id' => $customerWallet->id,
+                        'morphed_id' => $customer->id,
+                        'morphed_type' => 'App\Models\User',
+                        'user_id' => $customer->id,
+                        'is_pay' => 0,
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+                }
+            }
+        }
 
         return Response::json([
             'success' => true,
             'message' => 'تم سحب المبلغ بنجاح!',
             'amount' => $amount,
-            'note' => $note
+            'note' => $note,
+            'car_name' => $car_name
         ], 200);    
     }
     public function addPaymentCar()

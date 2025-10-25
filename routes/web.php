@@ -10,6 +10,9 @@ use App\Http\Controllers\TransfersController;
 use App\Http\Controllers\UserWalletController;
 use App\Http\Controllers\MainController;
 use App\Http\Controllers\InfoController;
+use App\Http\Controllers\CustomerWalletController;
+use App\Http\Controllers\SimpleCashController;
+use App\Http\Controllers\SimpleAccountingController;
 
 use App\Models\SystemConfig;
 
@@ -763,6 +766,12 @@ Route::group(['middleware' => ['tenant']], function () {
 
     Route::get('addTransfers',[TransfersController::class, 'addTransfers'])->name('addTransfers');
     Route::get('transfers',[TransfersController::class, 'index'])->name('transfers');
+    
+    // Simple Pages Routes
+Route::get('customer-wallet',[CustomerWalletController::class, 'index'])->name('customer-wallet');
+Route::get('simple-cash',[SimpleCashController::class, 'index'])->name('simple-cash');
+Route::get('simple-accounting',[SimpleAccountingController::class, 'index'])->name('simple-accounting');
+    
     Route::get('getIndexAccountsSelas',[TransfersController::class, 'getIndexAccountsSelas'])->name('getIndexAccountsSelas');
     Route::get('getCarsNeedingInvestmentCompletion',[TransfersController::class, 'getCarsNeedingInvestmentCompletion'])->name('getCarsNeedingInvestmentCompletion');
  

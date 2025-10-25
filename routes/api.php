@@ -16,6 +16,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\TransfersController;
 use App\Http\Controllers\UserWalletController;
+use App\Http\Controllers\CustomerWalletController;
 
 use App\Models\SystemConfig;
 
@@ -109,6 +110,14 @@ Route::group(['middleware' => ['tenant']], function () {
 
     Route::get('addToBox',[DashboardController::class, 'addToBox'])->name('addToBox');
     Route::get('withDrawFromBox',[DashboardController::class, 'withDrawFromBox'])->name('withDrawFromBox');
+    
+    // Customer Wallet API Routes
+Route::post('customer-wallet/create',[CustomerWalletController::class, 'createWallet'])->name('customer-wallet.create');
+Route::get('customer-wallet/{customerId}',[CustomerWalletController::class, 'getCustomerWallet'])->name('customer-wallet.get');
+
+// Simple Pages API Routes
+    Route::post('expenses/add',[DashboardController::class, 'addGenExpenses'])->name('expenses.add');
+    Route::get('expenses',[DashboardController::class, 'getIndexExpenses'])->name('expenses.index');
 
     // Route::get('getIndexCompany',[CarConfigController::class, 'getIndex'])->name('getIndexCompany');
     // Route::get('getIndexName',[CarConfigController::class, 'getIndexName'])->name('getIndexName');

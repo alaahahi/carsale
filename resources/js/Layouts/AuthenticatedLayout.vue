@@ -49,6 +49,38 @@ const switchLocale = (locale) => {
                   {{ $t("clients") }}
                 </NavLink>
               </div>
+        <!-- Hidden إدارة قاسة الزبون - merged into simple-cash -->
+        <!--
+        <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
+            <NavLink
+                :href="route('customer-wallet')"
+                :active="route().current('customer-wallet')"
+            >
+                إدارة قاسة الزبون
+            </NavLink>
+        </div>
+        -->
+        <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
+            <NavLink
+                :href="route('simple-cash')"
+                :active="route().current('simple-cash')"
+            >
+                إدارة الصندوق والقاسات
+            </NavLink>
+        </div>
+              <!-- Hidden المحاسبة المبسطة - removed as requested -->
+              <!--
+              <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
+                <NavLink
+                  :href="route('simple-accounting')"
+                  :active="route().current('simple-accounting')"
+                >
+                  المحاسبة المبسطة
+                </NavLink>
+              </div>
+              -->
+              <!-- Hidden complex pages - can be enabled later if needed -->
+              <!--
               <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
                 <NavLink
                   :href="route('transfers')"
@@ -57,6 +89,7 @@ const switchLocale = (locale) => {
                   {{ $t("accounts") }}
                 </NavLink>
               </div>
+              -->
         
        
             </div>
@@ -224,12 +257,42 @@ const switchLocale = (locale) => {
                 {{ $t("clients") }}
               </ResponsiveNavLink>
 
+        <!-- Hidden إدارة قاسة الزبون - merged into simple-cash -->
+        <!--
+        <ResponsiveNavLink
+            :href="route('customer-wallet')"
+            :active="route().current('customer-wallet')"
+        >
+            إدارة قاسة الزبون
+        </ResponsiveNavLink>
+        -->
+
+        <ResponsiveNavLink
+            :href="route('simple-cash')"
+            :active="route().current('simple-cash')"
+        >
+            إدارة الصندوق والقاسات
+        </ResponsiveNavLink>
+
+              <!-- Hidden المحاسبة المبسطة - removed as requested -->
+              <!--
+              <ResponsiveNavLink
+                :href="route('simple-accounting')"
+                :active="route().current('simple-accounting')"
+              >
+                المحاسبة المبسطة
+              </ResponsiveNavLink>
+              -->
+
+              <!-- Hidden complex pages - can be enabled later if needed -->
+              <!--
               <ResponsiveNavLink
                 :href="route('transfers')"
                 :active="route().current('transfers')"
               >
                 {{ $t("accounts") }}
               </ResponsiveNavLink>
+              -->
 
              
 

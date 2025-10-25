@@ -14,6 +14,39 @@ return new class extends Migration
      */
     public function up()
     {
+        // جدول المستأجرين (Tenants)
+        if (!Schema::hasTable('tenants')) {
+            Schema::create('tenants', function (Blueprint $table) {
+                $table->string('id')->primary();
+                $table->string('name');
+                $table->string('domain')->nullable();
+                $table->string('email')->nullable();
+                $table->string('phone')->nullable();
+                $table->text('address')->nullable();
+                $table->enum('status', ['active', 'inactive', 'suspended'])->default('active');
+                $table->string('subscription_plan')->nullable();
+                $table->timestamp('subscription_expires_at')->nullable();
+                $table->json('settings')->nullable();
+                $table->timestamps();
+                
+                $table->index(['status', 'created_at']);
+                $table->index(['domain']);
+            });
+        }
+
+        // جدول النطاقات (Domains)
+        if (!Schema::hasTable('domains')) {
+            Schema::create('domains', function (Blueprint $table) {
+                $table->id();
+                $table->string('domain');
+                $table->string('tenant_id');
+                $table->timestamps();
+                
+                $table->foreign('tenant_id')->references('id')->on('tenants')->onDelete('cascade');
+                $table->unique('domain');
+            });
+        }
+
         // جدول أنواع المستخدمين
         if (!Schema::hasTable('user_type')) {
             Schema::create('user_type', function (Blueprint $table) {
@@ -78,6 +111,7 @@ return new class extends Migration
             $table->decimal('dubai_shipping', 10, 2)->nullable();
             $table->string('source')->nullable();
             $table->string('tenant_id')->nullable();
+            $table->unsignedBigInteger('user_id')->nullable();
             $table->timestamps();
             $table->softDeletes();
             
