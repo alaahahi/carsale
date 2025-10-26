@@ -306,21 +306,24 @@ return new class extends Migration
     private function createUserTypes()
     {
         $userTypes = [
-            ['name' => 'admin'],
-            ['name' => 'seles'],
-            ['name' => 'client'],
-            ['name' => 'account'],
+            ['id' => 1, 'name' => 'admin', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 2, 'name' => 'seles', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 3, 'name' => 'client', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 4, 'name' => 'account', 'created_at' => now(), 'updated_at' => now()],
         ];
 
         foreach ($userTypes as $type) {
-            DB::table('user_type')->updateOrInsert(
-                ['name' => $type['name']],
-                [
+            // استخدام insertGetId مع ignore للسيطرة على IDs
+            $exists = DB::table('user_type')->where('name', $type['name'])->exists();
+            
+            if (!$exists) {
+                DB::table('user_type')->insert([
+                    'id' => $type['id'],
                     'name' => $type['name'],
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]
-            );
+                    'created_at' => $type['created_at'],
+                    'updated_at' => $type['updated_at'],
+                ]);
+            }
         }
     }
 

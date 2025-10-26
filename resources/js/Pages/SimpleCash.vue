@@ -371,14 +371,6 @@ const transactionForm = ref({
   note: ''
 })
 
-// Debug on mount
-onMounted(() => {
-  console.log('allCustomers:', props.allCustomers)
-  console.log('allCustomers type:', typeof props.allCustomers)
-  console.log('allCustomers is Array:', Array.isArray(props.allCustomers))
-  console.log('allCustomers length:', props.allCustomers?.length)
-})
-
 // Helper Methods
 const hasCustomerWallet = (customer) => {
   const wallet = props.customerWallets?.find(w => w.customer_id === customer.id)
