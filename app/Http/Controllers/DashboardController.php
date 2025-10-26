@@ -946,20 +946,52 @@ class DashboardController extends Controller
             if ($customer) {
                 // استخدام getWalletOrCreate للتأكد من وجود المحفظة
                 $customerWallet = $customer->getWalletOrCreate();
-                if ($customerWallet) {
-                    Transactions::create([
-                        'amount' => $amount,
-                        'type' => 'in',
-                        'description' => $desc,
-                        'wallet_id' => $customerWallet->id,
-                        'morphed_id' => $customer->id,
-                        'morphed_type' => 'App\Models\User',
-                        'user_id' => $customer->id,
-                        'is_pay' => 0,
-                        'created_at' => now(),
-                        'updated_at' => now()
+                
+                // التحقق من وجود المحفظة و الـ ID بشكل صحيح
+                if (!$customerWallet || !$customerWallet->id) {
+                    \Log::error('Customer wallet not created properly', [
+                        'customer_id' => $customer_id,
+                        'customer_name' => $customer->name,
+                        'wallet' => $customerWallet
                     ]);
+                    
+                    return Response::json([
+                        'success' => false,
+                        'error' => 'فشل في إنشاء أو العثور على محفظة الزبون'
+                    ], 500);
                 }
+                
+                // التحقق من وجود wallet في قاعدة البيانات
+                $walletExists = DB::table('wallets')->where('id', $customerWallet->id)->exists();
+                if (!$walletExists) {
+                    \Log::error('Wallet ID does not exist in database', [
+                        'wallet_id' => $customerWallet->id,
+                        'customer_id' => $customer_id
+                    ]);
+                    
+                    // محاولة إنشاء المحفظة مرة أخرى
+                    $customerWallet = $customer->createWalletIfNotExists();
+                    
+                    if (!$customerWallet || !$customerWallet->id) {
+                        return Response::json([
+                            'success' => false,
+                            'error' => 'فشل في إنشاء محفظة الزبون'
+                        ], 500);
+                    }
+                }
+                
+                Transactions::create([
+                    'amount' => $amount,
+                    'type' => 'in',
+                    'description' => $desc,
+                    'wallet_id' => $customerWallet->id,
+                    'morphed_id' => $customer->id,
+                    'morphed_type' => 'App\Models\User',
+                    'user_id' => $customer->id,
+                    'is_pay' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ]);
             }
         }
         
