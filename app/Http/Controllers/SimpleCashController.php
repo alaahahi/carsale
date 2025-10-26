@@ -109,8 +109,9 @@ class SimpleCashController extends Controller
             }
         }
         
-        // حساب رأس المال = سعر جميع السيارات + المصاريف
-        $totalCarsPrice = Car::sum('price') ?? 0;
+        // حساب رأس المال = سعر الشراء + جميع المصاريف لجميع السيارات + مصاريف عامة
+        $totalCarsPrice = Car::selectRaw('SUM(purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)) as total')
+                       ->value('total') ?? 0;
         $totalExpenses = Expenses::sum('amount') ?? 0;
         $capital = $totalCarsPrice + $totalExpenses;
         
