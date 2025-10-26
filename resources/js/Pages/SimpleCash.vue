@@ -61,7 +61,7 @@
         </div>
         
         <!-- Customer Wallets List - Only show when NOT viewing specific customer -->
-        <div v-if="!customer_id && allCustomers && allCustomers.length > 0" class="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden mb-6">
+        <div v-if="!customer_id && Array.isArray(allCustomers) && allCustomers.length > 0" class="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden mb-6">
           <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-medium text-gray-900 dark:text-white">قائمة الزبائن والقاسات</h3>
           </div>
@@ -369,6 +369,14 @@ const modalCustomer = ref(null)
 const transactionForm = ref({
   amount: '',
   note: ''
+})
+
+// Debug on mount
+onMounted(() => {
+  console.log('allCustomers:', props.allCustomers)
+  console.log('allCustomers type:', typeof props.allCustomers)
+  console.log('allCustomers is Array:', Array.isArray(props.allCustomers))
+  console.log('allCustomers length:', props.allCustomers?.length)
 })
 
 // Helper Methods

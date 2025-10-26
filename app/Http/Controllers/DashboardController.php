@@ -522,7 +522,8 @@ class DashboardController extends Controller
                     $this->accountingController->increaseWallet($pay_price-$paid_amount_pay, $debtDesc,$this->outAccount->id,$car->id,'App\Models\Car');
                 }
                 if($pay_price==$paid_amount_pay){
-                    $car->increment('results'); 
+                    // السيارة مدفوعة بالكامل
+                    $car->update(['results' => 2]);
                     
                     // حساب وتوزيع الربح تلقائياً عند بيع السيارة
                     try {
@@ -679,15 +680,16 @@ class DashboardController extends Controller
         // تحديث المبلغ المدفوع
         $car->paid_amount_pay = $newPaidAmount;
         
-        // إعادة حساب حالة السيارة
-        $totalCost = $car->purchase_price + $car->erbil_exp + $car->erbil_shipping + $car->dubai_exp + $car->dubai_shipping;
-        
-        if ($car->paid_amount_pay >= $totalCost && $car->pay_price) {
-            $car->results = 2; // مدفوعة بالكامل
-        } else if ($car->paid_amount_pay > 0 && $car->pay_price) {
-            $car->results = 1; // مدفوعة جزئياً
+        // إعادة حساب حالة السيارة حسب المبلغ المدفوع وسعر البيع
+        if ($car->paid_amount_pay >= $car->pay_price && $car->pay_price > 0) {
+            // السيارة مدفوعة بالكامل
+            $car->results = 2;
+        } else if ($car->paid_amount_pay > 0 && $car->pay_price > 0) {
+            // السيارة مدفوعة جزئياً
+            $car->results = 1;
         } else {
-            $car->results = 0; // غير مدفوعة
+            // غير مدفوعة
+            $car->results = 0;
         }
         
         $car->save();
@@ -758,15 +760,16 @@ class DashboardController extends Controller
         // تحديث المبلغ المدفوع في السيارة
         $car->paid_amount_pay = max(0, $car->paid_amount_pay - $deletedAmount);
         
-        // إعادة حساب حالة السيارة
-        $totalCost = $car->purchase_price + $car->erbil_exp + $car->erbil_shipping + $car->dubai_exp + $car->dubai_shipping;
-        
-        if ($car->paid_amount_pay >= $totalCost && $car->pay_price) {
-            $car->results = 2; // مدفوعة بالكامل
-        } else if ($car->paid_amount_pay > 0 && $car->pay_price) {
-            $car->results = 1; // مدفوعة جزئياً
+        // إعادة حساب حالة السيارة حسب المبلغ المدفوع وسعر البيع
+        if ($car->paid_amount_pay >= $car->pay_price && $car->pay_price > 0) {
+            // السيارة مدفوعة بالكامل
+            $car->results = 2;
+        } else if ($car->paid_amount_pay > 0 && $car->pay_price > 0) {
+            // السيارة مدفوعة جزئياً
+            $car->results = 1;
         } else {
-            $car->results = 0; // غير مدفوعة
+            // غير مدفوعة
+            $car->results = 0;
         }
         
         $car->save();
@@ -1102,8 +1105,14 @@ class DashboardController extends Controller
             $wallet->decrement('balance',$amount); 
         }
         
-        if($car->pay_price-$car->paid_amount_pay==0){
-            $car->increment('results'); 
+        // تحديث حالة السيارة بعد إضافة الدفعة
+        $car->refresh(); // تحديث بيانات السيارة بعد increment
+        $totalPaid = $car->paid_amount_pay;
+        $salePrice = $car->pay_price;
+        
+        if($totalPaid >= $salePrice && $salePrice > 0){
+            // السيارة مدفوعة بالكامل
+            $car->update(['results' => 2]);
             
             // حساب وتوزيع الربح تلقائياً عند اكتمال دفع السيارة
             try {
@@ -1121,6 +1130,9 @@ class DashboardController extends Controller
                     'error' => $e->getMessage()
                 ]);
             }
+        } else if($totalPaid > 0 && $totalPaid < $salePrice) {
+            // السيارة مدفوعة جزئياً
+            $car->update(['results' => 1]);
         }
         
         return Response::json([

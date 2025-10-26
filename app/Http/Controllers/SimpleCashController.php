@@ -81,7 +81,7 @@ class SimpleCashController extends Controller
                     'name' => $cust->name,
                     'email' => $cust->email,
                 ];
-            });
+            })->toArray();
             
             foreach ($customers as $cust) {
                 if ($cust->wallet) {
@@ -121,8 +121,8 @@ class SimpleCashController extends Controller
             'cars' => $cars,
             'customer_id' => $request->customer_id,
             'customer' => $customer,
-            'customerWallets' => $customerWallets,
-            'allCustomers' => $allCustomers,
+            'customerWallets' => $customerWallets ?? [],
+            'allCustomers' => $allCustomers ?? [],
             'totalCustomerWallets' => $totalCustomerWallets,
             'capital' => $capital,
             'totalCarsPrice' => $totalCarsPrice,
