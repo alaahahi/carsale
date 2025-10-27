@@ -5,6 +5,7 @@ namespace App\Helpers;
 use App\Models\UserType;
 use App\Models\User;
 use App\Models\ExpensesType;
+use App\Models\SystemConfig;
 
 class TenantDataHelper
 {
@@ -77,6 +78,38 @@ class TenantDataHelper
     }
 
     /**
+     * الحصول على إعدادات النظام من قاعدة بيانات الـ tenant
+     */
+    public static function getSystemConfig()
+    {
+        return cache()->remember('system_config', 3600, function () {
+            $config = SystemConfig::first();
+            
+            if (!$config) {
+                return [
+                    'company_name' => 'Salam Jalal Ayoub Company',
+                    'first_title_ar' => null,
+                    'first_title_kr' => null,
+                    'second_title_ar' => null,
+                    'second_title_kr' => null,
+                    'third_title_ar' => null,
+                    'third_title_kr' => null,
+                ];
+            }
+            
+            return [
+                'company_name' => $config->first_title_ar ?? 'Salam Jalal Ayoub Company',
+                'first_title_ar' => $config->first_title_ar,
+                'first_title_kr' => $config->first_title_kr,
+                'second_title_ar' => $config->second_title_ar,
+                'second_title_kr' => $config->second_title_kr,
+                'third_title_ar' => $config->third_title_ar,
+                'third_title_kr' => $config->third_title_kr,
+            ];
+        });
+    }
+
+    /**
      * مسح الكاش الخاص بالـ tenant
      */
     public static function clearCache()
@@ -84,6 +117,7 @@ class TenantDataHelper
         cache()->forget('user_types_tenant');
         cache()->forget('user_type_ids');
         cache()->forget('accounting_users');
+        cache()->forget('system_config');
         cache()->forget('user_type_admin');
         cache()->forget('user_type_seles');
         cache()->forget('user_type_client');

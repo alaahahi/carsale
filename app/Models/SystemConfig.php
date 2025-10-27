@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Scout\Searchable;
+use App\Helpers\TenantDataHelper;
 
 class SystemConfig extends Model
 {
@@ -20,4 +21,20 @@ class SystemConfig extends Model
         'third_title_ar',
         'third_title_kr',
     ];
+    
+    /**
+     * Boot method to clear cache on model events
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saved(function ($systemConfig) {
+            TenantDataHelper::clearCacheOnUpdate();
+        });
+
+        static::deleted(function ($systemConfig) {
+            TenantDataHelper::clearCacheOnUpdate();
+        });
+    }
 }

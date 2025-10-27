@@ -357,7 +357,7 @@ const printCarsTable = () => {
         <div style="font-family: Arial, sans-serif; padding: 20px;">
             <!-- Header -->
             <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="margin-bottom: 10px; color: #2563eb;">Salam Jalal Ayoub Company</h1>
+                <h1 style="margin-bottom: 10px; color: #2563eb;">${props.systemConfig?.company_name || 'Salam Jalal Ayoub Company'}</h1>
                 <h2 style="margin-bottom: 15px;">Cars Report</h2>
                 <p style="font-size: 14px; color: #666;">${new Date().toLocaleDateString('en-US')}</p>
             </div>
@@ -518,6 +518,7 @@ const props =  defineProps({
     debtAccount:Object,
     outSupplier:Object,
     debtSupplier:Object,
+    systemConfig:Object,
 });
 function confirmCar(V) {
   axios.post('/api/addCar',V)

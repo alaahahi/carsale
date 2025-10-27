@@ -55,7 +55,12 @@ class UserController extends Controller
     public function clients()
     {
         // Card functionality removed
-        return Inertia::render('Clients/Index', ['url'=>$this->url,'cards'=>[]]);
+        $systemConfig = TenantDataHelper::getSystemConfig();
+        return Inertia::render('Clients/Index', [
+            'url'=>$this->url,
+            'cards'=>[],
+            'systemConfig' => $systemConfig
+        ]);
     }
     
     public function show ()

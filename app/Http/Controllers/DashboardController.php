@@ -136,10 +136,20 @@ class DashboardController extends Controller
             ->value('grand_total'); // Directly retrieve the value
 
 
-        return Inertia::render('Dashboard', ['url'=>$this->url,'transfersAccount'=>$this->transfersAccount,
-        'outAccount'=>$this->outAccount,'inAccount'=>$this->inAccount,
-        'expenses'=> $expenses,'user'=> $user,'client'=>$client ,'carCount'=> $car->count(),
-        'working'=> $car->where('client_id',null)->count()]);   
+        $systemConfig = TenantDataHelper::getSystemConfig();
+        
+        return Inertia::render('Dashboard', [
+            'url'=>$this->url,
+            'transfersAccount'=>$this->transfersAccount,
+            'outAccount'=>$this->outAccount,
+            'inAccount'=>$this->inAccount,
+            'expenses'=> $expenses,
+            'user'=> $user,
+            'client'=>$client,
+            'carCount'=> $car->count(),
+            'working'=> $car->where('client_id',null)->count(),
+            'systemConfig' => $systemConfig
+        ]);   
 
     }
     public function totalInfo(Request $request)
