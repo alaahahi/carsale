@@ -21,26 +21,46 @@ use App\Models\Transactions;
 use App\Models\Expenses;
 use App\Models\Investment;
 
+use App\Helpers\TenantDataHelper;
+
 use Carbon\Carbon;
 use Inertia\Inertia;
 
 class TransfersController extends Controller
 {
+    protected $accountingController;
+    protected $url;
+    protected $userAdmin;
+    protected $userSeles;
+    protected $userClient;
+    protected $userAccount;
+    protected $mainAccount;
+    protected $inAccount;
+    protected $outAccount;
+    protected $transfersAccount;
+    protected $outSupplier;
+    protected $debtSupplier;
+
     public function __construct(AccountingController $accountingController)
     {
-    $this->accountingController = $accountingController;
-    $this->url = env('FRONTEND_URL');
-    $this->userAdmin =  UserType::where('name', 'admin')->first()->id;
-    $this->userSeles =  UserType::where('name', 'seles')->first()->id;
-    $this->userClient =  UserType::where('name', 'client')->first()->id;
-    $this->userAccount =  UserType::where('name', 'account')->first()->id;
+        $this->accountingController = $accountingController;
+        $this->url = env('FRONTEND_URL');
+        
+        // الحصول على أنواع المستخدمين من قاعدة بيانات الـ tenant
+        $userTypeIds = TenantDataHelper::getUserTypeIds();
+        $this->userAdmin = $userTypeIds['admin'];
+        $this->userSeles = $userTypeIds['seles'];
+        $this->userClient = $userTypeIds['client'];
+        $this->userAccount = $userTypeIds['account'];
 
-    $this->mainAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','main@account.com')->first();
-    $this->inAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','in@account.com')->first();
-    $this->outAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','out@account.com')->first();
-    $this->transfersAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','transfers@account.com')->first();
-    $this->outSupplier= User::with('wallet')->where('type_id', $this->userAccount)->where('email','supplier-out')->first();
-    $this->debtSupplier= User::with('wallet')->where('type_id', $this->userAccount)->where('email','supplier-debt')->first();
+        // الحصول على الحسابات المحاسبية من قاعدة بيانات الـ tenant
+        $accountingUsers = TenantDataHelper::getAccountingUsers();
+        $this->mainAccount = $accountingUsers['main'];
+        $this->inAccount = $accountingUsers['in'];
+        $this->outAccount = $accountingUsers['out'];
+        $this->transfersAccount = $accountingUsers['transfers'];
+        $this->outSupplier = $accountingUsers['outSupplier'];
+        $this->debtSupplier = $accountingUsers['debtSupplier'];
     }
     public function __invoke(Request $request)
     {

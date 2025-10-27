@@ -11,19 +11,29 @@ use App\Models\Transactions;
 use App\Models\Expenses;
 use App\Models\UserType;
 use App\Models\User;
+use App\Helpers\TenantDataHelper;
 use Illuminate\Support\Facades\DB;
 
 class SimpleCashController extends Controller
 {
+    protected $url;
+    protected $userAccount;
+    protected $inAccount;
+    protected $outAccount;
+    protected $transfersAccount;
+
     public function __construct()
     {
         $this->url = env('FRONTEND_URL');
         
-        // Get account users
-        $this->userAccount = UserType::where('name', 'account')->first()->id;
-        $this->inAccount = User::with('wallet')->where('type_id', $this->userAccount)->where('email','in@account.com')->first();
-        $this->outAccount = User::with('wallet')->where('type_id', $this->userAccount)->where('email','out@account.com')->first();
-        $this->transfersAccount = User::with('wallet')->where('type_id', $this->userAccount)->where('email','transfers@account.com')->first();
+        // Get account users from tenant database
+        $userTypeIds = TenantDataHelper::getUserTypeIds();
+        $this->userAccount = $userTypeIds['account'];
+        
+        $accountingUsers = TenantDataHelper::getAccountingUsers();
+        $this->inAccount = $accountingUsers['in'];
+        $this->outAccount = $accountingUsers['out'];
+        $this->transfersAccount = $accountingUsers['transfers'];
     }
 
     public function index(Request $request)
@@ -60,8 +70,8 @@ class SimpleCashController extends Controller
             $customer = User::find($request->customer_id);
         }
         
-        // Get all customer wallets with their balances
-        $clientTypeId = UserType::where('name', 'client')->first()->id ?? null;
+        // Get all customer wallets with their balances from tenant database
+        $clientTypeId = TenantDataHelper::getUserTypeId('client');
         $customerWallets = [];
         $totalCustomerWallets = 0;
         $allCustomers = [];

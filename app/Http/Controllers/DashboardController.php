@@ -22,6 +22,7 @@ use App\Models\Expenses;
 use App\Models\CarFieldHistory;
 
 use App\Helpers\UploadHelper;
+use App\Helpers\TenantDataHelper;
 
 use Carbon\Carbon;
 
@@ -29,21 +30,33 @@ use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
+    protected $accountingController;
+    protected $url;
+    protected $userAdmin;
+    protected $userSeles;
+    protected $userClient;
+    protected $userAccount;
+    protected $inAccount;
+    protected $outAccount;
+    protected $transfersAccount;
+
     public function __construct(AccountingController $accountingController)
     {
-    $this->accountingController = $accountingController;
-    $this->url = env('FRONTEND_URL');
-    $this->userAdmin =  UserType::where('name', 'admin')->first()->id;
-    $this->userSeles =  UserType::where('name', 'seles')->first()->id;
-    $this->userClient =  UserType::where('name', 'client')->first()->id;
-    $this->userAccount =  UserType::where('name', 'account')->first()->id;
+        $this->accountingController = $accountingController;
+        $this->url = env('FRONTEND_URL');
+        
+        // الحصول على أنواع المستخدمين من قاعدة بيانات الـ tenant
+        $userTypeIds = TenantDataHelper::getUserTypeIds();
+        $this->userAdmin = $userTypeIds['admin'];
+        $this->userSeles = $userTypeIds['seles'];
+        $this->userClient = $userTypeIds['client'];
+        $this->userAccount = $userTypeIds['account'];
 
-    $this->inAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','in@account.com')->first();
-
-    $this->outAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','out@account.com')->first();
-    $this->transfersAccount= User::with('wallet')->where('type_id', $this->userAccount)->where('email','transfers@account.com')->first();
-
-    
+        // الحصول على الحسابات المحاسبية من قاعدة بيانات الـ tenant
+        $accountingUsers = TenantDataHelper::getAccountingUsers();
+        $this->inAccount = $accountingUsers['in'];
+        $this->outAccount = $accountingUsers['out'];
+        $this->transfersAccount = $accountingUsers['transfers'];
     }
     // حساب وتوزيع الربح عند بيع السيارة
     public function calculateProfitOnCarSale(Request $request, $carId)
@@ -206,7 +219,7 @@ class DashboardController extends Controller
                 
                 if (!$outAccount) {
                     // إنشاء حساب الخرج إذا لم يكن موجوداً
-                    $accountTypeId = UserType::where('name', 'account')->value('id');
+                    $accountTypeId = TenantDataHelper::getUserTypeId('account');
                     if ($accountTypeId) {
                         $outAccount = User::create([
                             'name' => 'حساب الخرج',

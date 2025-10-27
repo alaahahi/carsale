@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\Name;
 use App\Models\CarModel;
 use App\Models\Color;
+use App\Helpers\TenantDataHelper;
 
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\ToCollection;
@@ -17,7 +18,8 @@ class CarDataImport implements ToCollection
 {
     public function __construct(){
         $this->url = env('FRONTEND_URL');
-        $this->userClient =  UserType::where('name', 'client')->first()->id;
+        // الحصول على نوع المستخدم من قاعدة بيانات الـ tenant
+        $this->userClient = TenantDataHelper::getUserTypeId('client');
 
    }
     public function collection(Collection $rows)

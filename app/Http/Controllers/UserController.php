@@ -15,16 +15,24 @@ use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Carbon\Carbon;
+use App\Helpers\TenantDataHelper;
 
 class UserController extends Controller
 {
+    protected $userAdmin;
+    protected $userSeles;
+    protected $userClient;
+    protected $userAccount;
+
     public function __construct(){
          $this->url = env('FRONTEND_URL');
-         $this->userAdmin =  UserType::where('name', 'admin')->first()->id;
-         $this->userSeles =  UserType::where('name', 'seles')->first()->id;
-         $this->userClient =  UserType::where('name', 'client')->first()->id;
-         $this->userAccount =  UserType::where('name', 'account')->first()->id;
-
+         
+         // الحصول على أنواع المستخدمين من قاعدة بيانات الـ tenant
+         $userTypeIds = TenantDataHelper::getUserTypeIds();
+         $this->userAdmin = $userTypeIds['admin'];
+         $this->userSeles = $userTypeIds['seles'];
+         $this->userClient = $userTypeIds['client'];
+         $this->userAccount = $userTypeIds['account'];
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\UserType;
 use App\Models\Wallet;
+use App\Helpers\TenantDataHelper;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -12,8 +13,8 @@ class CustomerWalletController extends Controller
 {
     public function index()
     {
-        // جلب نوع المستخدم "client" فقط
-        $clientTypeId = UserType::where('name', 'client')->first()->id ?? null;
+        // جلب نوع المستخدم "client" فقط من قاعدة بيانات الـ tenant
+        $clientTypeId = TenantDataHelper::getUserTypeId('client');
         
         if (!$clientTypeId) {
             // إذا لم يوجد نوع client، نعرض قائمة فارغة
