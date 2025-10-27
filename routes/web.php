@@ -733,13 +733,13 @@ Route::group(['middleware' => ['tenant']], function () {
             'phpVersion' => PHP_VERSION,
         ]);
     });
-    
-    Route::get('/import-cars', [InfoController::class, 'showUploadForm'])->name('car.import.form');
-    Route::post('/import-cars', [InfoController::class, 'import'])->name('car.import');
 
     Route::group(['middleware' => ['auth','verified']], function () {
-    Route::get('/dashboard', function () {return Inertia::render('Dashboard');})->middleware(['auth', 'verified'])->name('dashboard');
-
+    
+    // استيراد السيارات من Excel
+    Route::get('/import-cars', [InfoController::class, 'showUploadForm'])->name('car.import.form');
+    Route::post('/import-cars', [InfoController::class, 'import'])->name('car.import');
+    
     Route::get('dashboard',[DashboardController::class,'index'])->middleware(['auth', 'verified'])->name('dashboard');
     
     Route::get('getIndex',[UserController::class, 'getIndex'])->name("getIndex");
