@@ -530,14 +530,26 @@ class DashboardController extends Controller
 
         $car=Car::find($request->id);
         if($car->id){
+                // تحديد حالة السيارة بناءً على المبلغ المدفوع
+                $carResults = 1; // افتراضياً مدفوعة جزئياً
+                if ($pay_price > 0 && $paid_amount_pay >= $pay_price) {
+                    $carResults = 2; // مدفوعة بالكامل
+                } else if ($paid_amount_pay == 0 && $pay_price == 0) {
+                    $carResults = 0; // غير مدفوعة
+                }
+                
                 $car->update([
                 'note_pay' =>$request->note_pay,
                 'client_id'=> $client_id ,
                 'pay_data'=> Carbon::now()->format('Y-m-d'),
                 'pay_price'=>$pay_price,
                 'paid_amount_pay' =>  $paid_amount_pay,
-                'results'=>1
+                'results'=> $carResults
                  ]);
+                
+                // تحديث السيارة للتأكد من الحصول على البيانات المحدثة
+                $car->refresh();
+                
                 $desc=trans('text.buyCar').' '.$car->pay_price.trans('text.payDone').$car->paid_amount_pay;
                 if ($this->inAccount) {
                     $this->accountingController->increaseWallet($car->paid_amount_pay, $desc,$this->inAccount->id,$car->id,'App\Models\Car');
@@ -547,11 +559,9 @@ class DashboardController extends Controller
                     $debtDesc = 'دين عميل - ' . $desc;
                     $this->accountingController->increaseWallet($pay_price-$paid_amount_pay, $debtDesc,$this->outAccount->id,$car->id,'App\Models\Car');
                 }
-                if($pay_price==$paid_amount_pay){
-                    // السيارة مدفوعة بالكامل
-                    $car->update(['results' => 2]);
-                    
-                    // حساب وتوزيع الربح تلقائياً عند بيع السيارة
+                
+                // إذا كانت السيارة مدفوعة بالكامل، قم بتوزيع الربح
+                if ($carResults == 2 && $pay_price > 0) {
                     try {
                         $car->refresh(); // تحديث بيانات السيارة
                         $car->distributeProfitToInvestors();
@@ -559,6 +569,7 @@ class DashboardController extends Controller
                             'car_id' => $car->id,
                             'car_no' => $car->no,
                             'pay_price' => $pay_price,
+                            'paid_amount_pay' => $paid_amount_pay,
                             'total_cost' => $car->total_cost
                         ]);
                     } catch (\Exception $e) {
@@ -703,14 +714,18 @@ class DashboardController extends Controller
         $oldPaidAmount = $car->paid_amount_pay;
         $difference = $newPaidAmount - $oldPaidAmount;
         
+        // التحقق من الحالة السابقة (قبل التحديث)
+        $wasFullyPaid = ($oldPaidAmount >= $car->pay_price && $car->pay_price > 0);
+        
         // تحديث المبلغ المدفوع
         $car->paid_amount_pay = $newPaidAmount;
         
         // إعادة حساب حالة السيارة حسب المبلغ المدفوع وسعر البيع
-        if ($car->paid_amount_pay >= $car->pay_price && $car->pay_price > 0) {
+        $isNowFullyPaid = ($newPaidAmount >= $car->pay_price && $car->pay_price > 0);
+        if ($isNowFullyPaid) {
             // السيارة مدفوعة بالكامل
             $car->results = 2;
-        } else if ($car->paid_amount_pay > 0 && $car->pay_price > 0) {
+        } else if ($newPaidAmount > 0 && $car->pay_price > 0) {
             // السيارة مدفوعة جزئياً
             $car->results = 1;
         } else {
@@ -719,6 +734,26 @@ class DashboardController extends Controller
         }
         
         $car->save();
+        
+        // إذا كانت السيارة أصبحت مدفوعة بالكامل الآن ولم تكن من قبل، قم بتوزيع الربح
+        if ($isNowFullyPaid && !$wasFullyPaid) {
+            try {
+                $car->refresh(); // تحديث بيانات السيارة
+                $car->distributeProfitToInvestors();
+                \Log::info('Profit distributed automatically after editPaidAmount - FULL PAYMENT', [
+                    'car_id' => $car->id,
+                    'car_no' => $car->no,
+                    'pay_price' => $car->pay_price,
+                    'paid_amount_pay' => $newPaidAmount,
+                    'total_cost' => $car->total_cost
+                ]);
+            } catch (\Exception $e) {
+                \Log::error('Error distributing profit after editPaidAmount', [
+                    'car_id' => $car->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
         
         // إنشاء transaction عكسي إذا كان هناك فرق
         if ($difference != 0) {

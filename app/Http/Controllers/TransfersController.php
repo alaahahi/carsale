@@ -563,16 +563,30 @@ class TransfersController extends Controller
                 Wallet::create(['user_id' => $client->id]);
         }
 
+        $pay_price = (float)$_GET['pay_price'] ?? 0;
+        $paid_amount_pay = (float)$_GET['paid_amount_pay'] ?? 0;
+        
+        // تحديد حالة السيارة بناءً على المبلغ المدفوع
+        $carResults = 1; // افتراضياً مدفوعة جزئياً
+        if ($pay_price > 0 && $paid_amount_pay >= $pay_price) {
+            $carResults = 2; // مدفوعة بالكامل
+        } else if ($paid_amount_pay == 0 && $pay_price == 0) {
+            $carResults = 0; // غير مدفوعة
+        }
+        
         $car=Car::updateOrCreate(['id' => $_GET['id']],[
             'note_pay' =>$_GET['note_pay'],
             'client_id'=> ($client??'') ? $client->id : $_GET['client_id'],
             'pay_data'=> Carbon::now()->format('Y-m-d'),
-            'pay_price'=> $_GET['pay_price'],
-            'paid_amount_pay' =>  $_GET['paid_amount_pay'],
-            'results'=>1
+            'pay_price'=> $pay_price,
+            'paid_amount_pay' =>  $paid_amount_pay,
+            'results'=> $carResults
              ]);
                  
         if($car->id){
+                // تحديث السيارة للتأكد من الحصول على البيانات المحدثة
+                $car->refresh();
+                
                 // التحقق من وجود استثمارات في السيارة
                 $hasInvestments = $car->investmentCars()
                     ->whereHas('investment', function($query) {
@@ -588,6 +602,25 @@ class TransfersController extends Controller
                 $desc=trans('text.buyCar').' '.$car->pay_price.trans('text.payDone').$car->paid_amount_pay;
                 $this->accountingController->decreaseWallet($car->paid_amount_pay, $desc,$this->mainAccount->id);
                 $this->accountingController->increaseWallet($car->paid_amount_pay, $desc,$this->inAccount->id);
+            }
+            
+            // إذا كانت السيارة مدفوعة بالكامل، قم بتوزيع الربح
+            if ($carResults == 2 && $pay_price > 0) {
+                try {
+                    $car->refresh(); // تحديث بيانات السيارة
+                    $car->distributeProfitToInvestors();
+                    \Log::info('Profit distributed automatically in payCar (TransfersController)', [
+                        'car_id' => $car->id,
+                        'car_no' => $car->no,
+                        'pay_price' => $pay_price,
+                        'paid_amount_pay' => $paid_amount_pay
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('Error distributing profit in payCar (TransfersController)', [
+                        'car_id' => $car->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
             }
             
