@@ -45,18 +45,20 @@ class DashboardController extends Controller
         $this->accountingController = $accountingController;
         $this->url = env('FRONTEND_URL');
         
-        // الحصول على أنواع المستخدمين من قاعدة بيانات الـ tenant
-        $userTypeIds = TenantDataHelper::getUserTypeIds();
-        $this->userAdmin = $userTypeIds['admin'];
-        $this->userSeles = $userTypeIds['seles'];
-        $this->userClient = $userTypeIds['client'];
-        $this->userAccount = $userTypeIds['account'];
+        // تأجيل جلب بيانات الـ tenant لما بعد تهيئة التيننسي عبر ميدلوير الكنترولر
+        $this->middleware(function ($request, $next) {
+            $userTypeIds = TenantDataHelper::getUserTypeIds();
+            $this->userAdmin = $userTypeIds['admin'];
+            $this->userSeles = $userTypeIds['seles'];
+            $this->userClient = $userTypeIds['client'];
+            $this->userAccount = $userTypeIds['account'];
 
-        // الحصول على الحسابات المحاسبية من قاعدة بيانات الـ tenant
-        $accountingUsers = TenantDataHelper::getAccountingUsers();
-        $this->inAccount = $accountingUsers['in'];
-        $this->outAccount = $accountingUsers['out'];
-        $this->transfersAccount = $accountingUsers['transfers'];
+            $accountingUsers = TenantDataHelper::getAccountingUsers();
+            $this->inAccount = $accountingUsers['in'];
+            $this->outAccount = $accountingUsers['out'];
+            $this->transfersAccount = $accountingUsers['transfers'];
+            return $next($request);
+        });
     }
     // حساب وتوزيع الربح عند بيع السيارة
     public function calculateProfitOnCarSale(Request $request, $carId)

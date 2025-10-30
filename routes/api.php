@@ -144,6 +144,10 @@ Route::get('customer-wallet/{customerId}',[CustomerWalletController::class, 'get
     Route::get('clients/{clientId}/investments', [UserController::class, 'getClientInvestments'])->name('clients.investments');
     Route::post('clients/{clientId}/update-profit-shares', [UserController::class, 'updateClientProfitShares'])->name('clients.update-profit-shares');
     Route::get('car-payments', [DashboardController::class, 'getCarPayments']);
+    // حذف دفعة سيارة بحسب معرف المعاملة
+    Route::delete('delete-payment/{paymentId}', [DashboardController::class, 'deletePayment'])->name('payments.delete');
+    // مسار GET اختياري للتوافق إن كان الواجهة تستدعي GET
+    Route::get('delete-payment/{paymentId}', [DashboardController::class, 'deletePayment']);
     Route::post('editSalePrice', [DashboardController::class, 'editSalePrice']);
     Route::post('editPaidAmount', [DashboardController::class, 'editPaidAmount']);
     Route::get('main-fund-profit-from-investors', [DashboardController::class, 'getMainFundProfitFromInvestors'])->name('main-fund.profit-from-investors');
