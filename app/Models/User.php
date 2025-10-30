@@ -145,7 +145,7 @@ class User extends Authenticatable
             try {
                 $wallet = $this->wallet()->create([
                     'balance' => 0,
-                    'card' => null
+                    // legacy 'card' removed
                 ]);
                 
                 \Log::info("Wallet created for user", [

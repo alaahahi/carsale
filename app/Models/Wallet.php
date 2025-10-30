@@ -11,7 +11,7 @@ class Wallet extends Model
     protected $fillable = [
         'user_id',
         'balance',
-        'card'
+        // removed legacy 'card' column usage
     ];
 
     public function user()

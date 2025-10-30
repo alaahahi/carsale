@@ -554,12 +554,13 @@ class UserController extends Controller
     {
         // date('Y-m-d H:i:s', strtotime($data['datetime']))
             try {
-                $wallet = Wallet::where('user_id', $user_id)->first();
-                $old_card = $wallet->card; 
-                $new_card = $card; 
-                $wallet->update(['card' => $old_card+$new_card]);
+                $wallet = Wallet::firstOrCreate(['user_id' => $user_id], ['balance' => 0]);
+                $amount = (float) $card;
+                if ($amount > 0) {
+                    $wallet->increment('balance', $amount);
+                }
             
-                 return Response::json(['status' => 200,'massage' => 'massage','data' =>   $wallet],200);
+                 return Response::json(['status' => 200,'massage' => 'wallet updated','data' =>   $wallet->fresh()],200);
 
             } catch (\Throwable $th) {
                 return $th;
