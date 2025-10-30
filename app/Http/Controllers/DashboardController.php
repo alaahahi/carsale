@@ -60,6 +60,49 @@ class DashboardController extends Controller
             return $next($request);
         });
     }
+
+    private function ensureInitialized(): void
+    {
+        if (!$this->userClient || !$this->inAccount || !$this->outAccount || !$this->transfersAccount) {
+            $userTypeIds = TenantDataHelper::getUserTypeIds();
+            $this->userAdmin = $userTypeIds['admin'];
+            $this->userSeles = $userTypeIds['seles'];
+            $this->userClient = $userTypeIds['client'];
+            $this->userAccount = $userTypeIds['account'];
+
+            $accounts = TenantDataHelper::getAccountingUsers();
+            // إنشاء الحسابات الأساسية إذا كانت غير موجودة
+            if (!$accounts['in'] && $this->userAccount) {
+                $this->inAccount = \App\Models\User::firstOrCreate(
+                    ['email' => 'in@account.com', 'type_id' => $this->userAccount],
+                    ['name' => 'حساب الدخل', 'password' => bcrypt('password'), 'show_wallet' => false]
+                );
+                $this->inAccount->getWalletOrCreate();
+            } else {
+                $this->inAccount = $accounts['in'];
+            }
+
+            if (!$accounts['out'] && $this->userAccount) {
+                $this->outAccount = \App\Models\User::firstOrCreate(
+                    ['email' => 'out@account.com', 'type_id' => $this->userAccount],
+                    ['name' => 'حساب الخرج', 'password' => bcrypt('password'), 'show_wallet' => false]
+                );
+                $this->outAccount->getWalletOrCreate();
+            } else {
+                $this->outAccount = $accounts['out'];
+            }
+
+            if (!$accounts['transfers'] && $this->userAccount) {
+                $this->transfersAccount = \App\Models\User::firstOrCreate(
+                    ['email' => 'transfers@account.com', 'type_id' => $this->userAccount],
+                    ['name' => 'حساب التحويلات', 'password' => bcrypt('password'), 'show_wallet' => false]
+                );
+                $this->transfersAccount->getWalletOrCreate();
+            } else {
+                $this->transfersAccount = $accounts['transfers'];
+            }
+        }
+    }
     // حساب وتوزيع الربح عند بيع السيارة
     public function calculateProfitOnCarSale(Request $request, $carId)
     {
@@ -114,6 +157,7 @@ class DashboardController extends Controller
     }
     public function index(Request $request)
     {
+        $this->ensureInitialized();
         $authUser = auth()->user();
         $results = null;
         $user=   User::where('type_id', $this->userSeles)->get();
@@ -156,6 +200,7 @@ class DashboardController extends Controller
     }
     public function totalInfo(Request $request)
     {
+        $this->ensureInitialized();
         $expenses=ExpensesType::all();
         $car = Car::all();
 
@@ -803,52 +848,60 @@ class DashboardController extends Controller
     
     public function deletePayment($paymentId)
     {
-        $payment = Transactions::find($paymentId);
-        if (!$payment) {
-            return response()->json(['error' => 'الدفعة غير موجودة'], 404);
-        }
-        
-        // الحصول على السيارة المرتبطة بالدفعة
-        $car = Car::find($payment->morphed_id);
-        if (!$car) {
-            return response()->json(['error' => 'السيارة غير موجودة'], 404);
-        }
-        
-        // حفظ المبلغ المراد حذفه
-        $deletedAmount = $payment->amount;
-        
-        // حذف الدفعة
-        $payment->delete();
-        
-        // تحديث المبلغ المدفوع في السيارة
-        $car->paid_amount_pay = max(0, $car->paid_amount_pay - $deletedAmount);
-        
-        // إعادة حساب حالة السيارة حسب المبلغ المدفوع وسعر البيع
-        if ($car->paid_amount_pay >= $car->pay_price && $car->pay_price > 0) {
-            // السيارة مدفوعة بالكامل
-            $car->results = 2;
-        } else if ($car->paid_amount_pay > 0 && $car->pay_price > 0) {
-            // السيارة مدفوعة جزئياً
-            $car->results = 1;
-        } else {
-            // غير مدفوعة
-            $car->results = 0;
-        }
-        
-        $car->save();
-        
-        // إنشاء معاملة معاكسة من نوع out
-        Transactions::create([
-            'amount' => $deletedAmount,
-            'type' => 'out',
-            'description' => 'حذف دفعة - معاملة معاكسة للسيارة: ' . $car->name . ' - رقم: ' . $car->pin,
-            'wallet_id' => $payment->wallet_id, // نفس المحفظة الأصلية
-            'morphed_id' => $car->id,
-            'morphed_type' => 'App\Models\Car',
-            'user_id' => auth()->id(),
-        ]);
-        
-        return response()->json(['success' => 'تم حذف الدفعة وتحديث المبلغ المدفوع وإنشاء معاملة معاكسة بنجاح'], 200);
+        return DB::transaction(function () use ($paymentId) {
+            $payment = Transactions::find($paymentId);
+            if (!$payment) {
+                return response()->json(['error' => 'الدفعة غير موجودة'], 404);
+            }
+
+            // التأكد أن الدفعة تخص سيارة فقط
+            if ($payment->morphed_type !== 'App\\Models\\Car') {
+                return response()->json(['error' => 'هذه الدفعة لا تخص سيارة'], 400);
+            }
+
+            $car = Car::find($payment->morphed_id);
+            if (!$car) {
+                return response()->json(['error' => 'السيارة غير موجودة'], 404);
+            }
+
+            $deletedAmount = $payment->amount;
+            $deletedWalletId = $payment->wallet_id;
+
+            // حذف الدفعة المحددة فقط
+            $payment->delete();
+
+            // إعادة احتساب إجمالي المدفوع من واقع المعاملات المتبقية للسيارة
+            $totalPaid = Transactions::where('morphed_id', $car->id)
+                ->where('morphed_type', 'App\\Models\\Car')
+                ->where('type', 'in')
+                ->sum('amount');
+
+            // تحديث car وفق الإجمالي الحقيقي
+            $car->paid_amount_pay = max(0, (int) $totalPaid);
+
+            if ($car->paid_amount_pay >= $car->pay_price && $car->pay_price > 0) {
+                $car->results = 2; // مدفوعة بالكامل
+            } else if ($car->paid_amount_pay > 0 && $car->pay_price > 0) {
+                $car->results = 1; // مدفوعة جزئياً
+            } else {
+                $car->results = 0; // غير مدفوعة
+            }
+
+            $car->save();
+
+            // إنشاء معاملة معاكسة (out) لنفس المحفظة لأغراض المطابقة المحاسبية
+            Transactions::create([
+                'amount' => $deletedAmount,
+                'type' => 'out',
+                'description' => 'حذف دفعة - معاملة معاكسة للسيارة: ' . $car->name . ' - رقم: ' . $car->pin,
+                'wallet_id' => $deletedWalletId,
+                'morphed_id' => $car->id,
+                'morphed_type' => 'App\\Models\\Car',
+                'user_id' => auth()->id(),
+            ]);
+
+            return response()->json(['success' => 'تم حذف الدفعة وتحديث حالة السيارة بنجاح'], 200);
+        });
     }
     
     public function getIndexCar()
