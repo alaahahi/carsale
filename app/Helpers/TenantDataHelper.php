@@ -9,12 +9,33 @@ use App\Models\SystemConfig;
 
 class TenantDataHelper
 {
+    private static function isCacheEnabled(): bool
+    {
+        return (bool) config('tenant-cache.enabled', false);
+    }
+
+    private static function tenantCacheKey(string $baseKey): string
+    {
+        // Try to get current tenant id from stancl/tenancy helper or request merge
+        $tenantId = function_exists('tenant') ? (tenant('id') ?? null) : null;
+        if (!$tenantId && request()) {
+            $tenant = request()->get('current_tenant');
+            $tenantId = $tenant && isset($tenant->id) ? $tenant->id : null;
+        }
+        $tenantSuffix = $tenantId ?: 'central';
+        return $tenantSuffix . '_' . $baseKey;
+    }
+
     /**
      * الحصول على أنواع المستخدمين من قاعدة بيانات الـ tenant
      */
     public static function getUserTypes()
     {
-        return cache()->remember('user_types_tenant', 3600, function () {
+        $key = self::tenantCacheKey('user_types_tenant');
+        if (!self::isCacheEnabled()) {
+            return UserType::pluck('name', 'id');
+        }
+        return cache()->remember($key, 3600, function () {
             return UserType::pluck('name', 'id');
         });
     }
@@ -24,8 +45,10 @@ class TenantDataHelper
      */
     public static function getUserTypeId($name)
     {
-        $cacheKey = "user_type_{$name}";
-        
+        $cacheKey = self::tenantCacheKey("user_type_{$name}");
+        if (!self::isCacheEnabled()) {
+            return UserType::where('name', $name)->first()?->id;
+        }
         return cache()->remember($cacheKey, 3600, function () use ($name) {
             return UserType::where('name', $name)->first()?->id;
         });
@@ -36,7 +59,8 @@ class TenantDataHelper
      */
     public static function getUserTypeIds()
     {
-        return cache()->remember('user_type_ids', 3600, function () {
+        $key = self::tenantCacheKey('user_type_ids');
+        $compute = function () {
             $userType = UserType::select('id', 'name')->get();
             return [
                 'admin' => $userType->where('name', 'admin')->first()?->id,
@@ -44,7 +68,11 @@ class TenantDataHelper
                 'client' => $userType->where('name', 'client')->first()?->id,
                 'account' => $userType->where('name', 'account')->first()?->id,
             ];
-        });
+        };
+        if (!self::isCacheEnabled()) {
+            return $compute();
+        }
+        return cache()->remember($key, 3600, $compute);
     }
 
     /**
@@ -52,7 +80,8 @@ class TenantDataHelper
      */
     public static function getAccountingUsers()
     {
-        return cache()->remember('accounting_users', 3600, function () {
+        $key = self::tenantCacheKey('accounting_users');
+        $compute = function () {
             $userAccount = self::getUserTypeId('account');
             
             if (!$userAccount) {
@@ -74,7 +103,11 @@ class TenantDataHelper
                 'outSupplier' => User::with('wallet')->where('type_id', $userAccount)->where('email', 'supplier-out')->first(),
                 'debtSupplier' => User::with('wallet')->where('type_id', $userAccount)->where('email', 'supplier-debt')->first(),
             ];
-        });
+        };
+        if (!self::isCacheEnabled()) {
+            return $compute();
+        }
+        return cache()->remember($key, 3600, $compute);
     }
 
     /**
@@ -82,7 +115,8 @@ class TenantDataHelper
      */
     public static function getSystemConfig()
     {
-        return cache()->remember('system_config', 3600, function () {
+        $key = self::tenantCacheKey('system_config');
+        $compute = function () {
             $config = SystemConfig::first();
             
             if (!$config) {
@@ -106,7 +140,11 @@ class TenantDataHelper
                 'third_title_ar' => $config->third_title_ar,
                 'third_title_kr' => $config->third_title_kr,
             ];
-        });
+        };
+        if (!self::isCacheEnabled()) {
+            return $compute();
+        }
+        return cache()->remember($key, 3600, $compute);
     }
 
     /**
@@ -114,14 +152,19 @@ class TenantDataHelper
      */
     public static function clearCache()
     {
-        cache()->forget('user_types_tenant');
-        cache()->forget('user_type_ids');
-        cache()->forget('accounting_users');
-        cache()->forget('system_config');
-        cache()->forget('user_type_admin');
-        cache()->forget('user_type_seles');
-        cache()->forget('user_type_client');
-        cache()->forget('user_type_account');
+        $keys = [
+            'user_types_tenant',
+            'user_type_ids',
+            'accounting_users',
+            'system_config',
+            'user_type_admin',
+            'user_type_seles',
+            'user_type_client',
+            'user_type_account',
+        ];
+        foreach ($keys as $k) {
+            cache()->forget(self::tenantCacheKey($k));
+        }
     }
 
     /**

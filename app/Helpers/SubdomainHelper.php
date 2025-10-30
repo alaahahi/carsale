@@ -9,6 +9,10 @@ use App\Models\TenantDatabaseConfig;
 
 class SubdomainHelper
 {
+    private static function isCacheEnabled(): bool
+    {
+        return (bool) config('tenant-cache.enabled', false);
+    }
     /**
      * Cache duration in seconds (1 hour)
      */
@@ -36,9 +40,11 @@ class SubdomainHelper
     public static function getTenantBySubdomain($subdomain)
     {
         $cacheKey = "tenant_subdomain_{$subdomain}";
-        
+        if (!self::isCacheEnabled()) {
+            $domain = Domain::where('domain', 'LIKE', $subdomain . '.%')->with('tenant')->first();
+            return $domain ? $domain->tenant : null;
+        }
         return Cache::store(self::getCacheStore())->remember($cacheKey, self::getCacheDuration(), function () use ($subdomain) {
-            // Find domain that contains this subdomain
             $domain = Domain::where('domain', 'LIKE', $subdomain . '.%')->with('tenant')->first();
             return $domain ? $domain->tenant : null;
         });
@@ -50,7 +56,10 @@ class SubdomainHelper
     public static function getTenantByDomain($domain)
     {
         $cacheKey = "tenant_domain_{$domain}";
-        
+        if (!self::isCacheEnabled()) {
+            $domainModel = Domain::where('domain', $domain)->with('tenant')->first();
+            return $domainModel ? $domainModel->tenant : null;
+        }
         return Cache::store(self::getCacheStore())->remember($cacheKey, self::getCacheDuration(), function () use ($domain) {
             $domainModel = Domain::where('domain', $domain)->with('tenant')->first();
             return $domainModel ? $domainModel->tenant : null;
@@ -130,7 +139,9 @@ class SubdomainHelper
     public static function getAllTenantDomains()
     {
         $cacheKey = 'all_tenant_domains';
-        
+        if (!self::isCacheEnabled()) {
+            return Domain::with('tenant')->get();
+        }
         return Cache::store(self::getCacheStore())->remember($cacheKey, self::getCacheDuration(), function () {
             return Domain::with('tenant')->get();
         });
@@ -156,8 +167,7 @@ class SubdomainHelper
     public static function getTenantAndDatabaseConfigByDomain($host)
     {
         $cacheKey = "tenant_db_config_domain_{$host}";
-        
-        return Cache::store(self::getCacheStore())->remember($cacheKey, self::getCacheDuration(), function () use ($host) {
+        $compute = function () use ($host) {
             // Extract subdomain from host
             $subdomain = self::extractSubdomain($host);
             
@@ -183,7 +193,11 @@ class SubdomainHelper
                 'subdomain' => $subdomain,
                 'host' => $host
             ];
-        });
+        };
+        if (!self::isCacheEnabled()) {
+            return $compute();
+        }
+        return Cache::store(self::getCacheStore())->remember($cacheKey, self::getCacheDuration(), $compute);
     }
     
     /**
@@ -192,8 +206,7 @@ class SubdomainHelper
     public static function getTenantAndDatabaseConfigBySubdomain($subdomain)
     {
         $cacheKey = "tenant_db_config_subdomain_{$subdomain}";
-        
-        return Cache::store(self::getCacheStore())->remember($cacheKey, self::getCacheDuration(), function () use ($subdomain) {
+        $compute = function () use ($subdomain) {
             // Get tenant by subdomain
             $tenant = self::getTenantBySubdomain($subdomain);
             
@@ -211,7 +224,11 @@ class SubdomainHelper
                 'database_config' => $dbConfig,
                 'subdomain' => $subdomain
             ];
-        });
+        };
+        if (!self::isCacheEnabled()) {
+            return $compute();
+        }
+        return Cache::store(self::getCacheStore())->remember($cacheKey, self::getCacheDuration(), $compute);
     }
     
     /**

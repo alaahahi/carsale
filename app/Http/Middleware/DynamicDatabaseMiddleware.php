@@ -34,7 +34,7 @@ class DynamicDatabaseMiddleware
             return $next($request);
         }
         
-        // استخدام نظام الكاش المحسن للحصول على المستأجر وإعدادات قاعدة البيانات
+        // الحصول على بيانات المستأجر وإعدادات قاعدة البيانات (تحترم إعداد تعطيل الكاش)
         $tenantData = SubdomainHelper::getTenantAndDatabaseConfigByDomain($host);
         
         if ($tenantData && $tenantData['tenant'] && $tenantData['database_config']) {

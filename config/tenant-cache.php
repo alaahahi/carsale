@@ -3,6 +3,16 @@
 return [
     /*
     |--------------------------------------------------------------------------
+    | Enable/Disable Tenant Cache
+    |--------------------------------------------------------------------------
+    |
+    | Global switch to enable or disable tenant-specific caching. When disabled,
+    | helper methods should bypass caching to avoid any cross-tenant mixing.
+    |
+    */
+    'enabled' => env('TENANT_CACHE_ENABLED', false),
+    /*
+    |--------------------------------------------------------------------------
     | Tenant Cache Configuration
     |--------------------------------------------------------------------------
     |
