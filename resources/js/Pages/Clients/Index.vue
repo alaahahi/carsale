@@ -29,13 +29,7 @@
                                     <span>طباعة التقرير</span>
                                 </button>
                                 
-                                <button @click="goToExternalMerchant" 
-                                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg flex items-center space-x-2">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                                    </svg>
-                                    <span>معلومات التاجر (المشروع الثاني)</span>
-                                </button>
+                        
                             </div>
                         </div>
 
