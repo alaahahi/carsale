@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Carbon\Carbon;
 use App\Helpers\TenantDataHelper;
+use Illuminate\Support\Facades\Http;
 
 class UserController extends Controller
 {
@@ -642,6 +643,116 @@ class UserController extends Controller
             return Response::json([
                 'success' => false,
                 'message' => 'حدث خطأ أثناء تحديث نسب الربح: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * عرض صفحة معلومات التاجر من المشروع الثاني
+     */
+    public function externalMerchant(Request $request)
+    {
+        $systemConfig = TenantDataHelper::getSystemConfig();
+        $merchantIds = $systemConfig['external_merchant_ids'] ?? [];
+        $selectedMerchantId = $request->get('merchant_id');
+        
+        // إذا كان هناك تاجر محدد في الطلب، استخدمه
+        // وإلا استخدم الأول من القائمة إذا كان موجوداً
+        if ($selectedMerchantId && in_array((int)$selectedMerchantId, $merchantIds)) {
+            $currentMerchantId = (int)$selectedMerchantId;
+        } elseif (!empty($merchantIds)) {
+            $currentMerchantId = $merchantIds[0];
+        } else {
+            $currentMerchantId = null;
+        }
+        
+        return Inertia::render('Clients/ExternalMerchant', [
+            'url' => $this->url,
+            'systemConfig' => $systemConfig,
+            'merchantIds' => $merchantIds,
+            'currentMerchantId' => $currentMerchantId
+        ]);
+    }
+
+    /**
+     * جلب بيانات المبيعات للتاجر من المشروع الثاني
+     */
+    public function getExternalSales(Request $request)
+    {
+        try {
+            $systemConfig = TenantDataHelper::getSystemConfig();
+            $merchantIds = $systemConfig['external_merchant_ids'] ?? [];
+            
+            // الحصول على معرف التاجر من الطلب أو من system_config
+            $clientId = $request->get('id');
+            if (!$clientId && !empty($merchantIds)) {
+                $clientId = $merchantIds[0]; // استخدام الأول كافتراضي
+            }
+            
+            $secondProjectUrl = env('SECOND_PROJECT_URL');
+            $apiKey = env('EXTERNAL_API_KEY');
+
+            if (!$secondProjectUrl || !$apiKey || !$clientId) {
+                return Response::json([
+                    'success' => false,
+                    'message' => 'إعدادات API غير مكتملة. يرجى التحقق من متغيرات البيئة.'
+                ], 400);
+            }
+
+            // جلب بيانات المبيعات
+            $salesResponse = Http::timeout(5)
+                ->withHeaders([
+                    'X-API-Key' => $apiKey
+                ])
+                ->get("{$secondProjectUrl}/api/external/getSales", [
+                    'id' => $clientId
+                ]);
+
+            if (!$salesResponse->successful()) {
+                return Response::json([
+                    'success' => false,
+                    'message' => 'فشل في جلب بيانات المبيعات من المشروع الثاني'
+                ], $salesResponse->status());
+            }
+
+            $salesData = $salesResponse->json();
+
+            // جلب بيانات الدفعات
+            $from = $request->get('from', date('Y-01-01')); // بداية السنة الحالية
+            $to = $request->get('to', date('Y-12-31')); // نهاية السنة الحالية
+
+            $paymentsResponse = Http::timeout(5)
+                ->withHeaders([
+                    'X-API-Key' => $apiKey
+                ])
+                ->get("{$secondProjectUrl}/api/external/getPayments", [
+                    'client_id' => $clientId,
+                    'from' => $from,
+                    'to' => $to
+                ]);
+
+            $paymentsData = $paymentsResponse->successful() ? $paymentsResponse->json() : [
+                'success' => false,
+                'client' => ['id' => $clientId, 'name' => 'غير معروف', 'wallet_balance' => 0],
+                'payments' => [],
+                'summary' => [
+                    'total_payments_dollar' => 0,
+                    'total_payments_dinar' => 0,
+                    'count' => 0
+                ]
+            ];
+
+            return Response::json([
+                'success' => true,
+                'sales' => $salesData,
+                'payments' => $paymentsData
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Error fetching external merchant data: ' . $e->getMessage());
+            return Response::json([
+                'success' => false,
+                'message' => 'حدث خطأ أثناء جلب البيانات: ' . $e->getMessage()
             ], 500);
         }
     }

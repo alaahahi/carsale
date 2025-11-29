@@ -128,7 +128,27 @@ class TenantDataHelper
                     'second_title_kr' => null,
                     'third_title_ar' => null,
                     'third_title_kr' => null,
+                    'external_merchant_ids' => [],
                 ];
+            }
+            
+            // معالجة معرفات التجار الخارجيين (يمكن أن تكون JSON أو نص مفصول بفواصل)
+            $merchantIds = [];
+            if ($config->external_merchant_ids) {
+                // محاولة تحليل كـ JSON أولاً
+                $decoded = json_decode($config->external_merchant_ids, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $merchantIds = $decoded;
+                } else {
+                    // إذا لم يكن JSON، معالجة كـ نص مفصول بفواصل
+                    $merchantIds = array_filter(
+                        array_map('trim', explode(',', $config->external_merchant_ids)),
+                        function($id) {
+                            return !empty($id) && is_numeric($id);
+                        }
+                    );
+                    $merchantIds = array_map('intval', $merchantIds);
+                }
             }
             
             return [
@@ -139,6 +159,7 @@ class TenantDataHelper
                 'second_title_kr' => $config->second_title_kr,
                 'third_title_ar' => $config->third_title_ar,
                 'third_title_kr' => $config->third_title_kr,
+                'external_merchant_ids' => $merchantIds,
             ];
         };
         if (!self::isCacheEnabled()) {

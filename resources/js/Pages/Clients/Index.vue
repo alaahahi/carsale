@@ -28,6 +28,14 @@
                                     </svg>
                                     <span>طباعة التقرير</span>
                                 </button>
+                                
+                                <button @click="goToExternalMerchant" 
+                                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg flex items-center space-x-2">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                                    </svg>
+                                    <span>معلومات التاجر (المشروع الثاني)</span>
+                                </button>
                             </div>
                         </div>
 
@@ -200,7 +208,6 @@
                                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">المدفوع</th>
                                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">المتبقي</th>
                                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">الحالة</th>
-                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">نسبة الربح</th>
                                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">العمليات</th>
                                         </tr>
                                     </thead>
@@ -230,28 +237,19 @@
                                                 </span>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <div v-if="client.show_wallet && client.total_profit_share > 0" class="flex items-center gap-2">
-                                                    <span class="text-green-600 dark:text-green-400 font-bold">
-                                                        ${{ formatNumber(client.total_profit_share) }}
-                                                    </span>
-                                                    <span class="text-xs text-gray-500 dark:text-gray-400">
-                                                        ({{ client.total_profit_percentage?.toFixed(2) || '0.00' }}%)
-                                                    </span>
-                                                </div>
-                                                <span v-else-if="client.show_wallet" class="text-gray-400 dark:text-gray-500 text-xs">
-                                                    لا يوجد ربح
-                                                </span>
-                                                <span v-else class="text-gray-400 dark:text-gray-500 text-xs">
-                                                    غير متاح
-                                                </span>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                 <div class="flex items-center gap-2">
                                                     <button
                                                         v-if="client.email !== 'admin@admin.com' && client.show_wallet"
                                                         @click="goToUserWallet(client.id)"
                                                         class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 px-3 py-1 rounded-md bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/30 transition-colors duration-200">
                                                         قاسة
+                                                    </button>
+                                                    <button
+                                                        v-if="client.email !== 'admin@admin.com' && !client.show_wallet"
+                                                        @click="createWalletForClient(client)"
+                                                        :disabled="creatingWallet"
+                                                        class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 px-3 py-1 rounded-md bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 transition-colors duration-200 disabled:opacity-50">
+                                                        {{ creatingWallet ? 'جاري الإنشاء...' : 'إنشاء قاسة' }}
                                                     </button>
                                                     <button
                                                         v-if="client.email !== 'admin@admin.com' && client.show_wallet && client.total_profit_share > 0"
@@ -637,6 +635,7 @@ const isEditModalVisible = ref(false)
 const isAddModalVisible = ref(false)
 const editLoading = ref(false)
 const addLoading = ref(false)
+const creatingWallet = ref(false)
 
 // Profit edit modal
 const showProfitEdit = ref(false)
@@ -722,6 +721,33 @@ const getClientStatus = (debt) => {
 
 const goToUserWallet = (userId) => {
     window.location.href = `/user-wallet/${userId}`
+}
+
+const createWalletForClient = async (client) => {
+    creatingWallet.value = true
+    
+    try {
+        const response = await axios.post('/api/customer-wallet/create', {
+            customer_id: client.id
+        })
+        
+        if (response.data.success) {
+            toast.success('تم إنشاء القاسة بنجاح')
+            // Reload page after delay to update wallet list
+            setTimeout(() => {
+                window.location.href = window.location.href
+            }, 1000)
+        }
+    } catch (error) {
+        console.error('Error creating wallet:', error)
+        toast.error('حدث خطأ في إنشاء القاسة')
+    } finally {
+        creatingWallet.value = false
+    }
+}
+
+const goToExternalMerchant = () => {
+    window.location.href = '/external-merchant'
 }
 
 const showClientEditModal = (client) => {

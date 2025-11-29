@@ -183,6 +183,7 @@ class DashboardController extends Controller
 
 
         $systemConfig = TenantDataHelper::getSystemConfig();
+        $externalMerchantIds = $systemConfig['external_merchant_ids'] ?? [];
         
         return Inertia::render('Dashboard', [
             'url'=>$this->url,
@@ -194,7 +195,8 @@ class DashboardController extends Controller
             'client'=>$client,
             'carCount'=> $car->count(),
             'working'=> $car->where('client_id',null)->count(),
-            'systemConfig' => $systemConfig
+            'systemConfig' => $systemConfig,
+            'externalMerchantIds' => $externalMerchantIds
         ]);   
 
     }

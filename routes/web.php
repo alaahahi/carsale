@@ -748,6 +748,7 @@ Route::group(['middleware' => ['tenant']], function () {
     Route::get('getIndexClients',[UserController::class, 'getIndexClients'])->name("getIndexClients");
     Route::get('addClients',[UserController::class, 'addClients'])->name('addClients');
     Route::post('clientsStore',[UserController::class, 'clientsStore'])->name('clientsStore');
+    Route::get('external-merchant',[UserController::class, 'externalMerchant'])->name('external.merchant');
 
     
     Route::get('unban/{id}',[UserController::class, 'unban'])->name("unban");

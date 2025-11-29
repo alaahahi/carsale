@@ -11,7 +11,7 @@
         </div>
  
         <!-- Summary Cards - Only show when NOT viewing specific customer -->
-        <div v-if="!customer_id" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div v-if="!customer_id" class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <!-- Total Customer Wallets -->
           <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white">
             <div class="flex items-center justify-between">
@@ -27,13 +27,29 @@
             </div>
           </div>
 
-          <!-- Difference (Capital - Customer Wallets) -->
+          <!-- Capital - Paid Cars -->
+          <div class="bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-lg p-6 text-white">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-semibold mb-1 opacity-90">رأس المال - السيارات المدفوعة</h3>
+                <p class="text-3xl font-bold">${{ Math.round(capital - paidCars).toLocaleString() }}</p>
+                <p class="text-xs mt-1 opacity-75">${{ Math.round(capital).toLocaleString() }} - ${{ Math.round(paidCars).toLocaleString() }}</p>
+              </div>
+              <div class="w-14 h-14 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Difference (Capital - Customer Wallets - Paid Cars) -->
           <div class="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-6 text-white">
             <div class="flex items-center justify-between">
               <div>
-                <h3 class="text-sm font-semibold mb-1 opacity-90">الفرق (رأس المال - القاسات)</h3>
-                <p class="text-3xl font-bold" :class="(capital - totalCustomerWallets) >= 0 ? '' : 'text-red-200'">${{ Math.round(capital - totalCustomerWallets).toLocaleString() }}</p>
-                <p class="text-xs mt-1 opacity-75">${{ Math.round(capital).toLocaleString() }} - ${{ Math.round(totalCustomerWallets).toLocaleString() }}</p>
+                <h3 class="text-sm font-semibold mb-1 opacity-90">الفرق (رأس المال - القاسات - سيارات مدفوعة)</h3>
+                <p class="text-3xl font-bold" :class="getDifferenceColor()">${{ Math.round(getDifference()).toLocaleString() }}</p>
+                <p class="text-xs mt-1 opacity-75">${{ Math.round(capital).toLocaleString() }} - ${{ Math.round(totalCustomerWallets).toLocaleString() }} - ${{ Math.round(paidCars).toLocaleString() }}</p>
               </div>
               <div class="w-14 h-14 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -351,7 +367,8 @@ const props = defineProps({
   capital: Number,
   totalCarsPrice: Number,
   totalExpenses: Number,
-  allCustomers: Array
+  allCustomers: Array,
+  paidCars: Number
 })
 
 // Reactive data
@@ -544,6 +561,17 @@ const getRunningBalanceForViewing = (index) => {
     }
   }
   return balance
+}
+
+// Calculate Difference (Capital - Customer Wallets - Paid Cars)
+const getDifference = () => {
+  return props.capital - props.totalCustomerWallets - (props.paidCars || 0)
+}
+
+// Get color for difference
+const getDifferenceColor = () => {
+  const diff = getDifference()
+  return diff >= 0 ? '' : 'text-red-200'
 }
 </script>
 

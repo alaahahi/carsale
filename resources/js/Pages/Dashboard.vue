@@ -222,19 +222,19 @@ function openAddCar(form={}) {
     form.source = ''
   }
   if(!form.dubai_exp){
-    form.dubai_exp = 0
+    form.dubai_exp = null
   }
   if(!form.dubai_shipping){
-    form.dubai_shipping = 0
+    form.dubai_shipping = null
   }
   if(!form.erbil_exp){
-    form.erbil_exp = 0
+    form.erbil_exp = null
   }
   if(!form.erbil_shipping){
-    form.erbil_shipping = 0
+    form.erbil_shipping = null
   }
   if(!form.purchase_price){
-    form.purchase_price = 0
+    form.purchase_price = null
   }
     formData.value=form
     showModalCar.value = true;
@@ -519,9 +519,19 @@ const props =  defineProps({
     outSupplier:Object,
     debtSupplier:Object,
     systemConfig:Object,
+    externalMerchantIds:Array,
 });
 function confirmCar(V) {
-  axios.post('/api/addCar',V)
+  // تحويل null و undefined إلى 0 للحقول الرقمية
+  const numericFields = ['purchase_price', 'dubai_exp', 'dubai_shipping', 'erbil_exp', 'erbil_shipping'];
+  const dataToSend = { ...V };
+  numericFields.forEach(field => {
+    if (dataToSend[field] === null || dataToSend[field] === '' || dataToSend[field] === undefined) {
+      dataToSend[field] = 0;
+    }
+  });
+  
+  axios.post('/api/addCar', dataToSend)
   .then(response => {
     showModalCar.value = false;
       window.location.reload();
@@ -1113,6 +1123,22 @@ getResultsCar();
                             style="min-width:150px;"
                             className="px-6 mb-12 mx-2 text-center py-2 font-bold text-white bg-red-700 rounded">
                             {{ $t('clients') }}  
+                          </a>
+                        </div>
+                        <!-- External Merchant Buttons -->
+                        <div v-if="externalMerchantIds && externalMerchantIds.length > 0" class="flex flex-wrap gap-2 mb-4">
+                          <a
+                            v-for="merchantId in externalMerchantIds"
+                            :key="merchantId"
+                            :href="`/external-merchant?merchant_id=${merchantId}`"
+                            style="min-width:150px;"
+                            className="px-6 mb-12 mx-2 text-center py-2 font-bold text-white bg-purple-600 hover:bg-purple-700 rounded transition-colors duration-200">
+                            <div class="flex items-center justify-center gap-2">
+                              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                              </svg>
+                              <span>التاجر #{{ merchantId }}</span>
+                            </div>
                           </a>
                         </div>
                       </div>

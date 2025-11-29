@@ -125,6 +125,9 @@ class SimpleCashController extends Controller
         $totalExpenses = Expenses::sum('amount') ?? 0;
         $capital = $totalCarsPrice + $totalExpenses;
         
+        // حساب السيارات المدفوعة (السيارات المباعة فقط)
+        $paidCars = Car::where('results', '!=', 0)->sum('paid_amount_pay') ?? 0;
+        
         return Inertia::render('SimpleCash', [
             'url' => $this->url,
             'cashboxBalance' => $cashboxBalance,
@@ -136,7 +139,8 @@ class SimpleCashController extends Controller
             'totalCustomerWallets' => $totalCustomerWallets,
             'capital' => $capital,
             'totalCarsPrice' => $totalCarsPrice,
-            'totalExpenses' => $totalExpenses
+            'totalExpenses' => $totalExpenses,
+            'paidCars' => $paidCars
         ]);
     }
 }

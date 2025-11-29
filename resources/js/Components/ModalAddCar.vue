@@ -7,6 +7,9 @@ const props = defineProps({
   formData: Object,
   user: Array,
 });
+
+const emit = defineEmits(['a', 'close']);
+
 function VinApi (v){
   props.formData.car_type=''
     props.formData.year=''
@@ -24,6 +27,52 @@ let showDubaiShipping = ref(false)
 let showDubaiExp = ref(false)
 let showErbilShipping = ref(false)
 let showErbilExp = ref(false)
+
+// دالة لتنسيق المدخل الرقمي للعرض (إزالة .00 للأعداد الصحيحة)
+function formatNumericInput(value) {
+  if (value === null || value === undefined || value === '') {
+    return '';
+  }
+  const num = parseFloat(value);
+  if (isNaN(num)) {
+    return '';
+  }
+  // إذا كان عدد صحيح، عرضه بدون أرقام عشرية
+  if (num % 1 === 0) {
+    return num.toString();
+  }
+  // إذا كان عشري، عرضه كما هو
+  return num.toString();
+}
+
+// دالة لتحليل المدخل الرقمي
+function parseNumericInput(value) {
+  if (value === '' || value === null || value === undefined) {
+    return null;
+  }
+  // إزالة المسافات
+  const cleaned = value.trim();
+  if (cleaned === '') {
+    return null;
+  }
+  const num = parseFloat(cleaned);
+  if (isNaN(num)) {
+    return null;
+  }
+  return num;
+}
+
+// دالة لإرسال البيانات مع تحويل null إلى 0
+function submitForm() {
+  const numericFields = ['purchase_price', 'dubai_exp', 'dubai_shipping', 'erbil_exp', 'erbil_shipping'];
+  const dataToSend = { ...props.formData };
+  numericFields.forEach(field => {
+    if (dataToSend[field] === null || dataToSend[field] === '' || dataToSend[field] === undefined) {
+      dataToSend[field] = 0;
+    }
+  });
+  emit('a', dataToSend);
+}
 
 </script>
   <template>
@@ -112,9 +161,11 @@ let showErbilExp = ref(false)
                 }}</label>
                 <input
                   id="purchase_price"
-                  type="number"
+                  type="text"
+                  inputmode="decimal"
                   class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
-                  v-model="formData.purchase_price"
+                  :value="formatNumericInput(formData.purchase_price)"
+                  @input="formData.purchase_price = parseNumericInput($event.target.value)"
                 />
               </div>
 
@@ -151,9 +202,11 @@ let showErbilExp = ref(false)
                 <input
                   @focus="showDubaiShipping = false; showDubaiExp = true;showErbilShipping = false; showErbilExp = false;"
                   id="dubai_exp"
-                  type="number"
+                  type="text"
+                  inputmode="decimal"
                   class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
-                  v-model="formData.dubai_exp"
+                  :value="formatNumericInput(formData.dubai_exp)"
+                  @input="formData.dubai_exp = parseNumericInput($event.target.value)"
                 />
               </div>
               <div className="mb-4 mx-5" >
@@ -163,9 +216,11 @@ let showErbilExp = ref(false)
                 <input
                   @focus="showDubaiShipping = true; showDubaiExp = false;showErbilShipping = false; showErbilExp = false;"
                   id="dubai_shipping"
-                  type="number"
+                  type="text"
+                  inputmode="decimal"
                   class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
-                  v-model="formData.dubai_shipping"
+                  :value="formatNumericInput(formData.dubai_shipping)"
+                  @input="formData.dubai_shipping = parseNumericInput($event.target.value)"
                 />
               </div>
               <div className="mb-4 mx-5" >
@@ -175,9 +230,11 @@ let showErbilExp = ref(false)
                 <input
                   @focus="showDubaiShipping = false; showDubaiExp = false;showErbilShipping = false; showErbilExp = true;"
                   id="erbil_exp"
-                  type="number"
+                  type="text"
+                  inputmode="decimal"
                   class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
-                  v-model="formData.erbil_exp"
+                  :value="formatNumericInput(formData.erbil_exp)"
+                  @input="formData.erbil_exp = parseNumericInput($event.target.value)"
                 />
               </div>
               <div className="mb-4 mx-5" >
@@ -187,9 +244,11 @@ let showErbilExp = ref(false)
                 <input
                   @focus="showDubaiShipping = false; showDubaiExp = false;showErbilShipping = true; showErbilExp = false;"
                   id="erbil_shipping"
-                  type="number"
+                  type="text"
+                  inputmode="decimal"
                   class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-900"
-                  v-model="formData.erbil_shipping"
+                  :value="formatNumericInput(formData.erbil_shipping)"
+                  @input="formData.erbil_shipping = parseNumericInput($event.target.value)"
                 />
               </div>
               <div className="mb-4 mx-5" v-if="showDubaiExp">
@@ -255,10 +314,7 @@ let showErbilExp = ref(false)
               <div class="basis-1/2 px-4">
                 <button
                   class="modal-default-button py-3 bg-rose-500 rounded col-6"
-                  @click="
-                    $emit('a', formData);
-                    formData = '';
-                  "
+                  @click="submitForm()"
                   :disabled="!(formData.name)"
                 >
                   {{ $t("yes") }}
@@ -293,6 +349,8 @@ let showErbilExp = ref(false)
 .modal-container {
   width: 50%;
   min-width: 350px;
+  max-width: 90%;
+  max-height: 90vh;
   margin: 0px auto;
   padding: 20px 30px;
   padding-bottom: 60px;
@@ -301,6 +359,9 @@ let showErbilExp = ref(false)
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.33);
   transition: all 0.3s ease;
   border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .modal-header h3 {
@@ -310,6 +371,29 @@ let showErbilExp = ref(false)
 
 .modal-body {
   margin: 20px 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  max-height: calc(90vh - 150px);
+  padding-right: 10px;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 
 .modal-default-button {
