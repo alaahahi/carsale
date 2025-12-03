@@ -570,6 +570,15 @@ class DashboardController extends Controller
                 'initial_balance' => $pay_price - $paid_amount_pay
             ]);
         }else{
+            // التحقق من وجود الزبون قبل التحديث
+            $client = User::find($client_id);
+            if (!$client) {
+                return Response::json([
+                    'error' => 'الزبون غير موجود في قاعدة البيانات',
+                    'client_id' => $client_id
+                ], 404);
+            }
+            
             // تحديث محفظة الزبون الموجود
             $wallet = Wallet::where('user_id',$client_id)->first();
             if($wallet) {
@@ -578,7 +587,7 @@ class DashboardController extends Controller
         }
 
         $car=Car::find($request->id);
-        if($car->id){
+        if($car && $car->id){
                 // تحديد حالة السيارة بناءً على المبلغ المدفوع
                 $carResults = 1; // افتراضياً مدفوعة جزئياً
                 if ($pay_price > 0 && $paid_amount_pay >= $pay_price) {
@@ -587,14 +596,31 @@ class DashboardController extends Controller
                     $carResults = 0; // غير مدفوعة
                 }
                 
-                $car->update([
-                'note_pay' =>$request->note_pay,
-                'client_id'=> $client_id ,
-                'pay_data'=> Carbon::now()->format('Y-m-d'),
-                'pay_price'=>$pay_price,
-                'paid_amount_pay' =>  $paid_amount_pay,
-                'results'=> $carResults
-                 ]);
+                try {
+                    $car->update([
+                    'note_pay' =>$request->note_pay,
+                    'client_id'=> $client_id ,
+                    'pay_data'=> Carbon::now()->format('Y-m-d'),
+                    'pay_price'=>$pay_price,
+                    'paid_amount_pay' =>  $paid_amount_pay,
+                    'results'=> $carResults
+                     ]);
+                } catch (\Illuminate\Database\QueryException $e) {
+                    // في حالة فشل القيد الخارجي
+                    if ($e->getCode() == '23000') {
+                        \Log::error('Foreign key constraint violation', [
+                            'car_id' => $car->id,
+                            'client_id' => $client_id,
+                            'error' => $e->getMessage()
+                        ]);
+                        return Response::json([
+                            'error' => 'خطأ في القيد الخارجي: يرجى التحقق من وجود العميل في قاعدة البيانات أو تشغيل migration لإصلاح القيد الخارجي',
+                            'client_id' => $client_id,
+                            'details' => 'قد يكون القيد الخارجي يشير إلى جدول خاطئ. راجع ملف database/README_FIX_FOREIGN_KEY.md'
+                        ], 500);
+                    }
+                    throw $e;
+                }
                 
                 // تحديث السيارة للتأكد من الحصول على البيانات المحدثة
                 $car->refresh();
