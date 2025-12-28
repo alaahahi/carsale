@@ -359,16 +359,26 @@ class DashboardController extends Controller
             $car->refresh(); // تحديث البيانات من قاعدة البيانات
             $totalCost = $car->purchase_price + $car->erbil_exp + $car->erbil_shipping + $car->dubai_exp + $car->dubai_shipping;
             
-            // إذا كانت السيارة مبيعة (results = 2) وتغيرت التكلفة الإجمالية
-            if ($car->results == 2 && $car->pay_price) {
-                // إعادة حساب حالة السيارة حسب المبلغ المدفوع
-                if ($car->paid_amount_pay >= $totalCost) {
-                    $car->results = 2; // مدفوعة بالكامل
-                } else if ($car->paid_amount_pay > 0) {
-                    $car->results = 1; // مدفوعة جزئياً
-                } else {
-                    $car->results = 0; // غير مبيعة
+            // التحقق من حالة الدفع: إذا كانت السيارة مدفوعة بالكامل والمتبقي 0
+            if ($car->pay_price > 0 && $car->paid_amount_pay >= $car->pay_price) {
+                $remaining = $car->pay_price - $car->paid_amount_pay;
+                
+                // إذا كانت مدفوعة بالكامل والمتبقي 0، تحديث results إلى 2 (أخضر)
+                if ($remaining == 0) {
+                    $car->results = 2; // مدفوعة بالكامل - أخضر
+                    $car->save();
                 }
+            } else if ($car->pay_price > 0 && $car->paid_amount_pay > 0) {
+                // إذا كان هناك دفع جزئي
+                $car->results = 1; // مدفوعة جزئياً - أحمر
+                $car->save();
+            } else if ($car->pay_price > 0 && $car->paid_amount_pay == 0) {
+                // إذا كان هناك سعر بيع لكن لم يتم الدفع بعد
+                $car->results = 1; // مدفوعة جزئياً - أحمر
+                $car->save();
+            } else if (!$car->pay_price || $car->pay_price == 0) {
+                // إذا لم يكن هناك سعر بيع، السيارة في المخزن
+                $car->results = 0; // غير مبيعة - رمادي
                 $car->save();
             }
         }

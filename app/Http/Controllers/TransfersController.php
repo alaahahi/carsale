@@ -521,7 +521,12 @@ class TransfersController extends Controller
     {
         $maxNo = Car::max('no');
         $no = $maxNo + 1;
-        $car=Car::updateOrCreate(['id' => $_GET['id']],[
+        
+        // جلب بيانات السيارة الحالية للتحقق من حالة الدفع
+        $carId = $_GET['id'];
+        $existingCar = $carId ? Car::find($carId) : null;
+        
+        $car=Car::updateOrCreate(['id' => $carId],[
             'company_id' =>$_GET['company_id'],
             'name_id'=> $_GET['name_id'],
             'model_id'=> $_GET['model_id'],
@@ -534,6 +539,21 @@ class TransfersController extends Controller
             'user_id'=> auth()->user()->id,
             'no'=>$no
              ]);
+        
+        // التحقق من حالة الدفع: إذا كانت السيارة مدفوعة بالكامل والمتبقي 0
+        if ($car && $car->id) {
+            $car->refresh(); // تحديث بيانات السيارة من قاعدة البيانات
+            
+            // التحقق من بيانات البيع (pay_price و paid_amount_pay)
+            if ($car->pay_price > 0 && $car->paid_amount_pay >= $car->pay_price) {
+                $remaining = $car->pay_price - $car->paid_amount_pay;
+                
+                // إذا كانت مدفوعة بالكامل والمتبقي 0، تحديث results إلى 2
+                if ($remaining == 0) {
+                    $car->update(['results' => 2]);
+                }
+            }
+        }
         
             return Response::json('ok', 200);    
     }
