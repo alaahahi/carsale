@@ -22,7 +22,9 @@ watch(
 // Fetch car history from the API
 const fetchCarHistory = async (carId) => {
   try {
-    const response = await axios.get(`/api/car/${carId}/history`);
+    const response = await axios.get(`/api/car/${carId}/history`, {
+      params: { field: 'paid_amount_pay' },
+    });
     carHistory.value = response.data; // Assuming API returns an array of history
   } catch (error) {
     console.error("Error fetching car history:", error);

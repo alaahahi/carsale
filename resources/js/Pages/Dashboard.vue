@@ -730,7 +730,7 @@ function confirmAddPayment(V) {
     .then(data => {
       if (data.success) {
         toast.success(data.message);
-        showModalFromBox.value = false;
+        showModalCarHistory.value = false;
         window.location.reload();
       } else {
         toast.error(t('err_unknown') + ': ' + (data.error || ''));

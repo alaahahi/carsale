@@ -671,7 +671,18 @@ class DashboardController extends Controller
         $expens_amount=$_GET['expens_amount']??0;
         $note=$_GET['note']??'';
         
-        $expensesType =ExpensesType::find($expenses_id);
+        $expensesType = ExpensesType::find($expenses_id);
+        if (!$expensesType) {
+            return Response::json(['error' => 'نوع المصروف غير صالح'], 422);
+        }
+
+        // دفعات المورد تُسجّل فقط من صفحة مشتريات الموردين
+        if ($this->isSupplierPurchasePaymentType($expensesType)) {
+            return Response::json([
+                'error' => 'دفعات المورد تُسجّل من صفحة مشتريات الموردين فقط',
+            ], 422);
+        }
+
         $car = Car::with('company')->with('name')->find($car_id);
         switch ($expensesType->id) {
             case 1:
@@ -704,23 +715,6 @@ class DashboardController extends Controller
                 if ($this->outAccount) {
                     $this->accountingController->increaseWallet($expens_amount, $desc,$this->outAccount->id,$car_id,'App\Models\Car',$user_id);
                 }
-                break;
-
-            case 5:
-                if(($car->purchase_price - $car->paid_amount) ==0){
-                    return Response::json('error', 500);       
-                }
-                else{
-            
-                    $car->increment('paid_amount',$expens_amount);
-                    $desc=trans('text.expensesExpPay').$expens_amount.'$'.$car->company?->name.' '.$car->name?->name;
-                    if ($this->outAccount) {
-                    $this->accountingController->increaseWallet($expens_amount, $desc,$this->outAccount->id,$car_id,'App\Models\Car',$user_id);
-                }
-          
-
-                }
-
                 break;
 
             default:
@@ -1642,7 +1636,16 @@ class DashboardController extends Controller
         if($pay_price){
             $car->update(['pay_price'=>$pay_price]);
         }
+        $oldPaidPay = (float) ($car->paid_amount_pay ?? 0);
         $car->increment('paid_amount_pay',$amount);
+        $this->logCarFieldHistory(
+            (int) $car->id,
+            'paid_amount_pay',
+            $oldPaidPay,
+            $oldPaidPay + (float) $amount,
+            now(),
+            $note ? ('دفعة زبون: ' . $note) : 'دفعة زبون'
+        );
         
         $wallet = Wallet::where('user_id',$car->client_id)->first();
         $desc=trans('text.addPayment').' '.$amount.'$' .(($note)?' البيان : '.$note:'');
@@ -1809,13 +1812,23 @@ class DashboardController extends Controller
         
     }
 
-    public function getCarHistory($carId)
+    public function getCarHistory(Request $request, $carId)
     {
         try {
-            $history = CarFieldHistory::where('car_id', $carId)->get();
+            $q = CarFieldHistory::where('car_id', $carId);
+
+            // paid_amount_pay = دفعات الزبون (الداشبورد)
+            // paid_amount = دفعات المورد (صفحة المورد)
+            if ($request->filled('field')) {
+                $q->where('field', $request->get('field'));
+            } else {
+                $q->where('field', 'paid_amount_pay');
+            }
+
+            $history = $q->orderByDesc('created_at')->orderByDesc('id')->get();
 
             if ($history->isEmpty()) {
-                return response()->json(['message' => 'No history found for this car.'], 404);
+                return response()->json([], 200);
             }
 
             return response()->json($history, 200);
@@ -1860,6 +1873,41 @@ class DashboardController extends Controller
         }
     }
 
+
+    private function isSupplierPurchasePaymentType(?ExpensesType $type): bool
+    {
+        if (!$type) {
+            return false;
+        }
+
+        return in_array($type->name_ar, ['دفعة شراء', 'دفعة للمورد'], true)
+            || in_array($type->name_en, ['Purchase Payment', 'Supplier Payment'], true);
+    }
+
+    private function logCarFieldHistory(
+        int $carId,
+        string $field,
+        $oldValue,
+        $newValue,
+        $createdAt,
+        ?string $description = null
+    ): void {
+        $row = [
+            'car_id' => $carId,
+            'field' => $field,
+            'old_value' => $oldValue,
+            'new_value' => $newValue,
+            'user_id' => auth()->id() ?: null,
+            'created_at' => $createdAt,
+            'updated_at' => now(),
+        ];
+
+        if ($description !== null && Schema::hasColumn('car_field_histories', 'description')) {
+            $row['description'] = $description;
+        }
+
+        DB::table('car_field_histories')->insert($row);
+    }
 
     
 }

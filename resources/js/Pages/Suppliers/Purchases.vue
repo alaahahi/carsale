@@ -193,6 +193,7 @@
                                                     <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">{{ $t('purchase_price') }}</th>
                                                     <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">{{ $t('paid_col') }}</th>
                                                     <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">{{ $t('remaining_col') }}</th>
+                                                    <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">{{ $t('actions') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
@@ -207,9 +208,21 @@
                                                         :class="(Number(c.purchase_price || 0) - Number(c.paid_amount || 0)) > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'">
                                                         ${{ formatNumber((Number(c.purchase_price || 0) - Number(c.paid_amount || 0))) }}
                                                     </td>
+                                                    <td class="px-3 py-2 whitespace-nowrap">
+                                                        <button type="button"
+                                                                class="text-xs text-blue-600 dark:text-blue-400 hover:underline mr-2"
+                                                                @click="viewCarPayments(c)">
+                                                            {{ $t('payments_tab') }}
+                                                        </button>
+                                                        <button type="button"
+                                                                class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                                                                @click="openCarPaymentHistory(c)">
+                                                            {{ $t('payment_history') }}
+                                                        </button>
+                                                    </td>
                                                 </tr>
                                                 <tr v-if="(supplierDetails.cars?.data || []).length === 0">
-                                                    <td class="px-3 py-6 text-center text-gray-500 dark:text-gray-400" colspan="7">{{ $t('no_cars') }}</td>
+                                                    <td class="px-3 py-6 text-center text-gray-500 dark:text-gray-400" colspan="8">{{ $t('no_cars') }}</td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -222,6 +235,10 @@
                                                 <span v-if="supplierPaymentsSummary">
                                                     {{ $t('payments_total') }}: ${{ formatNumber(supplierPaymentsSummary.total || 0) }}
                                                     — {{ $t('count_col') }}: {{ supplierPaymentsSummary.count || 0 }}
+                                                </span>
+                                                <span v-if="paymentCarFilter" class="ml-2 text-blue-600 dark:text-blue-400">
+                                                    ({{ $t('filtered_by_car') }})
+                                                    <button type="button" class="underline ml-1" @click="clearPaymentCarFilter">{{ $t('show_all') }}</button>
                                                 </span>
                                             </div>
                                         </div>
@@ -460,6 +477,38 @@
                             </div>
                         </div>
 
+                        <!-- Car supplier payment history (read-only) -->
+                        <div v-if="showCarPaymentHistory" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                            <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white dark:bg-gray-900 dark:border-gray-800">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ $t('supplier_payment_history') }} — {{ carPaymentHistoryTitle }}</h3>
+                                    <button @click="showCarPaymentHistory = false" class="text-gray-400 hover:text-gray-600">✕</button>
+                                </div>
+                                <div v-if="loadingCarHistory" class="p-4 text-center text-gray-500">{{ $t('loading') }}</div>
+                                <div v-else class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-sm">
+                                        <thead class="bg-gray-50 dark:bg-gray-800">
+                                            <tr>
+                                                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">{{ $t('date') }}</th>
+                                                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">{{ $t('description') }}</th>
+                                                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">{{ $t('amount') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
+                                            <tr v-for="h in carPaymentHistory" :key="h.id">
+                                                <td class="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-gray-200">{{ (h.created_at || '').slice(0, 10) }}</td>
+                                                <td class="px-3 py-2 text-gray-700 dark:text-gray-200">{{ h.description || $t('paid_amount') }}</td>
+                                                <td class="px-3 py-2 whitespace-nowrap text-gray-900 dark:text-white">${{ formatNumber((Number(h.new_value || 0) - Number(h.old_value || 0))) }}</td>
+                                            </tr>
+                                            <tr v-if="carPaymentHistory.length === 0">
+                                                <td colspan="3" class="px-3 py-6 text-center text-gray-500 dark:text-gray-400">{{ $t('no_payments') }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Global aggregate -->
                         <div class="mt-8 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
                             <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
@@ -531,6 +580,11 @@ const activeTab = ref('cars')
 const globalAggregate = ref([])
 const supplierPayments = ref([])
 const supplierPaymentsSummary = ref(null)
+const paymentCarFilter = ref(null)
+const showCarPaymentHistory = ref(false)
+const carPaymentHistory = ref([])
+const carPaymentHistoryTitle = ref('')
+const loadingCarHistory = ref(false)
 
 const showAddPayment = ref(false)
 const paymentForm = ref({
@@ -619,11 +673,41 @@ const loadPayments = async () => {
     if (!selectedSupplierId.value) return
     loadingPayments.value = true
     try {
-        const res = await axios.get(`/suppliers/${selectedSupplierId.value}/payments`)
+        const params = {}
+        if (paymentCarFilter.value) {
+            params.car_id = paymentCarFilter.value
+        }
+        const res = await axios.get(`/suppliers/${selectedSupplierId.value}/payments`, { params })
         supplierPayments.value = res.data.payments?.data || []
         supplierPaymentsSummary.value = res.data.summary || null
     } finally {
         loadingPayments.value = false
+    }
+}
+
+const viewCarPayments = async (car) => {
+    paymentCarFilter.value = car?.id || null
+    activeTab.value = 'payments'
+    await loadPayments()
+}
+
+const clearPaymentCarFilter = async () => {
+    paymentCarFilter.value = null
+    await loadPayments()
+}
+
+const openCarPaymentHistory = async (car) => {
+    if (!car?.id) return
+    showCarPaymentHistory.value = true
+    carPaymentHistoryTitle.value = `#${car.no || ''} ${car.pin || ''} ${car.name || ''}`.trim()
+    loadingCarHistory.value = true
+    try {
+        const res = await axios.get(`/api/car/${car.id}/history`, { params: { field: 'paid_amount' } })
+        carPaymentHistory.value = Array.isArray(res.data) ? res.data : []
+    } catch {
+        carPaymentHistory.value = []
+    } finally {
+        loadingCarHistory.value = false
     }
 }
 

@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Schema;
 
 class SupplierPaymentsController extends Controller
 {
@@ -65,12 +66,18 @@ class SupplierPaymentsController extends Controller
         if ($from && $to) {
             $q->whereBetween('paid_at', [$from, $to]);
         }
+        if ($request->filled('car_id')) {
+            $q->where('car_id', (int) $request->get('car_id'));
+        }
 
         $payments = $q->paginate(100);
 
         $sumQ = SupplierPayment::where('supplier_id', $supplierId);
         if ($from && $to) {
             $sumQ->whereBetween('paid_at', [$from, $to]);
+        }
+        if ($request->filled('car_id')) {
+            $sumQ->where('car_id', (int) $request->get('car_id'));
         }
 
         return Response::json([
@@ -185,6 +192,7 @@ class SupplierPaymentsController extends Controller
                 if ($carDue <= 0) continue;
 
                 $pay = min($remaining, $carDue);
+                $carPaidBefore = $carPaid;
 
                 // paid_amount قد يكون NULL في بعض قواعد البيانات القديمة
                 // لذلك نستخدم COALESCE لضمان التحديث بشكل صحيح.
@@ -200,6 +208,15 @@ class SupplierPaymentsController extends Controller
                     'note' => $note,
                     'created_by' => auth()->id() ?: null,
                 ]);
+
+                $this->logSupplierPaymentHistory(
+                    (int) $car->id,
+                    $carPaidBefore,
+                    $carPaidBefore + $pay,
+                    $paidAt,
+                    $note,
+                    $supplier->name
+                );
 
                 $allocations[] = [
                     'supplier_payment_id' => $payment->id,
@@ -291,6 +308,8 @@ class SupplierPaymentsController extends Controller
 
             // إعادة ضبط paid_amount للسيارة من واقع دفعات المورد المتبقية
             if ($carId) {
+                $oldPaid = (float) (Car::where('id', $carId)->value('paid_amount') ?? 0);
+
                 $totalPaidForCar = (float) (SupplierPayment::where('supplier_id', $supplierId)
                     ->where('car_id', $carId)
                     ->sum('amount') ?? 0);
@@ -298,6 +317,15 @@ class SupplierPaymentsController extends Controller
                 Car::where('id', $carId)->update([
                     'paid_amount' => $totalPaidForCar,
                 ]);
+
+                $this->logSupplierPaymentHistory(
+                    $carId,
+                    $oldPaid,
+                    $totalPaidForCar,
+                    now(),
+                    'حذف دفعة للمورد',
+                    $supplier?->name
+                );
             }
 
             // معاملة محاسبية معاكسة: إعادة المبلغ إلى حساب الخرج (إن وُجد)
@@ -334,6 +362,39 @@ class SupplierPaymentsController extends Controller
                 'message' => 'تم حذف الدفعة بنجاح',
             ], 200);
         });
+    }
+
+    private function logSupplierPaymentHistory(
+        int $carId,
+        float $oldValue,
+        float $newValue,
+        $paidAt,
+        ?string $note,
+        ?string $supplierName = null
+    ): void {
+        $desc = 'دفعة للمورد';
+        if ($supplierName) {
+            $desc .= ': ' . $supplierName;
+        }
+        if ($note) {
+            $desc .= ' — ' . $note;
+        }
+
+        $row = [
+            'car_id' => $carId,
+            'field' => 'paid_amount',
+            'old_value' => $oldValue,
+            'new_value' => $newValue,
+            'user_id' => auth()->id() ?: null,
+            'created_at' => $paidAt,
+            'updated_at' => now(),
+        ];
+
+        if (Schema::hasColumn('car_field_histories', 'description')) {
+            $row['description'] = $desc;
+        }
+
+        DB::table('car_field_histories')->insert($row);
     }
 }
 

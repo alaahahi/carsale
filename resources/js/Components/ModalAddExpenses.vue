@@ -14,6 +14,13 @@ const props = defineProps({
 });
 let showClient =  ref(false);
 
+const carExpenseTypes = computed(() => {
+  return (props.expenses || []).filter((e) => {
+    const ar = (e?.name_ar || '').trim();
+    const en = (e?.name_en || '').trim();
+    return ar !== 'دفعة شراء' && ar !== 'دفعة للمورد' && en !== 'Purchase Payment' && en !== 'Supplier Payment';
+  });
+});
 </script>
   <template>
     <Transition name="modal">
@@ -117,7 +124,7 @@ let showClient =  ref(false);
                             id="expenses_id"
                             class="pr-8 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-black dark:focus:ring-blue-500 dark:focus:border-blue-500">
                             <option selected disabled>{{ $t('select_reason') }}</option>
-                            <template v-for="(card, index) in expenses" :key="index"  >
+                            <template v-for="(card, index) in carExpenseTypes" :key="index"  >
                               <option   :value="card.id">{{ card.name_ar }}</option>
                             </template>
                           </select>
