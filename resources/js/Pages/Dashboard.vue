@@ -29,7 +29,54 @@ import { ref, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const toast = useToast();
-const { t } = useI18n();
+const { t, locale } = useI18n();
+
+const printDateLocale = () => {
+  const map = { ar: 'ar-IQ', kr: 'ku', en: 'en-US' };
+  return map[locale.value] || 'ar-IQ';
+};
+
+const printDir = () => (locale.value === 'ar' || locale.value === 'kr') ? 'rtl' : 'ltr';
+
+const formatPrintDate = (date = new Date()) => {
+  try {
+    return new Date(date).toLocaleDateString(printDateLocale());
+  } catch {
+    return new Date(date).toLocaleDateString('en-US');
+  }
+};
+
+const carStatusLabel = (results) => {
+  if (Number(results) === 0) return t('in_stock');
+  if (Number(results) === 1) return t('sold_incomplete');
+  if (Number(results) === 2) return t('sold_complete');
+  return t('not_available');
+};
+
+const openPrintWindow = (title, bodyHtml) => {
+  const dir = printDir();
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <html dir="${dir}" lang="${locale.value}">
+      <head>
+        <meta charset="utf-8" />
+        <title>${title}</title>
+        <style>
+          body { font-family: Arial, sans-serif; }
+          @media print {
+            body { margin: 0; }
+            @page { margin: 1cm; }
+          }
+        </style>
+      </head>
+      <body>
+        ${bodyHtml}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.print();
+};
 
 onMounted(() => {
   const table = document.querySelector('.table-container');
@@ -206,42 +253,22 @@ function deletePayment(paymentId) {
 }
 
 function printPaymentReceipt(payment) {
-  // إنشاء محتوى الوصل
   const receiptContent = `
-    <div style="text-align: center; font-family: Arial, sans-serif; padding: 20px;">
+    <div style="text-align: center; padding: 20px;">
       <h2>${t('payment_receipt_title')}</h2>
       <hr>
       <p><strong>${t('car_number_label')}:</strong> ${selectedCar.value?.pin}</p>
       <p><strong>${t('car_name_label')}:</strong> ${selectedCar.value?.name}</p>
       <p><strong>${t('amount_label')}:</strong> ${Number(payment.amount).toLocaleString()} $</p>
       <p><strong>${t('description')}:</strong> ${payment.description}</p>
-      <p><strong>${t('date_label')}:</strong> ${new Date(payment.created_at).toLocaleDateString('en-US')}</p>
+      <p><strong>${t('date_label')}:</strong> ${formatPrintDate(payment.created_at)}</p>
       <p><strong>${t('user_label')}:</strong> ${payment.wallet?.user?.name || t('unspecified')}</p>
       <hr>
       <p style="margin-top: 30px;">${t('thanks_message')}</p>
     </div>
   `;
-  
-  // فتح نافذة الطباعة
-  const printWindow = window.open('', '_blank');
-  printWindow.document.write(`
-    <html>
-      <head>
-        <title>${t('payment_receipt_title')}</title>
-        <style>
-          @media print {
-            body { margin: 0; }
-            @page { margin: 1cm; }
-          }
-        </style>
-      </head>
-      <body>
-        ${receiptContent}
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
-  printWindow.print();
+
+  openPrintWindow(t('payment_receipt_title'), receiptContent);
 }
 
 // معالجة حذف الدفعة من ModalAddCarPayment
@@ -395,7 +422,6 @@ const resetFilters = () => {
 
 // طباعة جدول السيارات
 const printCarsTable = () => {
-    // حساب المجاميع
     const totalPurchasePrice = car.value.data.reduce((sum, carItem) => sum + (Number(carItem.purchase_price) || 0), 0);
     const totalCost = car.value.data.reduce((sum, carItem) => {
         return sum + ((Number(carItem.purchase_price) || 0) + (Number(carItem.erbil_exp) || 0) + (Number(carItem.erbil_shipping) || 0) + (Number(carItem.dubai_exp) || 0) + (Number(carItem.dubai_shipping) || 0));
@@ -411,83 +437,74 @@ const printCarsTable = () => {
         }
         return sum;
     }, 0);
-    
+
     const carsInStock = car.value.data.filter(c => c.results == 0).length;
     const carsSold = car.value.data.filter(c => c.results != 0).length;
-    
-    // إنشاء محتوى الطباعة الشامل
+    const textAlign = printDir() === 'rtl' ? 'right' : 'left';
+    const companyName = props.systemConfig?.company_name || t('company_default_name');
+
     const printContent = `
-        <div style="font-family: Arial, sans-serif; padding: 20px;">
-            <!-- Header -->
+        <div style="padding: 20px;">
             <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="margin-bottom: 10px; color: #2563eb;">${props.systemConfig?.company_name || 'Salam Jalal Ayoub Company'}</h1>
-                <h2 style="margin-bottom: 15px;">Cars Report</h2>
-                <p style="font-size: 14px; color: #666;">${new Date().toLocaleDateString('en-US')}</p>
+                <h1 style="margin-bottom: 10px; color: #2563eb;">${companyName}</h1>
+                <h2 style="margin-bottom: 15px;">${t('cars_report_title')}</h2>
+                <p style="font-size: 14px; color: #666;">${formatPrintDate()}</p>
             </div>
-            
-            <!-- Summary Cards -->
+
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px;">
                 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
-                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Cars</h3>
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">${t('total_car_count')}</h3>
                     <p style="font-size: 16px; font-weight: bold; color: #1f2937;">${car.value.total}</p>
                 </div>
-                
                 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
-                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Cars in Stock</h3>
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">${t('cars_in_stock')}</h3>
                     <p style="font-size: 16px; font-weight: bold; color: #059669;">${carsInStock}</p>
                 </div>
-                
                 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
-                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Cars Sold</h3>
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">${t('cars_sold')}</h3>
                     <p style="font-size: 16px; font-weight: bold; color: #dc2626;">${carsSold}</p>
                 </div>
-                
                 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
-                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Profit</h3>
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">${t('total_profit')}</h3>
                     <p style="font-size: 16px; font-weight: bold; color: ${totalProfit >= 0 ? '#059669' : '#dc2626'};">$${totalProfit.toLocaleString()}</p>
                 </div>
             </div>
-            
-            <!-- Financial Summary -->
+
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px;">
                 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
-                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Purchase Price</h3>
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">${t('total_purchase')}</h3>
                     <p style="font-size: 16px; font-weight: bold; color: #1f2937;">$${totalPurchasePrice.toLocaleString()}</p>
                 </div>
-                
                 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
-                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Cost</h3>
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">${t('total_cost')}</h3>
                     <p style="font-size: 16px; font-weight: bold; color: #1f2937;">$${totalCost.toLocaleString()}</p>
                 </div>
-                
                 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
-                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Sale Price</h3>
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">${t('total_sales')}</h3>
                     <p style="font-size: 16px; font-weight: bold; color: #1f2937;">$${totalSalePrice.toLocaleString()}</p>
                 </div>
-                
                 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
-                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">Total Remaining</h3>
+                    <h3 style="margin-bottom: 8px; color: #374151; font-size: 14px;">${t('total_remaining')}</h3>
                     <p style="font-size: 16px; font-weight: bold; color: #dc2626;">$${totalRemaining.toLocaleString()}</p>
                 </div>
             </div>
-            
-            <!-- Detailed Table -->
-            <h3 style="margin-bottom: 15px; text-align: center; color: #374151;">Cars Details</h3>
+
+            <h3 style="margin-bottom: 15px; text-align: center; color: #374151;">${t('cars_details')}</h3>
             <table style="width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px;">
                 <thead>
                     <tr style="background-color: #f8f9fa;">
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">No</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Serial</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Name</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Color</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Year</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Purchase Price</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Total Cost</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Sale Price</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Client</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Remaining</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Profit</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Status</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">${t('no')}</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">${t('vim')}</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">${t('name')}</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">${t('color')}</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">${t('year')}</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">${t('purchase_price')}</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">${t('total_cost')}</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">${t('sell_price')}</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">${t('customer')}</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">${t('remaining')}</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">${t('profit')}</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">${t('status')}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -495,47 +512,24 @@ const printCarsTable = () => {
                         <tr>
                             <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.no}</td>
                             <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.pin}</td>
-                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.name}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: ${textAlign};">${carItem.name}</td>
                             <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.color}</td>
                             <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.model}</td>
                             <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${Number(carItem.purchase_price || 0).toLocaleString()}</td>
                             <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${((Number(carItem.purchase_price) || 0) + (Number(carItem.erbil_exp) || 0) + (Number(carItem.erbil_shipping) || 0) + (Number(carItem.dubai_exp) || 0) + (Number(carItem.dubai_shipping) || 0)).toLocaleString()}</td>
                             <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${Number(carItem.pay_price || 0).toLocaleString()}</td>
-                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.client?.name || 'N/A'}</td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: ${textAlign};">${carItem.client?.name || t('not_available')}</td>
                             <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.results != 0 ? Number(carItem.pay_price - carItem.paid_amount_pay).toLocaleString() : ''}</td>
                             <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carItem.results != 0 ? Number(carItem.pay_price - ((Number(carItem.purchase_price) || 0) + (Number(carItem.erbil_exp) || 0) + (Number(carItem.erbil_shipping) || 0) + (Number(carItem.dubai_exp) || 0) + (Number(carItem.dubai_shipping) || 0))).toLocaleString() : ''}</td>
-                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">
-                                ${carItem.results == 0 ? 'In Stock' : 
-                                  carItem.results == 1 ? 'Sold (Partial)' : 
-                                  carItem.results == 2 ? 'Sold (Complete)' : 'N/A'}
-                            </td>
+                            <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${carStatusLabel(carItem.results)}</td>
                         </tr>
                     `).join('')}
                 </tbody>
             </table>
         </div>
     `;
-    
-    // فتح نافذة الطباعة
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-        <html>
-            <head>
-                <title>${t('cars_report_title')}</title>
-                <style>
-                    @media print {
-                        body { margin: 0; }
-                        @page { margin: 1cm; }
-                    }
-                </style>
-            </head>
-            <body>
-                ${printContent}
-            </body>
-        </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+
+    openPrintWindow(t('cars_report_title'), printContent);
 }
 const options = ref({
   shortcuts: {
