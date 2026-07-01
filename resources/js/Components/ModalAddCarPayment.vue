@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { useToast } from 'vue-toastification';
+import { useI18n } from 'vue-i18n';
 
 const toast = useToast();
+const { t } = useI18n();
 
 const emit = defineEmits(['close', 'a', 'deletePayment', 'printReceipt']);
 
@@ -30,7 +32,7 @@ function handleAmountChange() {
   
   if (props.formData.amountPayment > maxAmount) {
     // إعطاء تحذير
-    toast.warning(`المبلغ المدخل (${props.formData.amountPayment.toLocaleString()}) أكبر من الدين المتبقي (${maxAmount.toLocaleString()}). سيتم تعديل المبلغ للحد الأقصى المسموح.`);
+    toast.warning(t('amount_exceeds_debt_warning'));
     
     // تعديل المبلغ للحد الأقصى
     props.formData.amountPayment = maxAmount;
@@ -40,18 +42,17 @@ function handleAmountChange() {
 // دوال لتحديد نوع الدفعة والألوان
 function getPaymentTypeText(pay) {
   if (pay.type === 'in') {
-    // التحقق من نوع الحساب حسب wallet_id أو user email
     if (pay.wallet?.user?.email === 'main@account.com') {
-      return 'دخل للصندوق';
+      return t('payment_type_fund_income');
     } else if (pay.wallet?.user?.email === 'in@account.com') {
-      return 'دخل';
+      return t('payment_type_income');
     } else if (pay.wallet?.user?.email === 'debt@account.com') {
-      return 'دفع دين';
+      return t('payment_type_debt_payment');
     } else {
-      return 'دخل';
+      return t('payment_type_income');
     }
   } else if (pay.type === 'out') {
-    return 'خرج';
+    return t('payment_type_out');
   }
   return pay.type;
 }
@@ -156,13 +157,13 @@ function printPaymentReceipt(payment) {
                                   <th scope="col" class="px-1 py-3">{{ $t('date') }}</th>
                                   <th scope="col" class="px-1 py-3">{{ $t('amount') }}</th>
                                   <th scope="col" class="px-1 py-3">{{ $t('description') }}</th>
-                                  <th scope="col" class="px-1 py-3">النوع</th>
-                                  <th scope="col" class="px-1 py-3">العمليات</th>
+                                  <th scope="col" class="px-1 py-3">{{ $t('type_col') }}</th>
+                                  <th scope="col" class="px-1 py-3">{{ $t('operations') }}</th>
                                  </tr>
                               </thead>
                               <tbody>
                                 <template  v-for="(pay, index) in formData?.transactions" :key="index" >
-                                <tr v-if="getPaymentTypeText(pay) == 'دخل'" :class="getPaymentRowClass(pay)" class="border-b hover:bg-gray-50 dark:hover:bg-gray-600">
+                                <tr v-if="pay.type === 'in'" :class="getPaymentRowClass(pay)" class="border-b hover:bg-gray-50 dark:hover:bg-gray-600">
                                     <td className="px-4 py-2 border dark:border-gray-900">{{ (pay.created_at).substring(0, 10)  }}</td>
                                     <td className="px-4 py-2 border dark:border-gray-900 td">{{ Math.round(pay.amount).toLocaleString() }}</td>
                                     <td className="px-4 py-2 border dark:border-gray-900 td">{{ pay.description }}</td>
@@ -176,7 +177,7 @@ function printPaymentReceipt(payment) {
                                             <button
                                                 @click="printPaymentReceipt(pay)"
                                                 class="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
-                                                title="طباعة وصل"
+                                                :title="$t('print_receipt')"
                                             >
                                                 <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
@@ -185,7 +186,7 @@ function printPaymentReceipt(payment) {
                                             <button
                                                 @click="deletePayment(pay.id)"
                                                 class="px-3 py-2 bg-red-500 text-white text-sm rounded hover:bg-red-600"
-                                                title="حذف الدفعة"
+                                                :title="$t('delete_payment')"
                                             >
                                                 <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -197,7 +198,7 @@ function printPaymentReceipt(payment) {
                                 </template>
                                 <tr v-if="!formData?.transactions || formData.transactions.length === 0">
                                     <td colspan="5" class="px-4 py-2 text-center text-gray-500 dark:text-gray-400">
-                                        لا توجد دفعات مسجلة
+                                        {{ $t('no_payments_registered') }}
                                     </td>
                                 </tr>
                               </tbody>
@@ -225,7 +226,7 @@ function printPaymentReceipt(payment) {
                 @input="handleAmountChange"
                 :max="remainingDebt" />
               <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                الحد الأقصى المسموح: {{ remainingDebt.toLocaleString() }}
+                {{ $t('max_allowed_amount') }}: {{ remainingDebt.toLocaleString() }}
               </p>
               </div>
               <div className="mb-4 mx-5">

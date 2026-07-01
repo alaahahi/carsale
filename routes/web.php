@@ -13,6 +13,9 @@ use App\Http\Controllers\InfoController;
 use App\Http\Controllers\CustomerWalletController;
 use App\Http\Controllers\SimpleCashController;
 use App\Http\Controllers\SimpleAccountingController;
+use App\Http\Controllers\SupplierPurchasesController;
+use App\Http\Controllers\SupplierPaymentsController;
+use App\Http\Controllers\SystemSettingsController;
 
 use App\Models\SystemConfig;
 
@@ -772,6 +775,21 @@ Route::group(['middleware' => ['tenant']], function () {
 Route::get('customer-wallet',[CustomerWalletController::class, 'index'])->name('customer-wallet');
 Route::get('simple-cash',[SimpleCashController::class, 'index'])->name('simple-cash');
 Route::get('simple-accounting',[SimpleAccountingController::class, 'index'])->name('simple-accounting');
+
+    // مشتريات الموردين (التجار)
+    Route::get('suppliers-purchases', [SupplierPurchasesController::class, 'index'])->name('suppliers.purchases');
+
+    // دفعات الموردين (Web routes حتى يتم تسجيل المستخدم عبر جلسة الويب)
+    Route::get('suppliers/{supplierId}/payments', [SupplierPaymentsController::class, 'index'])->name('suppliers.payments.web.index');
+    Route::post('suppliers/{supplierId}/payments', [SupplierPaymentsController::class, 'store'])->name('suppliers.payments.web.store');
+    Route::delete('suppliers/{supplierId}/payments/{paymentId}', [SupplierPaymentsController::class, 'destroy'])->name('suppliers.payments.web.destroy');
+
+    // إعدادات النظام (للأدمن فقط)
+    Route::get('system-settings', [SystemSettingsController::class, 'index'])->name('system-settings');
+    Route::get('system-settings/migrations/list', [SystemSettingsController::class, 'migrationsList'])->name('system-settings.migrations.list');
+    Route::post('system-settings/migrations/run-one', [SystemSettingsController::class, 'runOneMigration'])->name('system-settings.migrations.run-one');
+    Route::get('system-settings/logs', [SystemSettingsController::class, 'getLogs'])->name('system-settings.logs.get');
+    Route::post('system-settings/logs/clear', [SystemSettingsController::class, 'clearLogs'])->name('system-settings.logs.clear');
     
     Route::get('getIndexAccountsSelas',[TransfersController::class, 'getIndexAccountsSelas'])->name('getIndexAccountsSelas');
     Route::get('getCarsNeedingInvestmentCompletion',[TransfersController::class, 'getCarsNeedingInvestmentCompletion'])->name('getCarsNeedingInvestmentCompletion');

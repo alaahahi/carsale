@@ -130,7 +130,22 @@ return new class extends Migration
         if (!Schema::hasTable('car_field_histories')) {
             Schema::create('car_field_histories', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('car_id');
+            // دعم قواعد بيانات قديمة يكون فيها car.id من نوع INT بدل BIGINT
+            $carIdColumn = null;
+            try {
+                $carIdColumn = DB::selectOne("SHOW COLUMNS FROM `car` WHERE Field = 'id'");
+            } catch (\Throwable $e) {
+                $carIdColumn = null;
+            }
+            $carIdType = strtolower((string) ($carIdColumn->Type ?? ''));
+            $isCarIdBigInt = str_contains($carIdType, 'bigint');
+            $isCarIdUnsigned = str_contains($carIdType, 'unsigned');
+
+            if ($isCarIdBigInt) {
+                $table->unsignedBigInteger('car_id');
+            } else {
+                $table->integer('car_id');
+            }
             $table->string('field');
             $table->text('old_value')->nullable();
             $table->text('new_value')->nullable();
@@ -138,7 +153,12 @@ return new class extends Migration
             $table->string('updated_by')->nullable(); // اسم المستخدم الذي قام بالتحديث
             $table->timestamps();
             
-            $table->foreign('car_id')->references('id')->on('car')->onDelete('cascade');
+            // إضافة FK فقط إذا كانت الأنواع متوافقة، وإلا نكتفي بفهرس
+            try {
+                $table->foreign('car_id')->references('id')->on('car')->onDelete('cascade');
+            } catch (\Throwable $e) {
+                // بعض قواعد البيانات القديمة يكون فيها car.id INT موقّع، فيفشل FK
+            }
             $table->foreign('user_id')->references('id')->on('users')->onDelete('set null');
             $table->index(['car_id', 'field']); // فهرس للبحث حسب السيارة والحقل
             });
@@ -244,11 +264,33 @@ return new class extends Migration
             Schema::create('investment_cars', function (Blueprint $table) {
             $table->id();
             $table->foreignId('investment_id')->constrained('investments')->onDelete('cascade');
-            $table->foreignId('car_id')->constrained('car')->onDelete('cascade');
+            // دعم قواعد بيانات قديمة يكون فيها car.id من نوع INT بدل BIGINT
+            $carIdColumn = null;
+            try {
+                $carIdColumn = DB::selectOne("SHOW COLUMNS FROM `car` WHERE Field = 'id'");
+            } catch (\Throwable $e) {
+                $carIdColumn = null;
+            }
+            $carIdType = strtolower((string) ($carIdColumn->Type ?? ''));
+            $isCarIdBigInt = str_contains($carIdType, 'bigint');
+            $isCarIdUnsigned = str_contains($carIdType, 'unsigned');
+
+            if ($isCarIdBigInt) {
+                $table->unsignedBigInteger('car_id');
+            } else {
+                $table->integer('car_id');
+            }
             $table->decimal('invested_amount', 15, 2)->default(0);
             $table->decimal('percentage', 5, 2)->default(0);
             $table->decimal('profit_share', 15, 2)->default(0);
             $table->timestamps();
+            
+            // محاولة إضافة FK (إذا كانت الأنواع متوافقة)
+            try {
+                $table->foreign('car_id')->references('id')->on('car')->onDelete('cascade');
+            } catch (\Throwable $e) {
+                $table->index('car_id');
+            }
             
             // فهرس فريد لمنع الاستثمار في نفس السيارة أكثر من مرة
             $table->unique(['investment_id', 'car_id']);
@@ -415,36 +457,41 @@ return new class extends Migration
      */
     private function createExpensesTypes()
     {
+        // دعم قواعد بيانات قديمة يكون فيها expenses_type.status رقم (tinyint) بدل enum نصي
+        $statusColumn = null;
+        try {
+            $statusColumn = DB::selectOne("SHOW COLUMNS FROM `expenses_type` WHERE Field = 'status'");
+        } catch (\Throwable $e) {
+            $statusColumn = null;
+        }
+        $statusType = strtolower((string) ($statusColumn->Type ?? ''));
+        $activeStatusValue = (str_contains($statusType, 'tinyint') || str_contains($statusType, 'int')) ? 1 : 'active';
+
         $expensesTypes = [
             [
                 'name_ar' => 'مصاريف دبي',
                 'name_en' => 'Dubai Expenses',
                 'name_kr' => 'مصاريف دبي',
-                'status' => 'active',
             ],
             [
                 'name_ar' => 'مصاريف أربيل',
                 'name_en' => 'Erbil Expenses',
                 'name_kr' => 'مصاريف أربيل',
-                'status' => 'active',
             ],
             [
                 'name_ar' => 'شحن أربيل',
                 'name_en' => 'Erbil Shipping',
                 'name_kr' => 'شحن أربيل',
-                'status' => 'active',
             ],
             [
                 'name_ar' => 'شحن دبي',
                 'name_en' => 'Dubai Shipping',
                 'name_kr' => 'شحن دبي',
-                'status' => 'active',
             ],
             [
                 'name_ar' => 'دفعة شراء',
                 'name_en' => 'Purchase Payment',
                 'name_kr' => 'دفعة شراء',
-                'status' => 'active',
             ],
         ];
 
@@ -455,7 +502,7 @@ return new class extends Migration
                     'name_ar' => $type['name_ar'],
                     'name_en' => $type['name_en'],
                     'name_kr' => $type['name_kr'],
-                    'status' => $type['status'],
+                    'status' => $activeStatusValue,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]

@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Transactions;
 use App\Models\Expenses;
 use App\Models\CarFieldHistory;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Schema;
 
 use App\Helpers\UploadHelper;
 use App\Helpers\TenantDataHelper;
@@ -75,7 +77,11 @@ class DashboardController extends Controller
             if (!$accounts['in'] && $this->userAccount) {
                 $this->inAccount = \App\Models\User::firstOrCreate(
                     ['email' => 'in@account.com', 'type_id' => $this->userAccount],
-                    ['name' => 'حساب الدخل', 'password' => bcrypt('password'), 'show_wallet' => false]
+                    array_filter([
+                        'name' => 'حساب الدخل',
+                        'password' => bcrypt('password'),
+                        'show_wallet' => Schema::hasColumn('users', 'show_wallet') ? false : null
+                    ], fn ($v) => $v !== null)
                 );
                 $this->inAccount->getWalletOrCreate();
             } else {
@@ -85,7 +91,11 @@ class DashboardController extends Controller
             if (!$accounts['out'] && $this->userAccount) {
                 $this->outAccount = \App\Models\User::firstOrCreate(
                     ['email' => 'out@account.com', 'type_id' => $this->userAccount],
-                    ['name' => 'حساب الخرج', 'password' => bcrypt('password'), 'show_wallet' => false]
+                    array_filter([
+                        'name' => 'حساب الخرج',
+                        'password' => bcrypt('password'),
+                        'show_wallet' => Schema::hasColumn('users', 'show_wallet') ? false : null
+                    ], fn ($v) => $v !== null)
                 );
                 $this->outAccount->getWalletOrCreate();
             } else {
@@ -95,7 +105,11 @@ class DashboardController extends Controller
             if (!$accounts['transfers'] && $this->userAccount) {
                 $this->transfersAccount = \App\Models\User::firstOrCreate(
                     ['email' => 'transfers@account.com', 'type_id' => $this->userAccount],
-                    ['name' => 'حساب التحويلات', 'password' => bcrypt('password'), 'show_wallet' => false]
+                    array_filter([
+                        'name' => 'حساب التحويلات',
+                        'password' => bcrypt('password'),
+                        'show_wallet' => Schema::hasColumn('users', 'show_wallet') ? false : null
+                    ], fn ($v) => $v !== null)
                 );
                 $this->transfersAccount->getWalletOrCreate();
             } else {
@@ -161,6 +175,55 @@ class DashboardController extends Controller
         $authUser = auth()->user();
         $results = null;
         $user=   User::where('type_id', $this->userSeles)->get();
+        // قائمة الموردين (لاختيار "المصدر" فعلياً كمورد)
+        // الموردين/التجار عندنا هم نوع المستخدم supplier
+        $supplierTypeId = TenantDataHelper::getUserTypeId('supplier');
+        if (!$supplierTypeId) {
+            // محاولة إنشاء النوع إذا غير موجود (متوافق مع قواعد بيانات قديمة)
+            $supplierTypeId = DB::transaction(function () {
+                $existing = DB::table('user_type')->where('name', 'supplier')->lockForUpdate()->first();
+                if ($existing && isset($existing->id)) {
+                    return (int) $existing->id;
+                }
+
+                $idColumn = null;
+                try {
+                    $idColumn = DB::selectOne("SHOW COLUMNS FROM `user_type` WHERE Field = 'id'");
+                } catch (\Throwable $e) {
+                    $idColumn = null;
+                }
+
+                $extra = strtolower((string) ($idColumn->Extra ?? ''));
+                $isAutoIncrement = str_contains($extra, 'auto_increment');
+
+                if ($isAutoIncrement) {
+                    return (int) DB::table('user_type')->insertGetId([
+                        'name' => 'supplier',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                $nextId = ((int) DB::table('user_type')->max('id')) + 1;
+                if ($nextId <= 0) {
+                    $nextId = 1;
+                }
+
+                DB::table('user_type')->insert([
+                    'id' => $nextId,
+                    'name' => 'supplier',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                return $nextId;
+            });
+        }
+        $suppliers = User::query()
+            ->select(['id', 'name', 'phone'])
+            ->where('type_id', (int) $supplierTypeId)
+            ->orderBy('name')
+            ->get();
         $car = Car::all();
         $carUser=  $car->where('user_id', $authUser->id)->count();
        
@@ -192,6 +255,7 @@ class DashboardController extends Controller
             'inAccount'=>$this->inAccount,
             'expenses'=> $expenses,
             'user'=> $user,
+            'suppliers' => $suppliers,
             'client'=>$client,
             'carCount'=> $car->count(),
             'working'=> $car->where('client_id',null)->count(),
@@ -253,12 +317,12 @@ class DashboardController extends Controller
         }
     
         if (!$car_id) {
-            $car = Car::create([
+            $createData = [
                 'name' => $request->name,
                 'model' => $request->model,
                 'color' => $request->color,
                 'pin' => $request->pin,
-                'source' => $request->source,
+                'user_purchase_id' => $request->user_purchase_id ? (int) $request->user_purchase_id : null,
                 'purchase_data' => $request->purchase_data,
                 'purchase_price' => $request->purchase_price,
                 'note' => $request->note ?? '',
@@ -268,8 +332,15 @@ class DashboardController extends Controller
                 'dubai_exp' => $request->dubai_exp,
                 'dubai_shipping' => $request->dubai_shipping,
                 'no' => $no,
-                'results' => 0
-            ]);
+                'results' => 0,
+                // قواعد بيانات قديمة تتطلب user_id
+                'user_id' => auth()->id() ?? 1,
+            ];
+            // لا نلمس source إلا إذا تم إرساله (نص يدوي)
+            if ($request->has('source')) {
+                $createData['source'] = $request->source;
+            }
+            $car = Car::create($createData);
             
             // إضافة دفعة من نوع out عند إضافة السيارة
             if ($car->id) {
@@ -334,7 +405,7 @@ class DashboardController extends Controller
             }
     
             // Update car fields
-            $car->update([
+            $updateData = [
                 'company_id' => $request->company_id,
                 'name_id' => $request->name_id,
                 'model_id' => $request->model_id,
@@ -343,6 +414,7 @@ class DashboardController extends Controller
                 'model' => $request->model,
                 'color' => $request->color,
                 'pin' => $request->pin,
+                'user_purchase_id' => $request->user_purchase_id ? (int) $request->user_purchase_id : null,
                 'purchase_data' => $request->purchase_data,
                 'purchase_price' => $request->purchase_price,
                 'note' => $request->note ?? '',
@@ -351,9 +423,12 @@ class DashboardController extends Controller
                 'erbil_shipping' => $request->erbil_shipping,
                 'dubai_exp' => $request->dubai_exp,
                 'dubai_shipping' => $request->dubai_shipping,
-                'source' => $request->source,
                 'no' => $no
-            ]);
+            ];
+            if ($request->has('source')) {
+                $updateData['source'] = $request->source;
+            }
+            $car->update($updateData);
             
             // إعادة حساب حالة السيارة بعد التحديث
             $car->refresh(); // تحديث البيانات من قاعدة البيانات
@@ -384,6 +459,113 @@ class DashboardController extends Controller
         }
     
         return response()->json('ok', 200);
+    }
+
+    /**
+     * إضافة سيارات "مجمعة" (عدة سيارات بنفس البيانات) بدون رقم شاصي/VIN
+     */
+    public function addCarGroup(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'group_count' => 'required|integer|min:1|max:200',
+            'name' => 'nullable|string|max:255',
+            'model' => 'nullable|string|max:255',
+            'color' => 'nullable|string|max:255',
+            'purchase_price' => 'nullable|numeric|min:0',
+            'purchase_data' => 'nullable|date',
+            'user_purchase_id' => 'nullable|integer|exists:users,id',
+            'note' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return Response::json([
+                'success' => false,
+                'message' => 'بيانات غير صحيحة',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $count = (int) $request->group_count;
+        $maxNo = Car::max(DB::raw('CAST(no AS UNSIGNED)'));
+        $startNo = ($maxNo ?? 0) + 1;
+
+        $createdIds = [];
+
+        DB::transaction(function () use ($request, $count, $startNo, &$createdIds) {
+            for ($i = 0; $i < $count; $i++) {
+                $no = $startNo + $i;
+
+                $car = Car::create([
+                    'name' => $request->name,
+                    'model' => $request->model,
+                    'color' => $request->color,
+                    'pin' => null,
+                    'user_purchase_id' => $request->user_purchase_id ? (int) $request->user_purchase_id : null,
+                    'purchase_data' => $request->purchase_data,
+                    'purchase_price' => $request->purchase_price ?? 0,
+                    'note' => ($request->note ?? '') . ($count > 1 ? " (مجمعة: {$count})" : ''),
+                    'image' => null,
+                    'erbil_exp' => 0,
+                    'erbil_shipping' => 0,
+                    'dubai_exp' => 0,
+                    'dubai_shipping' => 0,
+                    'no' => $no,
+                    'results' => 0,
+                    // قواعد بيانات قديمة تتطلب user_id
+                    'user_id' => auth()->id() ?? 1,
+                ]);
+                // مصدر نصي اختياري
+                if ($request->has('source')) {
+                    $car->source = $request->source;
+                    $car->save();
+                }
+
+                $createdIds[] = $car->id;
+
+                // إنشاء معاملة out لكل سيارة
+                $outAccount = User::where('email', 'out@account.com')->first();
+                if (!$outAccount) {
+                    $accountTypeId = TenantDataHelper::getUserTypeId('account');
+                    if ($accountTypeId) {
+                        $outAccount = User::create([
+                            'name' => 'حساب الخرج',
+                            'email' => 'out@account.com',
+                            'password' => bcrypt('password'),
+                            'type_id' => $accountTypeId,
+                            'show_wallet' => false,
+                        ]);
+
+                        Wallet::create([
+                            'user_id' => $outAccount->id,
+                            'balance' => 0,
+                        ]);
+                    }
+                }
+
+                if ($outAccount) {
+                    $totalCost = (float) ($car->purchase_price ?? 0);
+                    $description = 'شراء سيارة (مجمعة) - ' . ($car->name ?? '') . ' - رقم: ' . $car->no . ' - سنة: ' . ($car->model ?? '') . ' - لون: ' . ($car->color ?? '');
+
+                    $wallet = $outAccount->getWalletOrCreate();
+
+                    Transactions::create([
+                        'amount' => $totalCost,
+                        'type' => 'out',
+                        'description' => $description,
+                        'wallet_id' => $wallet->id,
+                        'morphed_id' => $car->id,
+                        'morphed_type' => 'App\\Models\\Car',
+                        'user_id' => auth()->id(),
+                    ]);
+                }
+            }
+        });
+
+        return Response::json([
+            'success' => true,
+            'message' => "تمت إضافة {$count} سيارة (مجمعة) بنجاح",
+            'created_ids' => $createdIds,
+        ], 200);
     }
     
     public function getIndexExpenses () {
@@ -667,6 +849,198 @@ class DashboardController extends Controller
             }
             return Response::json('ok', 200);    
     }
+
+    /**
+     * بيع مجمّع لعدة سيارات دفعة واحدة.
+     * المدخلات: car_ids[], client_id أو (client_name/phone) لإنشاء زبون جديد,
+     * pay_price_total, paid_amount_total, note_pay.
+     *
+     * ملاحظة: توزيع سعر البيع/المدفوع يتم تلقائياً على السيارات المختارة
+     * حسب "تكلفة السيارة" (purchase + expenses). إذا لم تتوفر التكلفة، يتم التوزيع بالتساوي.
+     */
+    public function payCarGroup(Request $request)
+    {
+        $request->validate([
+            'car_ids' => 'required|array|min:1',
+            'car_ids.*' => 'integer',
+            'client_id' => 'required|integer',
+            'pay_price_total' => 'required|numeric|min:0',
+            'paid_amount_total' => 'required|numeric|min:0',
+            'note_pay' => 'nullable|string',
+            'client_name' => 'nullable|string',
+            'client_phone' => 'nullable|string',
+        ]);
+
+        $carIds = array_values(array_unique(array_map('intval', $request->car_ids ?? [])));
+        $clientId = (int) $request->client_id;
+        $payTotal = (int) ($request->pay_price_total ?? 0);
+        $paidTotal = (int) ($request->paid_amount_total ?? 0);
+        $notePay = $request->note_pay ?? '';
+
+        if ($payTotal <= 0) {
+            return Response::json(['error' => 'يرجى إدخال سعر بيع صحيح'], 422);
+        }
+        if ($paidTotal < 0) {
+            return Response::json(['error' => 'يرجى إدخال مبلغ مدفوع صحيح'], 422);
+        }
+        if ($paidTotal > $payTotal) {
+            return Response::json(['error' => 'المبلغ المدفوع أكبر من سعر البيع'], 422);
+        }
+
+        return DB::transaction(function () use ($request, $carIds, $clientId, $payTotal, $paidTotal, $notePay) {
+            // إنشاء زبون جديد إذا client_id = 0
+            if ($clientId === 0) {
+                if (!trim((string) ($request->client_name ?? ''))) {
+                    return Response::json(['error' => 'يرجى إدخال اسم الزبون'], 422);
+                }
+                $client = new User;
+                $client->name = $request->client_name;
+                $client->phone = $request->client_phone;
+                $client->type_id = $this->userClient;
+                $client->save();
+
+                $clientId = (int) $client->id;
+            } else {
+                $client = User::find($clientId);
+                if (!$client) {
+                    return Response::json(['error' => 'الزبون غير موجود في قاعدة البيانات', 'client_id' => $clientId], 404);
+                }
+            }
+
+            // جلب السيارات المختارة (غير مباعة) مع قفل للتزامن
+            $cars = Car::whereIn('id', $carIds)->lockForUpdate()->get();
+            if ($cars->isEmpty()) {
+                return Response::json(['error' => 'لا توجد سيارات'], 404);
+            }
+
+            // منع بيع سيارات مباعة مسبقاً
+            $alreadySold = $cars->filter(function ($c) {
+                return (int) ($c->results ?? 0) !== 0 || !empty($c->client_id);
+            });
+            if ($alreadySold->isNotEmpty()) {
+                return Response::json(['error' => 'يوجد سيارات مباعة ضمن الاختيار، يرجى إلغاء تحديدها والمحاولة مجدداً'], 422);
+            }
+
+            // توزيع المبالغ حسب تكلفة السيارة
+            $weights = [];
+            foreach ($cars as $c) {
+                $cost = (int) (
+                    (int) ($c->purchase_price ?? 0)
+                    + (int) ($c->erbil_exp ?? 0)
+                    + (int) ($c->erbil_shipping ?? 0)
+                    + (int) ($c->dubai_exp ?? 0)
+                    + (int) ($c->dubai_shipping ?? 0)
+                );
+                $weights[] = max(0, $cost);
+            }
+            $sumWeights = array_sum($weights);
+            if ($sumWeights <= 0) {
+                $weights = array_fill(0, count($cars), 1);
+                $sumWeights = count($cars);
+            }
+
+            $distribute = function (int $total, array $w, int $sumW): array {
+                $alloc = [];
+                $fractions = [];
+                $sumAlloc = 0;
+                foreach ($w as $i => $wi) {
+                    $raw = ($sumW > 0) ? ($total * $wi / $sumW) : 0;
+                    $base = (int) floor($raw);
+                    $alloc[$i] = $base;
+                    $fractions[$i] = $raw - $base;
+                    $sumAlloc += $base;
+                }
+                $rem = $total - $sumAlloc;
+                if ($rem > 0) {
+                    arsort($fractions); // أعلى كسور أولاً
+                    foreach (array_keys($fractions) as $i) {
+                        if ($rem <= 0) break;
+                        $alloc[$i] += 1;
+                        $rem -= 1;
+                    }
+                }
+                return $alloc;
+            };
+
+            $saleAlloc = $distribute($payTotal, $weights, $sumWeights);
+            $paidAlloc = $distribute($paidTotal, $weights, $sumWeights);
+
+            $debtTotal = $payTotal - $paidTotal;
+
+            // تحديث محفظة الزبون (رصيد الدين)
+            $wallet = Wallet::where('user_id', $clientId)->first();
+            if (!$wallet) {
+                Wallet::create([
+                    'user_id' => $clientId,
+                    'balance' => $debtTotal
+                ]);
+            } else {
+                $wallet->increment('balance', $debtTotal);
+            }
+
+            $updated = [];
+
+            foreach ($cars->values() as $idx => $car) {
+                $sale = (int) ($saleAlloc[$idx] ?? 0);
+                $paid = (int) ($paidAlloc[$idx] ?? 0);
+
+                $carResults = 1;
+                if ($sale > 0 && $paid >= $sale) {
+                    $carResults = 2;
+                } elseif ($sale === 0 && $paid === 0) {
+                    $carResults = 0;
+                }
+
+                $car->update([
+                    'note_pay' => $notePay ? ($notePay . ' (بيع مجمع)') : 'بيع مجمع',
+                    'client_id' => $clientId,
+                    'pay_data' => Carbon::now()->format('Y-m-d'),
+                    'pay_price' => $sale,
+                    'paid_amount_pay' => $paid,
+                    'results' => $carResults,
+                ]);
+
+                // محاسبة لكل سيارة (دخل للمدفوع، ودين للمتبقي)
+                $desc = trans('text.buyCar') . ' ' . $sale . trans('text.payDone') . $paid . ' (بيع مجمع)';
+                if ($paid > 0 && $this->inAccount) {
+                    $this->accountingController->increaseWallet($paid, $desc, $this->inAccount->id, $car->id, 'App\Models\Car');
+                }
+                if (($sale - $paid) > 0 && $this->outAccount) {
+                    $debtDesc = 'دين عميل - ' . $desc;
+                    $this->accountingController->increaseWallet(($sale - $paid), $debtDesc, $this->outAccount->id, $car->id, 'App\Models\Car');
+                }
+
+                // توزيع الربح للمدفوع بالكامل
+                if ($carResults == 2 && $sale > 0) {
+                    try {
+                        $car->refresh();
+                        $car->distributeProfitToInvestors();
+                    } catch (\Exception $e) {
+                        \Log::error('Error distributing profit (group sale)', [
+                            'car_id' => $car->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
+
+                $updated[] = [
+                    'car_id' => $car->id,
+                    'sale' => $sale,
+                    'paid' => $paid,
+                    'remaining' => max(0, $sale - $paid),
+                ];
+            }
+
+            return Response::json([
+                'success' => true,
+                'client_id' => $clientId,
+                'pay_price_total' => $payTotal,
+                'paid_amount_total' => $paidTotal,
+                'debt_total' => $debtTotal,
+                'cars' => $updated,
+            ], 200);
+        });
+    }
     public function getCarPayments(Request $request)
     {
         $carId = $request->car_id;
@@ -944,7 +1318,7 @@ class DashboardController extends Controller
     
     public function getIndexCar()
     {
-        $data =  Car::with(['client', 'transactions.wallet.user']);
+        $data =  Car::with(['client', 'purchaseSupplier', 'transactions.wallet.user']);
         
         // فلتر حالة السيارة
         $type = $_GET['type'] ?? '';
@@ -1002,7 +1376,7 @@ class DashboardController extends Controller
     }
     public function getIndexCarSearch()
     {
-        $data = Car::with(['client', 'transactions.wallet.user']);
+        $data = Car::with(['client', 'purchaseSupplier', 'transactions.wallet.user']);
         
         // البحث بالرقم التسلسلي
         $term = $_GET['q'] ?? '';

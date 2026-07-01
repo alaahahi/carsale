@@ -17,6 +17,9 @@ use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\TransfersController;
 use App\Http\Controllers\UserWalletController;
 use App\Http\Controllers\CustomerWalletController;
+use App\Http\Controllers\SupplierPurchasesController;
+use App\Http\Controllers\SuppliersController;
+use App\Http\Controllers\SupplierPaymentsController;
 
 use App\Models\SystemConfig;
 
@@ -91,8 +94,11 @@ Route::group(['middleware' => ['tenant']], function () {
     // Route::get('addCarModel',[CarConfigController::class, 'storeCarModel'])->name('addCarModel');
     // Route::get('addColor',[CarConfigController::class, 'storeColor'])->name('addColor');
     Route::post('addCar',[DashboardController::class, 'addCar'])->name('addCar');
+    // إضافة سيارات "مجمعة" بدون رقم شاصي
+    Route::post('addCarGroup',[DashboardController::class, 'addCarGroup'])->name('addCarGroup');
 
     Route::post('payCar',[DashboardController::class, 'payCar'])->name('payCar');
+    Route::post('payCarGroup',[DashboardController::class, 'payCarGroup'])->name('payCarGroup');
     Route::post('DelCar',[DashboardController::class, 'DelCar'])->name('DelCar');
 
     Route::get('client',[DashboardController::class, 'client'])->name('client');
@@ -147,6 +153,15 @@ Route::get('customer-wallet/{customerId}',[CustomerWalletController::class, 'get
     
     // External merchant data
     Route::get('external-merchant/sales', [UserController::class, 'getExternalSales'])->name('external.merchant.sales');
+
+    // Supplier purchases (internal)
+    Route::get('suppliers/purchases/summary', [SupplierPurchasesController::class, 'summary'])->name('suppliers.purchases.summary');
+    Route::get('suppliers/{supplierId}/purchases', [SupplierPurchasesController::class, 'details'])->name('suppliers.purchases.details');
+    Route::get('cars/purchases/aggregate', [SupplierPurchasesController::class, 'carsAggregate'])->name('cars.purchases.aggregate');
+    Route::post('suppliers', [SuppliersController::class, 'store'])->name('suppliers.store');
+    Route::get('suppliers/{supplierId}/payments', [SupplierPaymentsController::class, 'index'])->name('suppliers.payments.index');
+    Route::post('suppliers/{supplierId}/payments', [SupplierPaymentsController::class, 'store'])->name('suppliers.payments.store');
+
     // حذف دفعة سيارة بحسب معرف المعاملة
     Route::delete('delete-payment/{paymentId}', [DashboardController::class, 'deletePayment'])->name('payments.delete');
     // مسار GET اختياري للتوافق إن كان الواجهة تستدعي GET

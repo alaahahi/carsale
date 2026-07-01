@@ -1,6 +1,6 @@
 <template>
     <AuthenticatedLayout>
-        <Head title="العملاء" />
+        <Head :title="$t('clients_page_title')" />
         
         <div class="py-2">
             <div class="max-w-9xl mx-auto sm:px-6 lg:px-8">
@@ -8,8 +8,8 @@
                     <div class="p-6 dark:bg-gray-900">
                         <!-- Header -->
                         <div class="mb-6">
-                            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">العملاء</h1>
-                            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">إدارة بيانات العملاء والمعاملات المالية</p>
+                            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">{{ $t('clients_page_title') }}</h1>
+                            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{{ $t('clients_page_desc') }}</p>
                             
                             <!-- Action Buttons -->
                             <div class="mt-4 flex gap-4">
@@ -18,7 +18,7 @@
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                                     </svg>
-                                    <span>إضافة عميل جديد</span>
+                                    <span>{{ $t('add_new_client') }}</span>
                                 </button>
                                 
                                 <button @click="printClientsReport" 
@@ -26,7 +26,7 @@
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
                                     </svg>
-                                    <span>طباعة التقرير</span>
+                                    <span>{{ $t('print_report') }}</span>
                                 </button>
                                 
                         
@@ -48,7 +48,7 @@
                                         </div>
                                         <div class="ml-5 w-0 flex-1">
                                             <dl>
-                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">إجمالي العملاء</dt>
+                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">{{ $t('total_clients') }}</dt>
                                                 <dd class="text-lg font-medium text-gray-900 dark:text-white">
                                                     {{ stats.total_clients || 0 }}
                                                 </dd>
@@ -71,7 +71,7 @@
                                         </div>
                                         <div class="ml-5 w-0 flex-1">
                                             <dl>
-                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">إجمالي المطلوب</dt>
+                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">{{ $t('total_required') }}</dt>
                                                 <dd class="text-lg font-medium text-gray-900 dark:text-white">
                                                     ${{ formatNumber(stats.total_required || 0) }}
                                                 </dd>
@@ -94,7 +94,7 @@
                                         </div>
                                         <div class="ml-5 w-0 flex-1">
                                             <dl>
-                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">إجمالي المدفوع</dt>
+                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">{{ $t('total_paid_stat') }}</dt>
                                                 <dd class="text-lg font-medium text-gray-900 dark:text-white">
                                                     ${{ formatNumber(stats.total_paid || 0) }}
                                                 </dd>
@@ -117,7 +117,7 @@
                                         </div>
                                         <div class="ml-5 w-0 flex-1">
                                             <dl>
-                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">إجمالي الدين</dt>
+                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">{{ $t('total_debt_stat') }}</dt>
                                                 <dd class="text-lg font-medium text-gray-900 dark:text-white">
                                                     ${{ formatNumber(stats.total_debt || 0) }}
                                                 </dd>
@@ -136,7 +136,7 @@
                                     v-model="searchName"
                                     @input="applyFilters"
                                     type="text"
-                                    placeholder="البحث بالاسم..."
+                                    :placeholder="$t('search_by_name')"
                                     class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200">
                             </div>
                             
@@ -146,7 +146,7 @@
                                     v-model="searchPhone"
                                     @input="applyFilters"
                                     type="text"
-                                    placeholder="البحث برقم الهاتف..."
+                                    :placeholder="$t('search_by_phone')"
                                     class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200">
                             </div>
                             
@@ -154,10 +154,10 @@
                             <div>
                                 <select v-model="statusFilter" @change="applyFilters" 
                                         class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200">
-                                    <option value="">جميع الحالات</option>
-                                    <option value="debtor">مدين</option>
-                                    <option value="paid">مدفوع بالكامل</option>
-                                    <option value="credit">لديه رصيد</option>
+                                    <option value="">{{ $t('all_statuses') }}</option>
+                                    <option value="debtor">{{ $t('debtor') }}</option>
+                                    <option value="paid">{{ $t('paid_full') }}</option>
+                                    <option value="credit">{{ $t('has_credit') }}</option>
                                 </select>
                             </div>
                             
@@ -168,7 +168,7 @@
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                                     </svg>
-                                    <span>إعادة تعيين</span>
+                                    <span>{{ $t('reset_filters') }}</span>
                                 </button>
                             </div>
                         </div>
@@ -176,7 +176,7 @@
                         <!-- Clients Table -->
                         <div class="bg-white dark:bg-gray-800 shadow rounded-lg">
                             <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                                <h3 class="text-lg font-medium text-gray-900 dark:text-white">قائمة العملاء</h3>
+                                <h3 class="text-lg font-medium text-gray-900 dark:text-white">{{ $t('clients_list') }}</h3>
                             </div>
                             
                             <div v-if="loading" class="flex justify-center items-center py-12">
@@ -187,8 +187,8 @@
                                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                                 </svg>
-                                <h3 class="mt-2 text-sm font-medium text-gray-900">لا يوجد عملاء</h3>
-                                <p class="mt-1 text-sm text-gray-500">ابدأ بإضافة عميل جديد.</p>
+                                <h3 class="mt-2 text-sm font-medium text-gray-900">{{ $t('no_clients') }}</h3>
+                                <p class="mt-1 text-sm text-gray-500">{{ $t('start_add_client') }}</p>
                             </div>
 
                             <div v-else class="overflow-x-auto">
@@ -196,13 +196,13 @@
                                     <thead class="bg-gray-50 dark:bg-gray-700">
                                         <tr>
                                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">#</th>
-                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">الاسم</th>
-                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">الهاتف</th>
-                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">المطلوب</th>
-                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">المدفوع</th>
-                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">المتبقي</th>
-                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">الحالة</th>
-                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">العمليات</th>
+                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{{ $t('name') }}</th>
+                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{{ $t('phone') }}</th>
+                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{{ $t('required_col') }}</th>
+                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{{ $t('paid_col') }}</th>
+                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{{ $t('remaining_col') }}</th>
+                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{{ $t('status_col') }}</th>
+                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{{ $t('actions_col') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -214,7 +214,7 @@
                                                 {{ client.name }}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                {{ client.phone || 'غير محدد' }}
+                                                {{ client.phone || $t('unspecified') }}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                                 ${{ formatNumber(client.total_required) }}
@@ -233,35 +233,41 @@
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                 <div class="flex items-center gap-2">
                                                     <button
+                                                        v-if="client.email !== 'admin@admin.com'"
+                                                        @click="openClientPayments(client)"
+                                                        class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 px-3 py-1 rounded-md bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/30 transition-colors duration-200">
+                                                        {{ $t('payments_btn') }}
+                                                    </button>
+                                                    <button
                                                         v-if="client.email !== 'admin@admin.com' && client.show_wallet"
                                                         @click="goToUserWallet(client.id)"
                                                         class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 px-3 py-1 rounded-md bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/30 transition-colors duration-200">
-                                                        قاسة
+                                                        {{ $t('wallet_btn') }}
                                                     </button>
                                                     <button
                                                         v-if="client.email !== 'admin@admin.com' && !client.show_wallet"
                                                         @click="createWalletForClient(client)"
                                                         :disabled="creatingWallet"
                                                         class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 px-3 py-1 rounded-md bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 transition-colors duration-200 disabled:opacity-50">
-                                                        {{ creatingWallet ? 'جاري الإنشاء...' : 'إنشاء قاسة' }}
+                                                        {{ creatingWallet ? $t('creating_wallet') : $t('create_wallet_btn') }}
                                                     </button>
                                                     <button
                                                         v-if="client.email !== 'admin@admin.com' && client.show_wallet && client.total_profit_share > 0"
                                                         @click="showProfitEditModal(client)"
                                                         class="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300 px-3 py-1 rounded-md bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 transition-colors duration-200">
-                                                        تعديل الربح
+                                                        {{ $t('edit_profit') }}
                                                     </button>
                                                     <button
                                                         v-if="client.email !== 'admin@admin.com'"
                                                         @click="showClientEditModal(client)"
                                                         class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 px-3 py-1 rounded-md bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 transition-colors duration-200">
-                                                        تعديل
+                                                        {{ $t('edit') }}
                                                     </button>
                                                     <button 
                                                         v-if="client.email !== 'admin@admin.com'"
                                                         @click="destroy(client.id)"
                                                         class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 px-3 py-1 rounded-md bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 transition-colors duration-200">
-                                                        حذف
+                                                        {{ $t('delete') }}
                                                     </button>
                                                 </div>
                                             </td>
@@ -277,25 +283,25 @@
                                         @click="previousPage" 
                                         :disabled="currentPage === 1"
                                         class="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                                        السابق
+                                        {{ $t('previous') }}
                                     </button>
                                     <button 
                                         @click="nextPage" 
                                         :disabled="currentPage === totalPages"
                                         class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                                        التالي
+                                        {{ $t('next') }}
                                     </button>
                                 </div>
                                 <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                                     <div>
                                         <p class="text-sm text-gray-700 dark:text-gray-300">
-                                            عرض
+                                            {{ $t('showing') }}
                                             <span class="font-medium">{{ (currentPage - 1) * perPage + 1 }}</span>
-                                            إلى
+                                            {{ $t('to') }}
                                             <span class="font-medium">{{ Math.min(currentPage * perPage, totalClients) }}</span>
-                                            من
+                                            {{ $t('of') }}
                                             <span class="font-medium">{{ totalClients }}</span>
-                                            نتيجة
+                                            {{ $t('results') }}
                                         </p>
                                     </div>
                                     <div>
@@ -304,7 +310,7 @@
                                                 @click="previousPage" 
                                                 :disabled="currentPage === 1"
                                                 class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                                                <span class="sr-only">السابق</span>
+                                                <span class="sr-only">{{ $t('previous') }}</span>
                                                 <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                                                     <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
                                                 </svg>
@@ -331,7 +337,7 @@
                                                 @click="nextPage" 
                                                 :disabled="currentPage === totalPages"
                                                 class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                                                <span class="sr-only">التالي</span>
+                                                <span class="sr-only">{{ $t('next') }}</span>
                                                 <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                                                     <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
                                                 </svg>
@@ -358,8 +364,8 @@
                             </svg>
                         </div>
                         <div class="ml-3">
-                            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">تعديل بيانات العميل</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">قم بتحديث المعلومات المطلوبة</p>
+                            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">{{ $t('edit_client_title') }}</h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ $t('update_info') }}</p>
                         </div>
                     </div>
                     <button @click="hideClientEditModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200">
@@ -372,7 +378,7 @@
                 <form @submit.prevent="updateClient" class="space-y-6">
                     <div>
                         <label for="edit_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 text-right">
-                            <span class="text-red-500">*</span> اسم العميل
+                            <span class="text-red-500">*</span> {{ $t('client_name') }}
                         </label>
                         <input
                             type="text"
@@ -380,19 +386,19 @@
                             v-model="editForm.name"
                             required
                             class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200 text-lg"
-                            placeholder="أدخل اسم العميل">
+                            :placeholder="$t('enter_client_name')">
                     </div>
 
                     <div>
                         <label for="edit_phone" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 text-right">
-                            رقم الهاتف
+                            {{ $t('phone') }}
                         </label>
                         <input
                             type="text"
                             id="edit_phone"
                             v-model="editForm.phone"
                             class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200 text-lg"
-                            placeholder="أدخل رقم الهاتف">
+                            :placeholder="$t('enter_phone')">
                     </div>
 
                     <div class="flex justify-end gap-4 pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -400,7 +406,7 @@
                             type="button"
                             @click="hideClientEditModal"
                             class="px-6 py-3 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200 font-medium">
-                            إلغاء
+                            {{ $t('cancel') }}
                         </button>
                         <button
                             type="submit"
@@ -413,7 +419,7 @@
                             <svg v-else class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                             </svg>
-                            {{ editLoading ? 'جاري التحديث...' : 'تحديث البيانات' }}
+                            {{ editLoading ? $t('updating') : $t('update_data') }}
                         </button>
                     </div>
                 </form>
@@ -432,8 +438,8 @@
                             </svg>
                         </div>
                         <div class="ml-3">
-                            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">إضافة عميل جديد</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">أدخل معلومات العميل الجديد</p>
+                            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">{{ $t('add_client_title') }}</h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ $t('enter_new_client_info') }}</p>
                         </div>
                     </div>
                     <button @click="hideAddClientModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200">
@@ -446,7 +452,7 @@
                 <form @submit.prevent="addClient" class="space-y-6">
                     <div>
                         <label for="add_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 text-right">
-                            <span class="text-red-500">*</span> اسم العميل
+                            <span class="text-red-500">*</span> {{ $t('client_name') }}
                         </label>
                         <input
                             type="text"
@@ -454,19 +460,19 @@
                             v-model="addForm.name"
                             required
                             class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-colors duration-200 text-lg"
-                            placeholder="أدخل اسم العميل">
+                            :placeholder="$t('enter_client_name')">
                     </div>
 
                     <div>
                         <label for="add_phone" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 text-right">
-                            رقم الهاتف
+                            {{ $t('phone') }}
                         </label>
                         <input
                             type="text"
                             id="add_phone"
                             v-model="addForm.phone"
                             class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-colors duration-200 text-lg"
-                            placeholder="أدخل رقم الهاتف">
+                            :placeholder="$t('enter_phone')">
                     </div>
 
                     <div class="flex justify-end gap-4 pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -474,7 +480,7 @@
                             type="button"
                             @click="hideAddClientModal"
                             class="px-6 py-3 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200 font-medium">
-                            إلغاء
+                            {{ $t('cancel') }}
                         </button>
                         <button
                             type="submit"
@@ -487,7 +493,7 @@
                             <svg v-else class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                             </svg>
-                            {{ addLoading ? 'جاري الإضافة...' : 'إضافة العميل' }}
+                            {{ addLoading ? $t('adding') : $t('add_client_btn') }}
                         </button>
                     </div>
                 </form>
@@ -498,7 +504,7 @@
         <Modal :show="showProfitEdit" @close="hideProfitEditModal">
             <div class="p-6">
                 <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">تعديل نسبة الربح</h3>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">{{ $t('edit_profit_share') }}</h3>
                     <button @click="hideProfitEditModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -509,14 +515,14 @@
                 <div v-if="selectedClient" class="space-y-6">
                     <!-- Client Info -->
                     <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                        <h4 class="font-medium text-gray-900 dark:text-white mb-2">معلومات العميل</h4>
+                        <h4 class="font-medium text-gray-900 dark:text-white mb-2">{{ $t('client_info') }}</h4>
                         <div class="grid grid-cols-2 gap-4 text-sm">
                             <div>
-                                <span class="text-gray-500 dark:text-gray-400">الاسم:</span>
+                                <span class="text-gray-500 dark:text-gray-400">{{ $t('name') }}:</span>
                                 <span class="font-medium text-gray-900 dark:text-white">{{ selectedClient.name }}</span>
                             </div>
                             <div>
-                                <span class="text-gray-500 dark:text-gray-400">إجمالي الربح الحالي:</span>
+                                <span class="text-gray-500 dark:text-gray-400">{{ $t('total_current_profit') }}:</span>
                                 <span class="font-bold text-green-600 dark:text-green-400">${{ formatNumber(selectedClient.total_profit_share) }}</span>
                             </div>
                         </div>
@@ -524,14 +530,14 @@
 
                     <!-- Investment Details -->
                     <div v-if="clientInvestments.length > 0">
-                        <h4 class="font-medium text-gray-900 dark:text-white mb-3">تفاصيل الاستثمارات</h4>
+                        <h4 class="font-medium text-gray-900 dark:text-white mb-3">{{ $t('investment_details') }}</h4>
                         <div class="space-y-3">
                             <div v-for="investment in clientInvestments" :key="investment.id" 
                                  class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
                                 <div class="flex justify-between items-start mb-3">
                                     <div>
-                                        <p class="font-medium text-gray-900 dark:text-white">استثمار #{{ investment.id }}</p>
-                                        <p class="text-sm text-gray-600 dark:text-gray-400">{{ investment.note || 'بدون ملاحظات' }}</p>
+                                        <p class="font-medium text-gray-900 dark:text-white">{{ $t('investment_number') }} #{{ investment.id }}</p>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">{{ investment.note || $t('no_notes') }}</p>
                                     </div>
                                     <div class="text-right">
                                         <p class="font-bold text-lg text-gray-900 dark:text-white">${{ formatNumber(investment.amount) }}</p>
@@ -544,14 +550,14 @@
                                          class="bg-gray-50 dark:bg-gray-600 rounded-lg p-3">
                                         <div class="flex justify-between items-center">
                                             <div>
-                                                <p class="font-medium text-gray-900 dark:text-white">{{ carInvestment.car?.name || 'سيارة غير معروفة' }}</p>
-                                                <p class="text-sm text-gray-600 dark:text-gray-400">رقم: {{ carInvestment.car?.no || 'غير محدد' }}</p>
+                                                <p class="font-medium text-gray-900 dark:text-white">{{ carInvestment.car?.name || $t('unknown_car') }}</p>
+                                                <p class="text-sm text-gray-600 dark:text-gray-400">{{ $t('number') }}: {{ carInvestment.car?.no || $t('unspecified') }}</p>
                                             </div>
                                             <div class="text-right">
-                                                <p class="font-bold text-gray-900 dark:text-white">المستثمر: ${{ formatNumber(carInvestment.invested_amount) }}</p>
+                                                <p class="font-bold text-gray-900 dark:text-white">{{ $t('investor') }}: ${{ formatNumber(carInvestment.invested_amount) }}</p>
                                                 <p class="text-sm text-gray-600 dark:text-gray-400">{{ carInvestment.percentage }}%</p>
                                                 <div class="flex items-center gap-2 mt-1">
-                                                    <span class="text-sm text-gray-500 dark:text-gray-400">نصيب الربح:</span>
+                                                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ $t('profit_share_label') }}:</span>
                                                     <input 
                                                         v-model="carInvestment.profit_share"
                                                         type="number"
@@ -569,7 +575,7 @@
                     </div>
 
                     <div v-else class="text-center py-8 text-gray-500 dark:text-gray-400">
-                        لا توجد استثمارات لهذا العميل
+                        {{ $t('no_investments') }}
                     </div>
                 </div>
 
@@ -579,7 +585,7 @@
                         type="button"
                         @click="hideProfitEditModal"
                         class="px-6 py-3 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200 font-medium">
-                        إلغاء
+                        {{ $t('cancel') }}
                     </button>
                     <button
                         type="button"
@@ -593,11 +599,101 @@
                         <svg v-else class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
                         </svg>
-                        {{ profitEditLoading ? 'جاري الحفظ...' : 'حفظ التغييرات' }}
+                        {{ profitEditLoading ? $t('saving_changes') : $t('save_changes') }}
                     </button>
                 </div>
             </div>
         </Modal>
+
+        <!-- Client payments / debt modal -->
+        <Modal :show="showClientPayments" @close="closeClientPayments">
+            <div class="bg-white dark:bg-gray-800 px-6 py-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ $t('client_payments_title') }}</h3>
+                        <p v-if="clientPaymentsClient" class="text-sm text-gray-600 dark:text-gray-300">
+                            {{ clientPaymentsClient.name }} — {{ $t('debt_label') }}: ${{ formatNumber(clientPaymentsClient.remaining_debt || 0) }}
+                        </p>
+                    </div>
+                    <button @click="closeClientPayments" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div v-if="!clientPaymentsClient" class="text-center py-10 text-gray-500 dark:text-gray-400">
+                    {{ $t('select_client') }}
+                </div>
+
+                <div v-else>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ $t('required_col') }}</div>
+                            <div class="text-lg font-bold text-gray-900 dark:text-white">${{ formatNumber(clientPaymentsClient.total_required || 0) }}</div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ $t('paid_col') }}</div>
+                            <div class="text-lg font-bold text-gray-900 dark:text-white">${{ formatNumber(clientPaymentsClient.total_paid || 0) }}</div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ $t('remaining_col') }}</div>
+                            <div class="text-lg font-bold" :class="(clientPaymentsClient.remaining_debt || 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'">
+                                ${{ formatNumber(clientPaymentsClient.remaining_debt || 0) }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                            <thead class="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">{{ $t('car') }}</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">{{ $t('sell_price') }}</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">{{ $t('paid_col') }}</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">{{ $t('remaining_col') }}</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">{{ $t('actions_col') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                <tr v-for="c in (clientPaymentsClient.cars || [])" :key="c.id">
+                                    <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">
+                                        #{{ c.no }} <span class="text-gray-500 dark:text-gray-400">{{ c.pin ? '(' + c.pin + ')' : '' }}</span>
+                                    </td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-gray-700 dark:text-gray-200">${{ formatNumber(c.pay_price || 0) }}</td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-gray-700 dark:text-gray-200">${{ formatNumber(c.paid_amount_pay || 0) }}</td>
+                                    <td class="px-4 py-2 whitespace-nowrap font-semibold"
+                                        :class="(Number(c.pay_price||0) - Number(c.paid_amount_pay||0)) > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'">
+                                        ${{ formatNumber((Number(c.pay_price||0) - Number(c.paid_amount_pay||0))) }}
+                                    </td>
+                                    <td class="px-4 py-2 whitespace-nowrap">
+                                        <button
+                                            class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                                            @click="openCarPayments(c)">
+                                            {{ $t('manage_payments') }}
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr v-if="(clientPaymentsClient.cars || []).length === 0">
+                                    <td colspan="5" class="px-4 py-6 text-center text-gray-500 dark:text-gray-400">{{ $t('no_sold_cars') }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </Modal>
+
+        <!-- Car payment modal (re-use existing component) -->
+        <ModalAddCarPayment
+            :formData="paymentCarFormData"
+            :show="showCarPaymentModal ? true : false"
+            :user="[]"
+            @a="confirmAddPayment($event)"
+            @close="showCarPaymentModal = false"
+            @deletePayment="handleDeletePaymentFromModal"
+            @printReceipt="handlePrintReceiptFromModal"
+        />
     </AuthenticatedLayout>
 </template>
 
@@ -606,10 +702,13 @@ import { ref, computed, onMounted } from 'vue'
 import { Head } from '@inertiajs/inertia-vue3'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 import Modal from '@/Components/Modal.vue'
+import ModalAddCarPayment from '@/Components/ModalAddCarPayment.vue'
 import { useToast } from 'vue-toastification'
+import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 
 const toast = useToast()
+const { t } = useI18n()
 
 // Props
 const props = defineProps({
@@ -630,6 +729,12 @@ const isAddModalVisible = ref(false)
 const editLoading = ref(false)
 const addLoading = ref(false)
 const creatingWallet = ref(false)
+
+// Client payments/debt
+const showClientPayments = ref(false)
+const clientPaymentsClient = ref(null)
+const showCarPaymentModal = ref(false)
+const paymentCarFormData = ref({})
 
 // Profit edit modal
 const showProfitEdit = ref(false)
@@ -705,11 +810,11 @@ const getDebtColor = (debt) => {
 
 const getClientStatus = (debt) => {
     if (debt === 0) {
-        return { text: 'مدفوع بالكامل', class: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' }
+        return { text: t('paid_full'), class: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' }
     } else if (debt > 0) {
-        return { text: 'مدين', class: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' }
+        return { text: t('debtor'), class: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' }
     } else {
-        return { text: 'لديه رصيد', class: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400' }
+        return { text: t('has_credit'), class: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400' }
     }
 }
 
@@ -726,7 +831,7 @@ const createWalletForClient = async (client) => {
         })
         
         if (response.data.success) {
-            toast.success('تم إنشاء القاسة بنجاح')
+            toast.success(t('wallet_created_success'))
             // Reload page after delay to update wallet list
             setTimeout(() => {
                 window.location.href = window.location.href
@@ -734,7 +839,7 @@ const createWalletForClient = async (client) => {
         }
     } catch (error) {
         console.error('Error creating wallet:', error)
-        toast.error('حدث خطأ في إنشاء القاسة')
+        toast.error(t('wallet_create_error'))
     } finally {
         creatingWallet.value = false
     }
@@ -769,7 +874,7 @@ const hideAddClientModal = () => {
 
 const updateClient = async () => {
     if (!editForm.value.name.trim()) {
-        toast.error('يرجى إدخال اسم العميل')
+        toast.error(t('enter_client_name_required'))
         return
     }
     
@@ -780,11 +885,11 @@ const updateClient = async () => {
             phone: editForm.value.phone
         })
         
-        toast.success('تم تحديث بيانات العميل بنجاح')
+        toast.success(t('success_update_client'))
         hideClientEditModal()
         loadClients()
     } catch (error) {
-        toast.error('حدث خطأ أثناء تحديث البيانات')
+        toast.error(t('err_update_client'))
         console.error(error)
     } finally {
         editLoading.value = false
@@ -793,7 +898,7 @@ const updateClient = async () => {
 
 const addClient = async () => {
     if (!addForm.value.name.trim()) {
-        toast.error('يرجى إدخال اسم العميل')
+        toast.error(t('enter_client_name_required'))
         return
     }
     
@@ -804,11 +909,11 @@ const addClient = async () => {
             phone: addForm.value.phone
         })
         
-        toast.success('تم إضافة العميل بنجاح')
+        toast.success(t('success_add_client'))
         hideAddClientModal()
         loadClients()
     } catch (error) {
-        toast.error('حدث خطأ أثناء إضافة العميل')
+        toast.error(t('err_add_client'))
         console.error(error)
     } finally {
         addLoading.value = false
@@ -816,18 +921,90 @@ const addClient = async () => {
 }
 
 const destroy = async (id) => {
-    if (!confirm('هل أنت متأكد من حذف هذا العميل؟')) {
+    if (!confirm(t('confirm_delete_client'))) {
         return
     }
     
     try {
         await axios.delete(`/api/clients/${id}`)
-        toast.success('تم حذف العميل بنجاح')
+        toast.success(t('success_delete_client'))
         loadClients()
     } catch (error) {
-        toast.error('حدث خطأ أثناء حذف العميل')
+        toast.error(t('err_delete_client'))
         console.error(error)
     }
+}
+
+const openClientPayments = (client) => {
+    clientPaymentsClient.value = client
+    showClientPayments.value = true
+}
+
+const closeClientPayments = () => {
+    showClientPayments.value = false
+    clientPaymentsClient.value = null
+}
+
+const openCarPayments = async (car) => {
+    // تجهيز فورم للـ ModalAddCarPayment
+    paymentCarFormData.value = {
+        ...car,
+        amountPayment: 0,
+        notePayment: '',
+        transactions: []
+    }
+    showCarPaymentModal.value = true
+
+    try {
+        const res = await axios.get(`/api/car-payments?car_id=${car.id}`)
+        paymentCarFormData.value.transactions = res.data || []
+    } catch (e) {
+        console.error(e)
+        toast.error(t('err_fetch_payments'))
+    }
+}
+
+const confirmAddPayment = (V) => {
+    // نفس أسلوب الرئيسية لضمان التوافق
+    fetch(`/addPaymentCar?car_id=${V.id}&pay_price=${V.pay_price ?? 0}&amount=${V.amountPayment ?? 0}&note=${V.notePayment ?? ''}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                toast.success(data.message || t('success_add_payment'))
+                // تحديث الدفعات + تحديث قائمة العملاء (لتحديث الدين)
+                if (paymentCarFormData.value?.id) {
+                    openCarPayments(paymentCarFormData.value)
+                }
+                loadClients()
+            } else {
+                toast.error(data.error || t('err_unknown'))
+            }
+        })
+        .catch((error) => {
+            console.error(error)
+            toast.error(t('err_connection'))
+        })
+}
+
+const deletePayment = async (paymentId) => {
+    if (!confirm(t('confirm_delete_payment'))) return
+    try {
+        await axios.delete(`/api/delete-payment/${paymentId}`)
+        toast.success(t('success_delete_payment'))
+        if (paymentCarFormData.value?.id) {
+            openCarPayments(paymentCarFormData.value)
+        }
+        loadClients()
+    } catch (e) {
+        console.error(e)
+        toast.error(t('err_delete_payment'))
+    }
+}
+
+// Events from ModalAddCarPayment
+const handleDeletePaymentFromModal = (paymentId) => deletePayment(paymentId)
+const handlePrintReceiptFromModal = () => {
+    // Optional: can implement receipt printing later
 }
 
 const loadClients = async () => {
@@ -847,7 +1024,7 @@ const loadClients = async () => {
         totalPages.value = response.data.last_page
         stats.value = response.data.stats
     } catch (error) {
-        toast.error('حدث خطأ أثناء تحميل البيانات')
+        toast.error(t('err_load_clients'))
         console.error(error)
     } finally {
         loading.value = false
@@ -922,7 +1099,7 @@ const printClientsReport = async () => {
             <!-- Header -->
             <div style="text-align: center; margin-bottom: 30px;">
                 <h1 style="margin-bottom: 10px; color: #2563eb;">${props.systemConfig?.company_name || 'Salam Jalal Ayoub Company'}</h1>
-                <h2 style="margin-bottom: 15px;">تقرير العملاء</h2>
+                <h2 style="margin-bottom: 15px;">${t('clients_report_title')}</h2>
                 <p style="font-size: 14px; color: #666;">${new Date().toLocaleDateString('en-US')}</p>
             </div>
             
@@ -1023,7 +1200,7 @@ const printClientsReport = async () => {
     printWindow.document.close();
     printWindow.print();
     } catch (error) {
-        toast.error('حدث خطأ أثناء تحميل البيانات للطباعة')
+        toast.error(t('err_print_clients'))
         console.error(error)
     }
 }
@@ -1039,7 +1216,7 @@ const showProfitEditModal = async (client) => {
         clientInvestments.value = response.data.investments || []
     } catch (error) {
         console.error('Error loading client investments:', error)
-        toast.error('حدث خطأ أثناء جلب استثمارات العميل')
+        toast.error(t('err_load_investments'))
         clientInvestments.value = []
     }
 }
@@ -1073,12 +1250,12 @@ const saveProfitChanges = async () => {
         })
         
         if (response.data.success) {
-            toast.success('تم تحديث نسب الربح بنجاح')
+            toast.success(t('success_update_profit'))
             hideProfitEditModal()
             // إعادة تحميل بيانات العملاء
             loadClients()
         } else {
-            toast.error(response.data.message || 'حدث خطأ أثناء تحديث نسب الربح')
+            toast.error(response.data.message || t('err_update_profit'))
         }
     } catch (error) {
         console.error('Error updating profit shares:', error)

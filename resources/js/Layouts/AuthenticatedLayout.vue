@@ -49,6 +49,24 @@ const switchLocale = (locale) => {
                   {{ $t("clients") }}
                 </NavLink>
               </div>
+
+              <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
+                <NavLink
+                  :href="route('suppliers.purchases')"
+                  :active="route().current('suppliers.purchases')"
+                >
+                  {{ $t("suppliers") }}
+                </NavLink>
+              </div>
+
+              <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
+                <NavLink
+                  :href="route('system-settings')"
+                  :active="route().current('system-settings')"
+                >
+                  {{ $t("system_settings") }}
+                </NavLink>
+              </div>
         <!-- Hidden إدارة قاسة الزبون - merged into simple-cash -->
         <!--
         <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
@@ -65,7 +83,7 @@ const switchLocale = (locale) => {
                 :href="route('simple-cash')"
                 :active="route().current('simple-cash')"
             >
-                إدارة الصندوق والقاسات
+                {{ $t("manage_fund_wallets") }}
             </NavLink>
         </div>
               <!-- Hidden المحاسبة المبسطة - removed as requested -->
@@ -120,10 +138,10 @@ const switchLocale = (locale) => {
                   </template>
                   <template #content>
                     <DropdownLink @click="switchLocale('ar')" as="button">
-                      عربي
+                      {{ $t('lang_arabic') }}
                     </DropdownLink>
                     <DropdownLink @click="switchLocale('kr')" as="button">
-                      كردي
+                      {{ $t('lang_kurdish') }}
                     </DropdownLink>
                     <!-- <DropdownLink  @click="switchLocale('en')"  as="button">
                                             English
@@ -257,6 +275,20 @@ const switchLocale = (locale) => {
                 {{ $t("clients") }}
               </ResponsiveNavLink>
 
+              <ResponsiveNavLink
+                :href="route('suppliers.purchases')"
+                :active="route().current('suppliers.purchases')"
+              >
+                {{ $t("suppliers") }}
+              </ResponsiveNavLink>
+
+              <ResponsiveNavLink
+                :href="route('system-settings')"
+                :active="route().current('system-settings')"
+              >
+                {{ $t("system_settings") }}
+              </ResponsiveNavLink>
+
         <!-- Hidden إدارة قاسة الزبون - merged into simple-cash -->
         <!--
         <ResponsiveNavLink
@@ -271,7 +303,7 @@ const switchLocale = (locale) => {
             :href="route('simple-cash')"
             :active="route().current('simple-cash')"
         >
-            إدارة الصندوق والقاسات
+            {{ $t("manage_fund_wallets") }}
         </ResponsiveNavLink>
 
               <!-- Hidden المحاسبة المبسطة - removed as requested -->

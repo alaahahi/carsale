@@ -99,7 +99,7 @@ let showClient =  ref(false);
                           v-model="formData.id" />
                         </div>
                         <div className="mb-4 mx-5">
-                          <label  class="dark:text-gray-200" for="user_id" >المستخدم الذي تم بالصرف</label>
+                          <label  class="dark:text-gray-200" for="user_id" >{{ $t('select_user_spent') }}</label>
                           <select
                             v-model="formData.user_id"
                             id="name_id"
@@ -111,19 +111,19 @@ let showClient =  ref(false);
                           </select>
                         </div>
                         <div className="mb-4 mx-5">
-                          <label  class="dark:text-gray-200" for="expenses_id" >السبب</label>
+                          <label  class="dark:text-gray-200" for="expenses_id" >{{ $t('reason') }}</label>
                           <select
                             v-model="formData.expenses_id"
                             id="expenses_id"
                             class="pr-8 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-black dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                            <option selected disabled>تحديد السبب</option>
+                            <option selected disabled>{{ $t('select_reason') }}</option>
                             <template v-for="(card, index) in expenses" :key="index"  >
                               <option   :value="card.id">{{ card.name_ar }}</option>
                             </template>
                           </select>
                         </div>
                         <div className="mb-4 mx-5">
-                        <label  class="dark:text-gray-200" for="expens_amount" >المبلغ</label>
+                        <label  class="dark:text-gray-200" for="expens_amount" >{{ $t('amount') }}</label>
                         <input
                           id="expens_amount"
                           type="number"

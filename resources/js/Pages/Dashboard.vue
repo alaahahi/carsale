@@ -5,6 +5,7 @@ import VueTailwindDatepicker from 'vue-tailwind-datepicker'
 import { useToast } from 'vue-toastification'
 import ModalAddCar from "@/Components/ModalAddCar.vue";
 import ModalAddSale from "@/Components/ModalAddSale.vue";
+import ModalAddSaleGroup from "@/Components/ModalAddSaleGroup.vue";
 import ModalAddExpenses from "@/Components/ModalAddExpenses.vue";
 import ModalAddGenExpenses from "@/Components/ModalAddGenExpenses.vue";
 import ModalAddToBox from "@/Components/ModalAddToBox.vue";
@@ -24,9 +25,11 @@ import { TailwindPagination } from "laravel-vue-pagination";
 import axios from 'axios';
 
 
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 const toast = useToast();
+const { t } = useI18n();
 
 onMounted(() => {
   const table = document.querySelector('.table-container');
@@ -36,6 +39,29 @@ onMounted(() => {
     const scrollTop = table.scrollTop;
     thead.style.transform = `translateY(${scrollTop}px)`;
   });
+
+  // فتح بوپ-أب الإضافة من روابط خارجية (مثل صفحة مشتريات الموردين)
+  try {
+    const url = new URL(window.location.href)
+    const addCar = url.searchParams.get('add_car')
+    if (addCar === '1') {
+      const supplierId = url.searchParams.get('supplier_id')
+      const tab = url.searchParams.get('tab')
+      initialAddCarTab.value = tab === 'group' ? 'group' : 'single'
+      const seed = {}
+      if (supplierId) {
+        seed.user_purchase_id = Number(supplierId)
+      }
+      openAddCar(seed)
+      // تنظيف الرابط حتى لا يعيد الفتح عند تحديث الصفحة
+      url.searchParams.delete('add_car')
+      url.searchParams.delete('supplier_id')
+      url.searchParams.delete('tab')
+      window.history.replaceState({}, '', url.toString())
+    }
+  } catch (e) {
+    // ignore
+  }
 });
 let searchTerm = ref('');
 let carStatusFilter = ref('');
@@ -43,6 +69,7 @@ let paymentStatusFilter = ref('');
 
 let showModalCar =  ref(false);
 let showModalCarSale =  ref(false);
+let showModalCarSaleGroup = ref(false);
 let showModalAddGenExpenses =  ref(false);
 let showModalToBox =  ref(false);
 let showModalFromBox =  ref(false);
@@ -58,6 +85,19 @@ let showModalEditPaidAmount = ref(false);
 let calculatingProfit = ref(false);
 let profitCalculationResult = ref(null);
 let showProfitModal = ref(false);
+let initialAddCarTab = ref('single'); // single | group
+
+// Group sale selection
+const selectedCarIds = ref([])
+const selectableCarIdsOnPage = computed(() => {
+  return (car.value?.data || [])
+    .filter(c => (Number(c.results || 0) === 0) && (!c.client_id))
+    .map(c => Number(c.id))
+})
+const selectedCars = computed(() => {
+  const set = new Set(selectedCarIds.value.map(Number))
+  return (car.value?.data || []).filter(c => set.has(Number(c.id)))
+})
 
 function openModalDelCar(form={}) {
   formData.value=form
@@ -75,7 +115,7 @@ function showCarPayments(car) {
     })
     .catch(error => {
       console.error('Error fetching car payments:', error);
-      toast.error('حدث خطأ في جلب الدفعات');
+      toast.error(t('err_fetch_payments'));
     });
 }
 
@@ -97,16 +137,16 @@ function calculateCarProfit(car) {
       if (response.data.success) {
         profitCalculationResult.value = response.data;
         showProfitModal.value = true;
-        toast.success('تم حساب وتوزيع الربح بنجاح');
+        toast.success(t('success_profit_distributed'));
         // تحديث بيانات السيارات
         getResultsCar();
       } else {
-        toast.error(response.data.message || 'حدث خطأ في حساب الربح');
+        toast.error(response.data.message || t('err_calculate_profit'));
       }
     })
     .catch(error => {
       console.error('Error calculating profit:', error);
-      toast.error('حدث خطأ في حساب الربح');
+      toast.error(t('err_calculate_profit'));
     })
     .finally(() => {
       calculatingProfit.value = false;
@@ -116,7 +156,7 @@ function calculateCarProfit(car) {
 function confirmEditSalePrice(data) {
   // إذا كان السعر الجديد صفر، إظهار تأكيد إضافي
   if (data.newPayPrice == 0) {
-    if (!confirm('هل أنت متأكد من إلغاء بيع هذه السيارة؟ سيتم حذف العميل وإعادة السيارة لحالة غير مباعة.')) {
+    if (!confirm(t('confirm_cancel_sale'))) {
       return;
     }
   }
@@ -124,12 +164,12 @@ function confirmEditSalePrice(data) {
   axios.post('/api/editSalePrice', data)
     .then(response => {
       showModalEditSalePrice.value = false;
-      toast.success(response.data.success || 'تم تعديل سعر البيع بنجاح');
+      toast.success(response.data.success || t('success_edit_sale_price'));
       window.location.reload();
     })
     .catch(error => {
       console.error(error);
-      toast.error('حدث خطأ في تعديل سعر البيع');
+      toast.error(t('err_edit_sale_price'));
     });
 }
 
@@ -137,20 +177,20 @@ function confirmEditPaidAmount(data) {
   axios.post('/api/editPaidAmount', data)
     .then(response => {
       showModalEditPaidAmount.value = false;
-      toast.success(response.data.success || 'تم تعديل المبلغ المدفوع بنجاح');
+      toast.success(response.data.success || t('success_edit_paid_amount'));
       window.location.reload();
     })
     .catch(error => {
       console.error(error);
-      toast.error('حدث خطأ في تعديل المبلغ المدفوع');
+      toast.error(t('err_edit_paid_amount'));
     });
 }
 
 function deletePayment(paymentId) {
-  if (confirm('هل أنت متأكد من حذف هذه الدفعة؟')) {
+  if (confirm(t('confirm_delete_payment'))) {
     axios.delete(`/api/delete-payment/${paymentId}`)
       .then(response => {
-        toast.success('تم حذف الدفعة وتحديث المبلغ المدفوع وإنشاء معاملة معاكسة بنجاح');
+        toast.success(t('success_delete_payment'));
         // إعادة جلب الدفعات
         if (selectedCar.value) {
           showCarPayments(selectedCar.value);
@@ -160,7 +200,7 @@ function deletePayment(paymentId) {
       })
       .catch(error => {
         console.error(error);
-        toast.error('حدث خطأ في حذف الدفعة');
+        toast.error(t('err_delete_payment'));
       });
   }
 }
@@ -169,16 +209,16 @@ function printPaymentReceipt(payment) {
   // إنشاء محتوى الوصل
   const receiptContent = `
     <div style="text-align: center; font-family: Arial, sans-serif; padding: 20px;">
-      <h2>وصل استلام دفعة</h2>
+      <h2>${t('payment_receipt_title')}</h2>
       <hr>
-      <p><strong>رقم السيارة:</strong> ${selectedCar.value?.pin}</p>
-      <p><strong>اسم السيارة:</strong> ${selectedCar.value?.name}</p>
-      <p><strong>المبلغ:</strong> ${Number(payment.amount).toLocaleString()} دينار</p>
-      <p><strong>البيان:</strong> ${payment.description}</p>
-      <p><strong>التاريخ:</strong> ${new Date(payment.created_at).toLocaleDateString('en-US')}</p>
-      <p><strong>المستخدم:</strong> ${payment.wallet?.user?.name || 'غير محدد'}</p>
+      <p><strong>${t('car_number_label')}:</strong> ${selectedCar.value?.pin}</p>
+      <p><strong>${t('car_name_label')}:</strong> ${selectedCar.value?.name}</p>
+      <p><strong>${t('amount_label')}:</strong> ${Number(payment.amount).toLocaleString()} $</p>
+      <p><strong>${t('description')}:</strong> ${payment.description}</p>
+      <p><strong>${t('date_label')}:</strong> ${new Date(payment.created_at).toLocaleDateString('en-US')}</p>
+      <p><strong>${t('user_label')}:</strong> ${payment.wallet?.user?.name || t('unspecified')}</p>
       <hr>
-      <p style="margin-top: 30px;">شكراً لتعاملكم معنا</p>
+      <p style="margin-top: 30px;">${t('thanks_message')}</p>
     </div>
   `;
   
@@ -187,7 +227,7 @@ function printPaymentReceipt(payment) {
   printWindow.document.write(`
     <html>
       <head>
-        <title>وصل استلام دفعة</title>
+        <title>${t('payment_receipt_title')}</title>
         <style>
           @media print {
             body { margin: 0; }
@@ -218,6 +258,12 @@ function openAddCar(form={}) {
   if(!form.purchase_data){
     form.purchase_data = getTodayDate()
   }
+  if (form.user_purchase_id === undefined || form.user_purchase_id === '') {
+    form.user_purchase_id = null
+  } else if (form.user_purchase_id !== null) {
+    // ضمان التطابق مع <select> (number)
+    form.user_purchase_id = Number(form.user_purchase_id)
+  }
   if(!form.source){
     form.source = ''
   }
@@ -242,6 +288,23 @@ function openAddCar(form={}) {
 function openSaleCar(form={}) {
     formData.value=form
     showModalCarSale.value = true;
+}
+
+function openSaleCarGroup() {
+  if (!selectedCarIds.value.length) {
+    toast.warning(t('select_cars_first'))
+    return
+  }
+  formData.value = {
+    car_ids: [...selectedCarIds.value],
+    pay_price_total: 0,
+    paid_amount_total: 0,
+    note_pay: '',
+    client_id: null,
+    client_name: '',
+    client_phone: '',
+  }
+  showModalCarSaleGroup.value = true
 }
 function openAddGenExpenses(form={}) {
     formGenExpenses.value=form
@@ -458,7 +521,7 @@ const printCarsTable = () => {
     printWindow.document.write(`
         <html>
             <head>
-                <title>تقرير السيارات</title>
+                <title>${t('cars_report_title')}</title>
                 <style>
                     @media print {
                         body { margin: 0; }
@@ -476,11 +539,11 @@ const printCarsTable = () => {
 }
 const options = ref({
   shortcuts: {
-    today: 'اليوم',
-    yesterday: 'البارحة',
-    past: period => period + ' قبل يوم',
-    currentMonth: 'الشهر الحالي',
-    pastMonth: 'الشهر السابق'
+    today: t('today'),
+    yesterday: t('yesterday'),
+    past: period => period + ' ' + t('past_days'),
+    currentMonth: t('current_month'),
+    pastMonth: t('past_month')
   },
   footer: {
     apply: 'Terapkan',
@@ -499,6 +562,7 @@ const props =  defineProps({
     carCount:String,
     url: String,
     user: Array,
+    suppliers: Array,
     profile:String,
     comp:String,
     working:String,
@@ -530,7 +594,20 @@ function confirmCar(V) {
       dataToSend[field] = 0;
     }
   });
-  
+
+  // إضافة مجمعة (بدون رقم شاصي)
+  if (dataToSend.is_group) {
+    axios.post('/api/addCarGroup', dataToSend)
+      .then(() => {
+        showModalCar.value = false;
+        window.location.reload();
+      })
+      .catch(error => {
+        console.error(error);
+      });
+    return;
+  }
+
   axios.post('/api/addCar', dataToSend)
   .then(response => {
     showModalCar.value = false;
@@ -543,14 +620,48 @@ function confirmCar(V) {
 function confirmPayCar(V) {
   axios.post('/api/payCar',V)
   .then(response => {
-    toast.success('تم بيع السيارة بنجاح!');
+    toast.success(t('success_sell_car'));
     showModalCarSale.value = false;
     window.location.reload();
   })
   .catch(error => {
     console.error(error);
-    toast.error('حدث خطأ في بيع السيارة');
+    toast.error(t('err_sell_car'));
   })
+}
+
+function confirmPayCarGroup(V) {
+  axios.post('/api/payCarGroup', V)
+    .then(() => {
+      toast.success(t('success_group_sale'))
+      showModalCarSaleGroup.value = false
+      selectedCarIds.value = []
+      window.location.reload()
+    })
+    .catch(error => {
+      console.error(error)
+      toast.error(error?.response?.data?.error || t('err_group_sale'))
+    })
+}
+
+function toggleSelectAllOnPage(ev) {
+  const checked = !!ev?.target?.checked
+  if (checked) {
+    selectedCarIds.value = [...new Set([...selectedCarIds.value, ...selectableCarIdsOnPage.value])]
+  } else {
+    const onPage = new Set(selectableCarIdsOnPage.value)
+    selectedCarIds.value = selectedCarIds.value.filter(id => !onPage.has(Number(id)))
+  }
+}
+
+function toggleCarSelection(carId, ev) {
+  const checked = !!ev?.target?.checked
+  const id = Number(carId)
+  if (checked) {
+    if (!selectedCarIds.value.includes(id)) selectedCarIds.value.push(id)
+  } else {
+    selectedCarIds.value = selectedCarIds.value.filter(x => Number(x) !== id)
+  }
 }
 function conGenfirmExpenses(V) {
   fetch(`/GenExpenses?amount=${V.amount??0}&reason=${V.reason??''}&note=${V.note??''}`)
@@ -561,12 +672,12 @@ function conGenfirmExpenses(V) {
         showModalAddGenExpenses.value = false;
         window.location.reload();
       } else {
-        toast.error('حدث خطأ: ' + (data.error || 'خطأ غير معروف'));
+        toast.error(t('err_unknown') + ': ' + (data.error || ''));
       }
     })
     .catch((error) => {
       console.error(error);
-      toast.error('حدث خطأ في الاتصال');
+      toast.error(t('err_connection'));
     });
 }
 function conAddTransfers(V) {
@@ -588,12 +699,12 @@ function confirmAddToBox(V) {
         showModalToBox.value = false;
         window.location.reload();
       } else {
-        toast.error('حدث خطأ: ' + (data.error || 'خطأ غير معروف'));
+        toast.error(t('err_unknown') + ': ' + (data.error || ''));
       }
     })
     .catch((error) => {
       console.error(error);
-      toast.error('حدث خطأ في الاتصال');
+      toast.error(t('err_connection'));
     });
 }
 function confirmWithDrawFromBox(V) {
@@ -605,12 +716,12 @@ function confirmWithDrawFromBox(V) {
         showModalFromBox.value = false;
         window.location.reload();
       } else {
-        toast.error('حدث خطأ: ' + (data.error || 'خطأ غير معروف'));
+        toast.error(t('err_unknown') + ': ' + (data.error || ''));
       }
     })
     .catch((error) => {
       console.error(error);
-      toast.error('حدث خطأ في الاتصال');
+      toast.error(t('err_connection'));
     });
 }
 function confirmAddPayment(V) {
@@ -622,12 +733,12 @@ function confirmAddPayment(V) {
         showModalFromBox.value = false;
         window.location.reload();
       } else {
-        toast.error('حدث خطأ: ' + (data.error || 'خطأ غير معروف'));
+        toast.error(t('err_unknown') + ': ' + (data.error || ''));
       }
     })
     .catch((error) => {
       console.error(error);
-      toast.error('حدث خطأ في الاتصال');
+      toast.error(t('err_connection'));
     });
 }
 function confirmDelCar(V) {
@@ -660,7 +771,8 @@ getResultsCar();
             :company="company"
             :name="name"
             :color="color"
-            :user="user"
+            :suppliers="suppliers"
+            :initialTab="initialAddCarTab"
             :carModel="carModel"
             @a="confirmCar($event)"
             @close="showModalCar = false"
@@ -682,6 +794,17 @@ getResultsCar();
         <template #header>
           </template>
     </ModalAddSale>
+    <ModalAddSaleGroup
+            :formData="formData"
+            :show="showModalCarSaleGroup ? true : false"
+            :client="client"
+            :cars="selectedCars"
+            @submit="confirmPayCarGroup($event)"
+            @close="showModalCarSaleGroup = false"
+            >
+        <template #header>
+          </template>
+    </ModalAddSaleGroup>
     <ModalAddGenExpenses
             :formData="formData"
             :show="showModalAddGenExpenses ? true : false"
@@ -754,8 +877,7 @@ getResultsCar();
             @close="showModalDelCar = false"
             >
           <template #header>
-          هل متأكد من حذف السيارة
-          ؟
+          {{ $t('confirm_delete_car') }}
           </template>
     </ModalDelCar>
     
@@ -765,7 +887,7 @@ getResultsCar();
             <div class="mt-3">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-                        دفعات السيارة: {{ selectedCar?.name }} - {{ selectedCar?.pin }}
+                        {{ $t('car_payments_title') }}: {{ selectedCar?.name }} - {{ selectedCar?.pin }}
                     </h3>
                     <button @click="showModalCarPayments = false" class="text-gray-400 hover:text-gray-600">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -779,19 +901,19 @@ getResultsCar();
                         <thead class="bg-gray-50 dark:bg-gray-700">
                             <tr>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    التاريخ
+                                    {{ $t('date') }}
                                 </th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    المبلغ
+                                    {{ $t('amount') }}
                                 </th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    البيان
+                                    {{ $t('description') }}
                                 </th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    المستخدم
+                                    {{ $t('user') }}
                                 </th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    العمليات
+                                    {{ $t('operations') }}
                                 </th>
                             </tr>
                         </thead>
@@ -807,14 +929,14 @@ getResultsCar();
                                     {{ payment.description }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                    {{ payment.wallet?.user?.name || 'غير محدد' }}
+                                    {{ payment.wallet?.user?.name || $t('unspecified') }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                     <div class="flex space-x-2">
                                         <button
                                             @click="printPaymentReceipt(payment)"
                                             class="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
-                                            title="طباعة وصل"
+                                            :title="$t('print_receipt')"
                                         >
                                             <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
@@ -823,7 +945,7 @@ getResultsCar();
                                         <button
                                             @click="deletePayment(payment.id)"
                                             class="px-3 py-2 bg-red-500 text-white text-sm rounded hover:bg-red-600"
-                                            title="حذف الدفعة"
+                                            :title="$t('delete_payment')"
                                         >
                                             <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -834,7 +956,7 @@ getResultsCar();
                             </tr>
                             <tr v-if="!carPayments || carPayments.length === 0">
                                 <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                                    لا توجد دفعات مسجلة لهذه السيارة
+                                    {{ $t('no_payments_for_car') }}
                                 </td>
                             </tr>
                         </tbody>
@@ -850,7 +972,7 @@ getResultsCar();
             <div class="mt-3">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-                        تعديل سعر البيع: {{ formData?.name }} - {{ formData?.pin }}
+                        {{ $t('edit_sale_price_title') }}: {{ formData?.name }} - {{ formData?.pin }}
                     </h3>
                     <button @click="showModalEditSalePrice = false" class="text-gray-400 hover:text-gray-600">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -863,7 +985,7 @@ getResultsCar();
                     <!-- السعر الحالي -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            السعر الحالي
+                            {{ $t('current_price') }}
                         </label>
                         <input
                             type="text"
@@ -876,23 +998,23 @@ getResultsCar();
                     <!-- السعر الجديد -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            السعر الجديد
+                            {{ $t('new_price') }}
                         </label>
                         <input
                             type="number"
                             v-model="formData.newPayPrice"
                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-300"
-                            placeholder="أدخل السعر الجديد"
+                            :placeholder="$t('enter_new_price')"
                         />
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            ملاحظة: إدخال 0 سيؤدي إلى إلغاء بيع السيارة
+                            {{ $t('sale_cancel_note') }}
                         </p>
                     </div>
                     
                     <!-- المبلغ المدفوع حالياً -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            المبلغ المدفوع حالياً
+                            {{ $t('currently_paid') }}
                         </label>
                         <input
                             type="text"
@@ -905,7 +1027,7 @@ getResultsCar();
                     <!-- المبلغ المتبقي بعد التعديل -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            المبلغ المتبقي بعد التعديل
+                            {{ $t('remaining_after_edit') }}
                         </label>
                         <input
                             type="text"
@@ -918,13 +1040,13 @@ getResultsCar();
                     <!-- ملاحظة -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            ملاحظة
+                            {{ $t('note') }}
                         </label>
                         <textarea
                             v-model="formData.editNote"
                             rows="3"
                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-300"
-                            placeholder="أدخل ملاحظة حول تعديل السعر"
+                            :placeholder="$t('enter_price_note')"
                         ></textarea>
                     </div>
                 </div>
@@ -934,14 +1056,14 @@ getResultsCar();
                         @click="showModalEditSalePrice = false"
                         class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
                     >
-                        إلغاء
+                        {{ $t('cancel') }}
                     </button>
                     <button
                         @click="confirmEditSalePrice(formData)"
                         :disabled="formData.newPayPrice === '' || formData.newPayPrice === null || formData.newPayPrice === undefined"
                         class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-400"
                     >
-                        تأكيد التعديل
+                        {{ $t('confirm_edit') }}
                     </button>
                 </div>
             </div>
@@ -1009,7 +1131,7 @@ getResultsCar();
                                   dark:focus:ring-blue-500
                                   dark:focus:border-blue-500
                                 "
-                                placeholder="بحث بالرقم التسلسلي"
+                                :placeholder="$t('search_by_serial')"
                                 required
                               />
                             </div>
@@ -1020,10 +1142,10 @@ getResultsCar();
                         <div>
                           <select v-model="carStatusFilter" @change="applyFilters" 
                                   class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                            <option value="">جميع السيارات</option>
-                            <option value="0">في المخزن</option>
-                            <option value="1">مباعة (غير مكتملة)</option>
-                            <option value="2">مباعة (مكتملة)</option>
+                            <option value="">{{ $t('all_cars_filter') }}</option>
+                            <option value="0">{{ $t('in_stock') }}</option>
+                            <option value="1">{{ $t('sold_incomplete') }}</option>
+                            <option value="2">{{ $t('sold_complete') }}</option>
                           </select>
                         </div>
                         
@@ -1031,10 +1153,10 @@ getResultsCar();
                         <div>
                           <select v-model="paymentStatusFilter" @change="applyFilters" 
                                   class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                            <option value="">جميع حالات الدفع</option>
-                            <option value="unpaid">غير مدفوع</option>
-                            <option value="partial">مدفوع جزئياً</option>
-                            <option value="paid">مدفوع بالكامل</option>
+                            <option value="">{{ $t('all_payment_status') }}</option>
+                            <option value="unpaid">{{ $t('unpaid') }}</option>
+                            <option value="partial">{{ $t('partial_paid') }}</option>
+                            <option value="paid">{{ $t('paid_full') }}</option>
                           </select>
                         </div>
                         
@@ -1045,7 +1167,7 @@ getResultsCar();
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
                             </svg>
-                            <span>طباعة</span>
+                            <span>{{ $t('print') }}</span>
                           </button>
                         </div>
                         
@@ -1056,7 +1178,7 @@ getResultsCar();
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                             </svg>
-                            <span>إعادة تعيين</span>
+                            <span>{{ $t('reset_filters') }}</span>
                           </button>
                         </div>
                       </div>
@@ -1137,16 +1259,37 @@ getResultsCar();
                               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
                               </svg>
-                              <span>التاجر #{{ merchantId }}</span>
+                              <span>{{ $t('merchant_number') }} #{{ merchantId }}</span>
                             </div>
                           </a>
                         </div>
                       </div>
                       <div>
+                        <div class="flex items-center justify-between mb-2">
+                          <div class="text-sm text-gray-600 dark:text-gray-200">
+                            {{ $t('selected_cars_group_sale') }} <span class="font-bold">{{ selectedCarIds.length }}</span>
+                          </div>
+                          <button
+                            type="button"
+                            class="px-4 py-2 text-sm font-bold text-white rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                            :disabled="selectedCarIds.length === 0"
+                            @click="openSaleCarGroup"
+                          >
+                            {{ $t('group_sale_btn') }}
+                          </button>
+                        </div>
                         <div class="relative overflow-x-auto shadow-md sm:rounded-lg table-container scrollbar scrollbar-thumb-blue-600 scrollbar-thumb-rounded">
                           <table class="w-full text-sm text-right text-gray-500 dark:text-gray-200 dark:text-gray-400 text-center">
                               <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 text-center" >
                                   <tr>
+                                      <th scope="col" class="px-1 py-3 text-base">
+                                        <input
+                                          type="checkbox"
+                                          :checked="selectableCarIdsOnPage.length > 0 && selectableCarIdsOnPage.every(id => selectedCarIds.includes(id))"
+                                          :disabled="selectableCarIdsOnPage.length === 0"
+                                          @change="toggleSelectAllOnPage"
+                                        />
+                                      </th>
                                       <th scope="col" class="px-1 py-3 text-base	" >
                                         {{ $t('no') }}  
                                       </th>
@@ -1194,13 +1337,21 @@ getResultsCar();
                               </thead>
                               <tbody>
                                 <tr v-for="car in car.data" :key="car.id" :class="car.results == 0?'bg-gray-100 dark:bg-gray-600':car.results == 1 ?'bg-red-100 dark:bg-red-900':car.results == 2 ?'bg-green-100 dark:bg-green-900':''"  class="bg-white border-b dark:bg-gray-900 dark:border-gray-900 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                    <td className="border dark:border-gray-800 text-center px-2 py-2 text-base">
+                                      <input
+                                        type="checkbox"
+                                        :disabled="!(Number(car.results || 0) === 0 && !car.client_id)"
+                                        :checked="selectedCarIds.includes(Number(car.id))"
+                                        @change="toggleCarSelection(car.id, $event)"
+                                      />
+                                    </td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base ">{{ car.no }}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.pin }}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.name}}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.color }}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.model }}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ Number(car.purchase_price || 0).toLocaleString() }}</td> 
-                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.source  }}</td>
+                                    <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ car.purchase_supplier?.name || car.source || '' }}</td>
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ Number(car.dubai_shipping || 0).toLocaleString() }}</td> 
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ Number(car.dubai_exp || 0).toLocaleString() }}</td> 
                                     <td className="border dark:border-gray-800 text-center px-4 py-2 text-base">{{ Number(car.erbil_shipping || 0).toLocaleString() }}</td> 
@@ -1505,7 +1656,7 @@ getResultsCar();
             <div class="mt-3">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-                        تعديل المبلغ المدفوع: {{ formData?.name }} - {{ formData?.pin }}
+                        {{ $t('edit_paid_amount_title') }}: {{ formData?.name }} - {{ formData?.pin }}
                     </h3>
                     <button @click="showModalEditPaidAmount = false" class="text-gray-400 hover:text-gray-600">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1518,7 +1669,7 @@ getResultsCar();
                     <!-- المبلغ المدفوع حالياً -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            المبلغ المدفوع حالياً
+                            {{ $t('currently_paid') }}
                         </label>
                         <input
                             type="text"
@@ -1528,23 +1679,21 @@ getResultsCar();
                         />
                     </div>
                     
-                    <!-- المبلغ الجديد -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            المبلغ الجديد
+                            {{ $t('new_amount') }}
                         </label>
                         <input
                             type="number"
                             v-model="formData.newPaidAmount"
                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-300"
-                            placeholder="أدخل المبلغ الجديد"
+                            :placeholder="$t('enter_new_amount')"
                         />
                     </div>
                     
-                    <!-- الفرق -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            الفرق
+                            {{ $t('difference') }}
                         </label>
                         <input
                             type="text"
@@ -1557,13 +1706,13 @@ getResultsCar();
                     <!-- ملاحظة -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            ملاحظة
+                            {{ $t('note') }}
                         </label>
                         <textarea
                             v-model="formData.editNote"
                             rows="3"
                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-300"
-                            placeholder="أدخل ملاحظة حول التعديل"
+                            :placeholder="$t('enter_edit_note')"
                         ></textarea>
                     </div>
                 </div>
@@ -1573,14 +1722,14 @@ getResultsCar();
                         @click="showModalEditPaidAmount = false"
                         class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
                     >
-                        إلغاء
+                        {{ $t('cancel') }}
                     </button>
                     <button
                         @click="confirmEditPaidAmount(formData)"
                         :disabled="formData.newPaidAmount === '' || formData.newPaidAmount === null || formData.newPaidAmount === undefined"
                         class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:bg-gray-400"
                     >
-                        تأكيد التعديل
+                        {{ $t('confirm_edit') }}
                     </button>
                 </div>
             </div>
@@ -1593,7 +1742,7 @@ getResultsCar();
             <div class="mt-3">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-                        نتائج حساب وتوزيع الربح
+                        {{ $t('profit_calculation_results') }}
                     </h3>
                     <button @click="showProfitModal = false" class="text-gray-400 hover:text-gray-600">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1605,26 +1754,26 @@ getResultsCar();
                 <div v-if="profitCalculationResult" class="space-y-6">
                     <!-- معلومات السيارة -->
                     <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                        <h4 class="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">معلومات السيارة</h4>
+                        <h4 class="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">{{ $t('car_info') }}</h4>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">رقم السيارة</label>
+                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">{{ $t('car_number_label') }}</label>
                                 <p class="text-sm text-gray-900 dark:text-white">{{ profitCalculationResult.car?.no }}</p>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">اسم السيارة</label>
+                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">{{ $t('car_name_label') }}</label>
                                 <p class="text-sm text-gray-900 dark:text-white">{{ profitCalculationResult.car?.name }}</p>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">التكلفة الإجمالية</label>
+                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">{{ $t('total_cost_car') }}</label>
                                 <p class="text-sm text-gray-900 dark:text-white">${{ Number(profitCalculationResult.car?.total_cost || 0).toLocaleString() }}</p>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">سعر البيع</label>
+                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">{{ $t('sell_price') }}</label>
                                 <p class="text-sm text-gray-900 dark:text-white">${{ Number(profitCalculationResult.car?.sale_price || 0).toLocaleString() }}</p>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">الربح الإجمالي</label>
+                                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">{{ $t('total_profit') }}</label>
                                 <p class="text-sm font-bold text-green-600 dark:text-green-400">${{ Number(profitCalculationResult.car?.profit || 0).toLocaleString() }}</p>
                             </div>
                         </div>
@@ -1632,15 +1781,15 @@ getResultsCar();
                     
                     <!-- تفاصيل المستثمرين -->
                     <div v-if="profitCalculationResult.investors && profitCalculationResult.investors.length > 0">
-                        <h4 class="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">تفاصيل المستثمرين</h4>
+                        <h4 class="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">{{ $t('investor_details') }}</h4>
                         <div class="overflow-x-auto">
                             <table class="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                                 <thead class="bg-gray-50 dark:bg-gray-700">
                                     <tr>
-                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">اسم المستثمر</th>
-                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">المبلغ المستثمر</th>
-                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">النسبة المئوية</th>
-                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">نصيب الربح</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ $t('investor_name') }}</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ $t('invested_amount') }}</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ $t('percentage') }}</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ $t('profit_share_label') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -1657,7 +1806,7 @@ getResultsCar();
                         <!-- إجمالي الربح الموزع -->
                         <div class="mt-4 bg-green-50 dark:bg-green-900 rounded-lg p-4">
                             <div class="flex justify-between items-center">
-                                <span class="text-lg font-semibold text-green-800 dark:text-green-200">إجمالي الربح الموزع:</span>
+                                <span class="text-lg font-semibold text-green-800 dark:text-green-200">{{ $t('total_distributed_profit') }}:</span>
                                 <span class="text-xl font-bold text-green-600 dark:text-green-400">
                                     ${{ Number(profitCalculationResult.investors.reduce((sum, investor) => sum + (investor.profit_share || 0), 0)).toLocaleString() }}
                                 </span>
@@ -1666,7 +1815,7 @@ getResultsCar();
                     </div>
                     
                     <div v-else class="text-center py-8 text-gray-500 dark:text-gray-400">
-                        لا يوجد مستثمرين في هذه السيارة
+                        {{ $t('no_investors_for_car') }}
                     </div>
                 </div>
                 
@@ -1675,7 +1824,7 @@ getResultsCar();
                         @click="showProfitModal = false"
                         class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
                     >
-                        إغلاق
+                        {{ $t('close') }}
                     </button>
                 </div>
             </div>

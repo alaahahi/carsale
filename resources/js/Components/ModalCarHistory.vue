@@ -56,15 +56,15 @@ const restoreValue = async (historyId) => {
           <div class="modal-body">
             <!-- Car History Table -->
             <div class="mb-4 mx-5">
-              <label class="dark:text-gray-200">تاريخ السيارة</label>
+              <label class="dark:text-gray-200">{{ $t('car_history_date') }}</label>
               <table class="w-full text-sm text-right text-gray-500 dark:text-gray-400 mt-4">
                 <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                   <tr>
                     <th scope="col" class="px-1 py-3">{{ $t('date') }}</th>
-                    <th scope="col" class="px-1 py-3">الحقل</th>
+                    <th scope="col" class="px-1 py-3">{{ $t('field_col') }}</th>
                     <!-- <th scope="col" class="px-1 py-3">{{ $t('old_value') }}</th> -->
-                    <th scope="col" class="px-1 py-3">الوصف</th>
-                    <th scope="col" class="px-1 py-3">المبلغ</th>
+                    <th scope="col" class="px-1 py-3">{{ $t('description') }}</th>
+                    <th scope="col" class="px-1 py-3">{{ $t('amount') }}</th>
 
                     <!-- <th scope="col" class="px-1 py-3">{{ $t('actions') }}</th> -->
                   </tr>

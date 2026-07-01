@@ -67,6 +67,14 @@ class Car extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * التاجر/المورد الذي تم الشراء منه
+     */
+    public function purchaseSupplier()
+    {
+        return $this->belongsTo(User::class, 'user_purchase_id');
+    }
+
     // العلاقة مع استثمارات السيارات
     public function investmentCars()
     {

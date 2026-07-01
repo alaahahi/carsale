@@ -128,7 +128,7 @@ const totalCarCost = computed(() => {
                           v-model="formData.purchase_price" />
                         </div>
                         <div className="mb-4 mx-5">
-                        <label  class="dark:text-gray-200" for="total_expenses" >مجموع المصاريف</label>
+                        <label  class="dark:text-gray-200" for="total_expenses" >{{ $t('total_expenses_sum') }}</label>
                         <input
                           id="total_expenses"
                           type="text"
@@ -137,7 +137,7 @@ const totalCarCost = computed(() => {
                           :value="Math.round(totalExpenses).toLocaleString()" />
                         </div>
                         <div className="mb-4 mx-5">
-                        <label  class="dark:text-gray-200" for="total_car_cost" >المجموع الكامل للسيارة</label>
+                        <label  class="dark:text-gray-200" for="total_car_cost" >{{ $t('total_car_cost') }}</label>
                         <input
                           id="total_car_cost"
                           type="text"
