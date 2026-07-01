@@ -430,6 +430,7 @@
     "operation_description": "وصف العملية",
     "lang_arabic": "عربي",
     "lang_kurdish": "كردي",
+    "lang_english": "إنجليزي",
     "success_add_payment": "تمت إضافة الدفعة",
     "err_load_clients": "حدث خطأ أثناء تحميل البيانات",
     "customer_wallet_title": "إدارة قاسة الزبون",

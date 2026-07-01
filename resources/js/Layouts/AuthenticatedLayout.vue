@@ -143,9 +143,9 @@ const switchLocale = (locale) => {
                     <DropdownLink @click="switchLocale('kr')" as="button">
                       {{ $t('lang_kurdish') }}
                     </DropdownLink>
-                    <!-- <DropdownLink  @click="switchLocale('en')"  as="button">
-                                            English
-                                        </DropdownLink> -->
+                    <DropdownLink @click="switchLocale('en')" as="button">
+                      {{ $t('lang_english') }}
+                    </DropdownLink>
                   </template>
                 </Dropdown>
               </div>
