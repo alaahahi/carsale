@@ -167,12 +167,12 @@
                         <td class="px-3 py-2 whitespace-nowrap text-gray-600 dark:text-gray-300">{{ m.batch ?? '—' }}</td>
                         <td class="px-3 py-2 whitespace-nowrap">
                           <button
-                            @click="openRunOne(m)"
+                            @click="runOne(m)"
                             class="px-3 py-1 rounded-lg text-xs font-semibold"
                             :class="m.status === 'pending' && migrationsUiEnabled
                               ? 'bg-blue-600 hover:bg-blue-700 text-white'
                               : 'bg-gray-200 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:text-gray-500'"
-                            :disabled="m.status !== 'pending' || !migrationsUiEnabled"
+                            :disabled="m.status !== 'pending' || !migrationsUiEnabled || runningMigrations"
                           >
                             {{ $t('run_one') }}
                           </button>
@@ -183,44 +183,6 @@
                       </tr>
                     </tbody>
                   </table>
-                </div>
-              </div>
-
-              <!-- Run-one confirmation -->
-              <div v-if="selectedMigration" class="border border-gray-200 dark:border-gray-800 rounded-lg p-4">
-                <div class="mb-2 text-sm font-semibold text-gray-900 dark:text-white">
-                  {{ $t('run_one_migration') }}: <span class="font-mono text-xs">{{ selectedMigration.name }}</span>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      {{ $t('confirm_text_run_one') }}
-                    </label>
-                    <input
-                      v-model="runOneConfirm"
-                      type="text"
-                      :placeholder="`RUN:${selectedMigration.name}`"
-                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm font-mono"
-                    />
-                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                      {{ $t('migrate_warning') }}
-                    </p>
-                  </div>
-                  <div class="flex items-end gap-2">
-                    <button
-                      @click="selectedMigration = null; runOneConfirm = ''"
-                      class="px-4 py-2 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-lg text-sm"
-                    >
-                      {{ $t('cancel') }}
-                    </button>
-                    <button
-                      @click="runOne"
-                      class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold"
-                      :disabled="runningMigrations"
-                    >
-                      {{ runningMigrations ? $t('running') : $t('run_migrations') }}
-                    </button>
-                  </div>
                 </div>
               </div>
 
@@ -347,8 +309,6 @@ const migrationsOutput = ref('')
 const migrationsDatabase = ref('')
 const migrations = ref([])
 const migrationsWarning = ref(null)
-const selectedMigration = ref(null)
-const runOneConfirm = ref('')
 
 const loadingLogs = ref(false)
 const clearingLogs = ref(false)
@@ -439,24 +399,16 @@ const loadMigrationsList = async () => {
   }
 }
 
-const openRunOne = (m) => {
-  selectedMigration.value = m
-  runOneConfirm.value = ''
-}
-
-const runOne = async () => {
-  if (!props.migrationsUiEnabled) return
+const runOne = async (m) => {
+  if (!props.migrationsUiEnabled || !m?.name) return
   runningMigrations.value = true
   try {
     const res = await axios.post(route('system-settings.migrations.run-one'), {
-      migration: selectedMigration.value?.name,
-      confirm: runOneConfirm.value
+      migration: m.name,
     })
     migrationsDatabase.value = res.data.database || ''
     migrationsOutput.value = res.data.output || ''
     toast.success('تم تشغيل المايغريشن')
-    selectedMigration.value = null
-    runOneConfirm.value = ''
     await loadMigrationsList()
   } catch (e) {
     toast.error(e.response?.data?.message || 'فشل تشغيل المايغريشن')

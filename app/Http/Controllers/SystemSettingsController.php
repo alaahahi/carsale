@@ -155,20 +155,9 @@ class SystemSettingsController extends Controller
 
         $request->validate([
             'migration' => 'required|string',
-            'confirm' => 'required|string',
         ]);
 
         $migrationName = trim((string) $request->migration);
-        $confirm = trim((string) $request->confirm);
-
-        // Confirm text must be: RUN:<migration_name>
-        if ($confirm !== ("RUN:" . $migrationName)) {
-            return Response::json([
-                'success' => false,
-                'message' => 'نص التأكيد غير صحيح. اكتب: RUN:' . $migrationName,
-            ], 422);
-        }
-
         $connectionName = DB::getDefaultConnection();
         $filePath = database_path('migrations/' . $migrationName . '.php');
         if (!file_exists($filePath)) {
