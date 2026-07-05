@@ -22,6 +22,12 @@
             <div class="mb-6 border-b border-gray-200 dark:border-gray-800">
               <nav class="-mb-px flex gap-6" aria-label="Tabs">
                 <button
+                  @click="activeTab = 'branding'"
+                  :class="tabClass('branding')"
+                >
+                  {{ $t('branding_tab') }}
+                </button>
+                <button
                   @click="activeTab = 'migrations'"
                   :class="tabClass('migrations')"
                 >
@@ -40,6 +46,51 @@
                   {{ $t('import_excel') }}
                 </button>
               </nav>
+            </div>
+
+            <!-- BRANDING -->
+            <div v-show="activeTab === 'branding'" class="space-y-4">
+              <div class="border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">{{ $t('branding_tab') }}</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">{{ $t('branding_desc') }}</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{{ $t('logo_image_label') }}</label>
+                    <input v-model="brandingForm.logo_image" type="text"
+                           placeholder="logo-color1.png"
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm" />
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $t('logo_upload_hint') }}</p>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{{ $t('login_bg_image_label') }}</label>
+                    <input v-model="brandingForm.login_bg_image" type="text"
+                           placeholder="logo-color1.png"
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm" />
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $t('login_bg_upload_hint') }}</p>
+                  </div>
+                </div>
+
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div class="border border-gray-200 dark:border-gray-800 rounded-lg p-3">
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ $t('logo_preview') }}</div>
+                    <img v-if="brandingPreview.logo_url" :src="brandingPreview.logo_url" :alt="brandingPreview.company_name"
+                         class="max-h-40 mx-auto object-contain rounded" />
+                  </div>
+                  <div class="border border-gray-200 dark:border-gray-800 rounded-lg p-3 min-h-[120px]"
+                       :style="{ backgroundImage: `url('${brandingPreview.login_bg_url || ''}')`, backgroundSize: 'cover', backgroundPosition: 'center' }">
+                    <div class="text-xs text-gray-500 dark:text-gray-400 bg-white/80 dark:bg-gray-900/80 inline-block px-2 py-1 rounded">{{ $t('login_bg_preview') }}</div>
+                  </div>
+                </div>
+
+                <div class="mt-4 flex justify-end">
+                  <button @click="saveBranding"
+                          class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold"
+                          :disabled="savingBranding">
+                    {{ savingBranding ? $t('saving') : $t('save') }}
+                  </button>
+                </div>
+              </div>
             </div>
 
             <!-- MIGRATIONS -->
@@ -306,6 +357,18 @@ const logsPath = ref('')
 const logsSize = ref(null)
 const clearConfirm = ref('')
 
+const loadingBranding = ref(false)
+const savingBranding = ref(false)
+const brandingForm = ref({
+  logo_image: '',
+  login_bg_image: '',
+})
+const brandingPreview = ref({
+  logo_url: '/img/logo-color1.png',
+  login_bg_url: '/img/logo-color1.png',
+  company_name: '',
+})
+
 const tabClass = (tab) => {
   const base = 'whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm'
   if (activeTab.value === tab) {
@@ -317,6 +380,50 @@ const tabClass = (tab) => {
 const formatNumber = (n) => Math.round(Number(n || 0)).toLocaleString('en-US')
 
 const goBack = () => window.history.back()
+
+const resolvePreviewUrl = (filename, fallback = 'logo-color1.png') => {
+  const name = (filename || fallback).split(/[/\\]/).pop() || fallback
+  return `/img/${name}`
+}
+
+const loadBranding = async () => {
+  loadingBranding.value = true
+  try {
+    const res = await axios.get(route('system-settings.branding.get'))
+    const b = res.data.branding || {}
+    brandingForm.value = {
+      logo_image: b.logo_image || '',
+      login_bg_image: b.login_bg_image || '',
+    }
+    brandingPreview.value = {
+      logo_url: b.logo_url || resolvePreviewUrl(brandingForm.value.logo_image),
+      login_bg_url: b.login_bg_url || resolvePreviewUrl(brandingForm.value.login_bg_image || brandingForm.value.logo_image),
+      company_name: b.company_name || '',
+    }
+  } catch (e) {
+    toast.error(e.response?.data?.message || 'فشل جلب إعدادات الشعار')
+  } finally {
+    loadingBranding.value = false
+  }
+}
+
+const saveBranding = async () => {
+  savingBranding.value = true
+  try {
+    const res = await axios.post(route('system-settings.branding.update'), brandingForm.value)
+    const b = res.data.branding || {}
+    brandingPreview.value = {
+      logo_url: b.logo_url,
+      login_bg_url: b.login_bg_url,
+      company_name: b.company_name || '',
+    }
+    toast.success(res.data.message || 'تم الحفظ')
+  } catch (e) {
+    toast.error(e.response?.data?.message || 'فشل حفظ إعدادات الشعار')
+  } finally {
+    savingBranding.value = false
+  }
+}
 
 const loadMigrationsList = async () => {
   loadingMigrations.value = true
@@ -387,6 +494,7 @@ const clearLogs = async () => {
 }
 
 onMounted(async () => {
+  await loadBranding()
   await loadMigrationsList()
   await loadLogs()
 })

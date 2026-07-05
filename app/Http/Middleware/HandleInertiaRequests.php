@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Helpers\TenantDataHelper;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Tightenco\Ziggy\Ziggy;
@@ -45,7 +46,14 @@ class HandleInertiaRequests extends Middleware
             },
             'flash' => [
                 'message' => session('message')
-            ]
+            ],
+            'systemConfig' => function () {
+                try {
+                    return TenantDataHelper::getSystemConfig();
+                } catch (\Throwable $e) {
+                    return TenantDataHelper::defaultSystemConfig();
+                }
+            },
         ]);
     }
 }

@@ -790,6 +790,8 @@ Route::get('simple-accounting',[SimpleAccountingController::class, 'index'])->na
     Route::post('system-settings/migrations/run-one', [SystemSettingsController::class, 'runOneMigration'])->name('system-settings.migrations.run-one');
     Route::get('system-settings/logs', [SystemSettingsController::class, 'getLogs'])->name('system-settings.logs.get');
     Route::post('system-settings/logs/clear', [SystemSettingsController::class, 'clearLogs'])->name('system-settings.logs.clear');
+    Route::get('system-settings/branding', [SystemSettingsController::class, 'getBranding'])->name('system-settings.branding.get');
+    Route::post('system-settings/branding', [SystemSettingsController::class, 'updateBranding'])->name('system-settings.branding.update');
     
     Route::get('getIndexAccountsSelas',[TransfersController::class, 'getIndexAccountsSelas'])->name('getIndexAccountsSelas');
     Route::get('getCarsNeedingInvestmentCompletion',[TransfersController::class, 'getCarsNeedingInvestmentCompletion'])->name('getCarsNeedingInvestmentCompletion');

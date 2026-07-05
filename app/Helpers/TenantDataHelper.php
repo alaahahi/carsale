@@ -111,56 +111,89 @@ class TenantDataHelper
     }
 
     /**
+     * مسار صورة عامة من public/img حسب اسم الملف في system_config
+     */
+    public static function resolvePublicImageUrl(?string $filename, string $default = 'logo-color1.png'): string
+    {
+        $name = trim((string) ($filename ?: $default));
+        $name = basename(str_replace('\\', '/', $name));
+        if ($name === '' || $name === '.' || $name === '..') {
+            $name = $default;
+        }
+
+        return '/img/' . $name;
+    }
+
+    public static function defaultSystemConfig(): array
+    {
+        $defaultLogo = 'logo-color1.png';
+
+        return [
+            'company_name' => 'Salam Jalal Ayoub Company',
+            'first_title_ar' => null,
+            'first_title_kr' => null,
+            'second_title_ar' => null,
+            'second_title_kr' => null,
+            'third_title_ar' => null,
+            'third_title_kr' => null,
+            'logo_image' => $defaultLogo,
+            'login_bg_image' => $defaultLogo,
+            'logo_url' => self::resolvePublicImageUrl($defaultLogo),
+            'login_bg_url' => self::resolvePublicImageUrl($defaultLogo),
+            'external_merchant_ids' => [],
+        ];
+    }
+
+    private static function formatSystemConfig(?SystemConfig $config): array
+    {
+        if (!$config) {
+            return self::defaultSystemConfig();
+        }
+
+        $logoImage = $config->logo_image ?: 'logo-color1.png';
+        $loginBgImage = $config->login_bg_image ?: $logoImage;
+
+        return [
+            'company_name' => $config->first_title_ar ?? 'Salam Jalal Ayoub Company',
+            'first_title_ar' => $config->first_title_ar,
+            'first_title_kr' => $config->first_title_kr,
+            'second_title_ar' => $config->second_title_ar,
+            'second_title_kr' => $config->second_title_kr,
+            'third_title_ar' => $config->third_title_ar,
+            'third_title_kr' => $config->third_title_kr,
+            'logo_image' => $logoImage,
+            'login_bg_image' => $loginBgImage,
+            'logo_url' => self::resolvePublicImageUrl($logoImage),
+            'login_bg_url' => self::resolvePublicImageUrl($loginBgImage),
+            'external_merchant_ids' => self::parseMerchantIds($config->external_merchant_ids),
+        ];
+    }
+
+    private static function parseMerchantIds($raw): array
+    {
+        if (!$raw) {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return $decoded;
+        }
+
+        return array_map('intval', array_filter(
+            array_map('trim', explode(',', (string) $raw)),
+            fn ($id) => $id !== '' && is_numeric($id)
+        ));
+    }
+
+    /**
      * الحصول على إعدادات النظام من قاعدة بيانات الـ tenant
      */
     public static function getSystemConfig()
     {
         $key = self::tenantCacheKey('system_config');
         $compute = function () {
-            $config = SystemConfig::first();
-            
-            if (!$config) {
-                return [
-                    'company_name' => 'Salam Jalal Ayoub Company',
-                    'first_title_ar' => null,
-                    'first_title_kr' => null,
-                    'second_title_ar' => null,
-                    'second_title_kr' => null,
-                    'third_title_ar' => null,
-                    'third_title_kr' => null,
-                    'external_merchant_ids' => [],
-                ];
-            }
-            
-            // معالجة معرفات التجار الخارجيين (يمكن أن تكون JSON أو نص مفصول بفواصل)
-            $merchantIds = [];
-            if ($config->external_merchant_ids) {
-                // محاولة تحليل كـ JSON أولاً
-                $decoded = json_decode($config->external_merchant_ids, true);
-                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                    $merchantIds = $decoded;
-                } else {
-                    // إذا لم يكن JSON، معالجة كـ نص مفصول بفواصل
-                    $merchantIds = array_filter(
-                        array_map('trim', explode(',', $config->external_merchant_ids)),
-                        function($id) {
-                            return !empty($id) && is_numeric($id);
-                        }
-                    );
-                    $merchantIds = array_map('intval', $merchantIds);
-                }
-            }
-            
-            return [
-                'company_name' => $config->first_title_ar ?? 'Salam Jalal Ayoub Company',
-                'first_title_ar' => $config->first_title_ar,
-                'first_title_kr' => $config->first_title_kr,
-                'second_title_ar' => $config->second_title_ar,
-                'second_title_kr' => $config->second_title_kr,
-                'third_title_ar' => $config->third_title_ar,
-                'third_title_kr' => $config->third_title_kr,
-                'external_merchant_ids' => $merchantIds,
-            ];
+            return self::formatSystemConfig(SystemConfig::first());
         };
         if (!self::isCacheEnabled()) {
             return $compute();

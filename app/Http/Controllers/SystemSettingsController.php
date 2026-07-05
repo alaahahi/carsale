@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\TenantDataHelper;
+use App\Models\SystemConfig;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -289,6 +290,47 @@ class SystemSettingsController extends Controller
         return Response::json([
             'success' => true,
             'message' => 'تم تفريغ اللوج بنجاح',
+        ], 200);
+    }
+
+    public function getBranding()
+    {
+        $this->ensureAdmin();
+
+        return Response::json([
+            'success' => true,
+            'branding' => TenantDataHelper::getSystemConfig(),
+        ], 200);
+    }
+
+    public function updateBranding(Request $request)
+    {
+        $this->ensureAdmin();
+
+        $request->validate([
+            'logo_image' => 'nullable|string|max:255',
+            'login_bg_image' => 'nullable|string|max:255',
+        ]);
+
+        $config = SystemConfig::query()->first();
+        if (!$config) {
+            $config = SystemConfig::create([]);
+        }
+
+        $logo = trim((string) $request->input('logo_image', ''));
+        $bg = trim((string) $request->input('login_bg_image', ''));
+
+        $config->update([
+            'logo_image' => $logo !== '' ? basename(str_replace('\\', '/', $logo)) : null,
+            'login_bg_image' => $bg !== '' ? basename(str_replace('\\', '/', $bg)) : null,
+        ]);
+
+        TenantDataHelper::clearCacheOnUpdate();
+
+        return Response::json([
+            'success' => true,
+            'message' => 'تم حفظ إعدادات الشعار والخلفية',
+            'branding' => TenantDataHelper::getSystemConfig(),
         ], 200);
     }
 }

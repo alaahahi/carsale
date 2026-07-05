@@ -20,6 +20,8 @@ class SystemConfig extends Model
         'second_title_kr',
         'third_title_ar',
         'third_title_kr',
+        'logo_image',
+        'login_bg_image',
         'external_merchant_ids',
     ];
     

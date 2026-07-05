@@ -1,10 +1,20 @@
 <script setup>
-import ApplicationLogo from '@/Components/ApplicationLogo.vue';
-import { Link } from '@inertiajs/inertia-vue3';
+import { computed } from 'vue';
+import { usePage } from '@inertiajs/inertia-vue3';
+
+const page = usePage();
+
+const loginBgStyle = computed(() => {
+  const url = page.props.systemConfig?.login_bg_url || '/img/logo-color1.png';
+  return {
+    backgroundImage: `url('${url}')`,
+    backgroundSize: 'cover',
+  };
+});
 </script>
 
 <template>
-    <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100"  style="background-image:url('img/logo-color1.png');background-size: cover;">
+    <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100" :style="loginBgStyle">
         <div>
     
         </div>
