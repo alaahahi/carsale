@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>انتهاء الاشتراك — {{ $tenant->name ?? config('app.name') }}</title>
+    <title data-i18n="pageTitle">انتهاء الاشتراك — {{ $tenant->name ?? config('app.name') }}</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -28,14 +28,47 @@
             overflow: hidden;
             box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
             animation: fadeUp 0.6s ease-out;
+            position: relative;
         }
         @keyframes fadeUp {
             from { opacity: 0; transform: translateY(24px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        .lang-switch {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            z-index: 10;
+            display: flex;
+            gap: 0.35rem;
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 2rem;
+            padding: 0.25rem;
+        }
+        .lang-btn {
+            border: none;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.7);
+            font-family: 'Cairo', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 0.35rem 0.75rem;
+            border-radius: 2rem;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .lang-btn.active {
+            background: rgba(255, 255, 255, 0.95);
+            color: #1e1b4b;
+        }
+        .lang-btn:hover:not(.active) {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.1);
+        }
         .header {
             background: linear-gradient(135deg, #dc2626 0%, #b91c1c 50%, #991b1b 100%);
-            padding: 2rem 2rem 1.75rem;
+            padding: 2.5rem 2rem 1.75rem;
             text-align: center;
             position: relative;
             overflow: hidden;
@@ -161,64 +194,136 @@
 </head>
 <body>
     <div class="card">
+        <div class="lang-switch" role="group" aria-label="تغيير اللغة">
+            <button type="button" class="lang-btn active" data-lang="ar">العربية</button>
+            <button type="button" class="lang-btn" data-lang="ku">کوردی</button>
+        </div>
+
         <div class="header">
             <div class="icon-wrap">
                 <i class="fas fa-lock"></i>
             </div>
-            <h1>
-                @if($reason === 'expired')
-                    انتهت مدة الاشتراك
-                @elseif($reason === 'suspended')
-                    الحساب معلّق مؤقتاً
-                @else
-                    الحساب غير مفعّل
-                @endif
-            </h1>
-            <p>يتعذّر الوصول إلى النظام في الوقت الحالي</p>
+            <h1 id="title-text"></h1>
+            <p id="subtitle-text"></p>
         </div>
 
         <div class="body">
             @if($tenant->name)
-                <div class="tenant-name">الحساب: <strong>{{ $tenant->name }}</strong></div>
+                <div class="tenant-name" id="tenant-label">
+                    <span id="account-label"></span> <strong>{{ $tenant->name }}</strong>
+                </div>
             @endif
 
-            <p class="message">
-                @if($reason === 'expired')
-                    انتهت الفترة التجريبية أو مدة اشتراكك. للاستمرار في استخدام النظام، يرجى التواصل مع المطور لتجديد الاشتراك.
-                @elseif($reason === 'suspended')
-                    تم تعليق حسابك مؤقتاً. للتجديد وإعادة التفعيل، يرجى التواصل مع المطور.
-                @else
-                    حسابك غير مفعّل حالياً. يرجى التواصل مع المطور لتفعيل الاشتراك.
-                @endif
-            </p>
+            <p class="message" id="message-text"></p>
 
             <div class="safe-box">
                 <i class="fas fa-shield-halved"></i>
-                <p>
-                    <strong>اطمئن، بياناتك في أمان.</strong>
-                    جميع معلوماتك ومحتويات حسابك محفوظة بالكامل ولن يتم حذفها. بمجرد تجديد الاشتراك ستعود للعمل من حيث توقفت.
-                </p>
+                <p id="safe-text"></p>
             </div>
 
-            <div class="warning-strip">
-                <i class="fas fa-triangle-exclamation"></i>
-                لا يمكن إجراء أي تعديلات على الحساب حتى يتم تجديد الاشتراك
-            </div>
+            <div class="warning-strip" id="warning-text"></div>
 
-            <a href="{{ $whatsappLink }}?text={{ urlencode('مرحباً، أرغب بتجديد اشتراك حساب ' . ($tenant->name ?? '') . ' في نظام إدارة السيارات') }}"
-               class="cta" target="_blank" rel="noopener">
+            <a href="{{ $whatsappLink }}" id="whatsapp-cta" class="cta" target="_blank" rel="noopener">
                 <i class="fab fa-whatsapp"></i>
-                تواصل مع المطور عبر واتساب
+                <span id="cta-text"></span>
             </a>
 
             <div class="phone">
                 <span>{{ $whatsapp }}</span>
             </div>
 
-            <div class="footer">
-                للمساعدة والدعم الفني — فريق التطوير
-            </div>
+            <div class="footer" id="footer-text"></div>
         </div>
     </div>
+
+    <script>
+        const REASON = @json($reason);
+        const TENANT_NAME = @json($tenant->name ?? '');
+        const WHATSAPP_BASE = @json($whatsappLink);
+
+        const i18n = {
+            ar: {
+                pageTitle: 'انتهاء الاشتراك — ' + TENANT_NAME,
+                titles: {
+                    expired: 'انتهت مدة الاشتراك',
+                    suspended: 'الحساب معلّق مؤقتاً',
+                    inactive: 'الحساب غير مفعّل',
+                },
+                subtitle: 'يتعذّر الوصول إلى النظام في الوقت الحالي',
+                accountLabel: 'الحساب:',
+                messages: {
+                    expired: 'انتهت الفترة التجريبية أو مدة اشتراكك. للاستمرار في استخدام النظام، يرجى التواصل مع المطور لتجديد الاشتراك.',
+                    suspended: 'تم تعليق حسابك مؤقتاً. للتجديد وإعادة التفعيل، يرجى التواصل مع المطور.',
+                    inactive: 'حسابك غير مفعّل حالياً. يرجى التواصل مع المطور لتفعيل الاشتراك.',
+                },
+                safeHtml: '<strong>اطمئن، بياناتك في أمان.</strong> جميع معلوماتك ومحتويات حسابك محفوظة بالكامل ولن يتم حذفها. بمجرد تجديد الاشتراك ستعود للعمل من حيث توقفت.',
+                warning: 'لا يمكن إجراء أي تعديلات على الحساب حتى يتم تجديد الاشتراك',
+                cta: 'تواصل مع المطور عبر واتساب',
+                footer: 'للمساعدة والدعم الفني — فريق التطوير',
+                whatsappMsg: 'مرحباً، أرغب بتجديد اشتراك حساب ' + TENANT_NAME + ' في نظام إدارة السيارات',
+            },
+            ku: {
+                pageTitle: 'کۆتایی هاتنی بەشداریکردن — ' + TENANT_NAME,
+                titles: {
+                    expired: 'ماوەی بەشداریکردن تەواو بوو',
+                    suspended: 'هەژمارەکە کاتییەوە ڕاگیراوە',
+                    inactive: 'هەژمار چالاک نەکراوە',
+                },
+                subtitle: 'لە ئێستادا ناتوانیت بچیتە ناو سیستەمەوە',
+                accountLabel: 'هەژمار:',
+                messages: {
+                    expired: 'ماوەی تاقیکردنەوە یان بەشداریکردنەکەت تەواو بووە. بۆ بەردەوامبوون لە بەکارهێنانی سیستەم، تکایە پەیوەندی بە گەشەپێدەرەوە بکە بۆ نوێکردنەوەی بەشداریکردن.',
+                    suspended: 'هەژمارەکەت کاتییەوە ڕاگیراوە. بۆ نوێکردنەوە و چالاککردنەوە، تکایە پەیوەندی بە گەشەپێدەرەوە بکە.',
+                    inactive: 'هەژمارەکەت لە ئێستادا چالاک نییە. تکایە پەیوەندی بە گەشەپێدەرەوە بکە بۆ چالاککردنی بەشداریکردن.',
+                },
+                safeHtml: '<strong>دڵنیابە، زانیارییەکانت پارێزراون.</strong> هەموو زانیاری و ناوەڕۆکی هەژمارەکەت بەتەواوی پارێزراوە و ناسڕدرێت. دوای نوێکردنەوەی بەشداریکردن دەگەڕیتەوە بۆ کار لەو شوێنەی وەستایت.',
+                warning: 'ناتوانیت هیچ گۆڕانکارییەک بکەیت لەسەر هەژمار تا بەشداریکردن نوێ بکرێتەوە',
+                cta: 'پەیوەندی بە گەشەپێدەرەوە بکە لە ڕێگەی واتساپ',
+                footer: 'بۆ یارمەتی و پاڵپشتی تەکنیکی — تیمی گەشەپێدان',
+                whatsappMsg: 'سڵاو، دەمەوێت بەشداریکردنی هەژماری ' + TENANT_NAME + ' لە سیستەمی بەڕێوەبردنی ئۆتۆمبێل نوێ بکمەوە',
+            },
+        };
+
+        function getReasonKey() {
+            return ['expired', 'suspended', 'inactive'].includes(REASON) ? REASON : 'suspended';
+        }
+
+        function applyLang(lang) {
+            const t = i18n[lang];
+            const reason = getReasonKey();
+
+            document.documentElement.lang = lang === 'ku' ? 'ckb' : 'ar';
+            document.title = t.pageTitle;
+
+            document.getElementById('title-text').textContent = t.titles[reason];
+            document.getElementById('subtitle-text').textContent = t.subtitle;
+
+            const accountLabel = document.getElementById('account-label');
+            if (accountLabel) accountLabel.textContent = t.accountLabel;
+
+            document.getElementById('message-text').textContent = t.messages[reason];
+            document.getElementById('safe-text').innerHTML = t.safeHtml;
+            document.getElementById('warning-text').innerHTML =
+                '<i class="fas fa-triangle-exclamation"></i> ' + t.warning;
+            document.getElementById('cta-text').textContent = t.cta;
+            document.getElementById('footer-text').textContent = t.footer;
+
+            document.getElementById('whatsapp-cta').href =
+                WHATSAPP_BASE + '?text=' + encodeURIComponent(t.whatsappMsg);
+
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.lang === lang);
+            });
+
+            localStorage.setItem('access-blocked-lang', lang);
+        }
+
+        document.querySelectorAll('.lang-btn').forEach(btn => {
+            btn.addEventListener('click', () => applyLang(btn.dataset.lang));
+        });
+
+        const savedLang = localStorage.getItem('access-blocked-lang');
+        applyLang(savedLang === 'ku' ? 'ku' : 'ar');
+    </script>
 </body>
 </html>
