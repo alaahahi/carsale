@@ -36,6 +36,10 @@ class DynamicDatabaseMiddleware
         
         // الحصول على بيانات المستأجر وإعدادات قاعدة البيانات (تحترم إعداد تعطيل الكاش)
         $tenantData = SubdomainHelper::getTenantAndDatabaseConfigByDomain($host);
+
+        if ($tenantData && $tenantData['tenant'] && $tenantData['tenant']->isAccessBlocked()) {
+            return $this->blockedTenantResponse($request, $tenantData['tenant']);
+        }
         
         if ($tenantData && $tenantData['tenant'] && $tenantData['database_config']) {
             try {
@@ -94,5 +98,30 @@ class DynamicDatabaseMiddleware
         }
         
         return $next($request);
+    }
+
+    /**
+     * Return blocked-access response for suspended/inactive/expired tenants
+     */
+    private function blockedTenantResponse(Request $request, $tenant)
+    {
+        $whatsapp = config('tenancy.developer_whatsapp', '+9647511077812');
+        $whatsappDigits = preg_replace('/[^0-9]/', '', $whatsapp);
+
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'error' => 'subscription_blocked',
+                'message' => $tenant->getAccessBlockMessage(),
+                'reason' => $tenant->getAccessBlockReason(),
+                'whatsapp' => $whatsapp,
+            ], 403);
+        }
+
+        return response()->view('tenant.access-blocked', [
+            'tenant' => $tenant,
+            'reason' => $tenant->getAccessBlockReason(),
+            'whatsapp' => $whatsapp,
+            'whatsappLink' => 'https://wa.me/' . $whatsappDigits,
+        ], 403);
     }
 }

@@ -28,6 +28,11 @@ return [
     ],
 
     /**
+     * Developer contact for subscription renewal (WhatsApp)
+     */
+    'developer_whatsapp' => env('DEVELOPER_WHATSAPP', '+9647511077812'),
+
+    /**
      * Tenancy bootstrappers are executed when tenancy is initialized.
      * Their responsibility is making Laravel features tenant-aware.
      *

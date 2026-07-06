@@ -88,6 +88,31 @@ class SubdomainHelper
     }
     
     /**
+     * Clear all tenant-related caches (domain, subdomain, database config)
+     */
+    public static function clearAllCachesForTenant($tenant)
+    {
+        if (!$tenant) {
+            return;
+        }
+
+        self::clearTenantCache($tenant->id);
+
+        $domains = $tenant->relationLoaded('domains')
+            ? $tenant->domains
+            : Domain::where('tenant_id', $tenant->id)->get();
+
+        foreach ($domains as $domain) {
+            self::clearTenantDatabaseConfigCache($tenant->id, $domain->domain);
+        }
+
+        $dbConfigs = TenantDatabaseConfig::where('tenant_id', $tenant->id)->get();
+        foreach ($dbConfigs as $config) {
+            self::clearTenantDatabaseConfigCache($tenant->id, null, $config->subdomain);
+        }
+    }
+
+    /**
      * Clear tenant cache
      */
     public static function clearTenantCache($tenantId = null, $domain = null)

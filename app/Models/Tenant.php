@@ -96,6 +96,55 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     }
 
     /**
+     * Check if tenant access should be blocked (suspended, inactive, or expired subscription)
+     */
+    public function isAccessBlocked(): bool
+    {
+        if (in_array($this->status, ['suspended', 'inactive'], true)) {
+            return true;
+        }
+
+        if ($this->subscription_expires_at && $this->subscription_expires_at->isPast()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Get the reason code for blocked access
+     */
+    public function getAccessBlockReason(): string
+    {
+        if ($this->status === 'suspended') {
+            return 'suspended';
+        }
+
+        if ($this->status === 'inactive') {
+            return 'inactive';
+        }
+
+        if ($this->subscription_expires_at && $this->subscription_expires_at->isPast()) {
+            return 'expired';
+        }
+
+        return 'none';
+    }
+
+    /**
+     * Get Arabic message for blocked access
+     */
+    public function getAccessBlockMessage(): string
+    {
+        return match ($this->getAccessBlockReason()) {
+            'suspended' => 'تم تعليق حسابك مؤقتاً. يرجى التواصل مع المطور لتجديد الاشتراك.',
+            'inactive' => 'حسابك غير مفعّل حالياً. يرجى التواصل مع المطور لتفعيل الاشتراك.',
+            'expired' => 'انتهت الفترة التجريبية أو مدة الاشتراك. يرجى التواصل مع المطور للتجديد.',
+            default => 'الوصول إلى النظام غير متاح حالياً. يرجى التواصل مع المطور.',
+        };
+    }
+
+    /**
      * Get tenant setting
      */
     public function getSetting($key, $default = null)

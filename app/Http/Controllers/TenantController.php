@@ -312,8 +312,9 @@ class TenantController extends Controller
             $domain->update(['domain' => $request->domain]);
                 
                 // Clear cache for old and new domains
-                \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $oldDomain);
-                \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $request->domain);
+                \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant->fresh(['domains']));
+            } else {
+                \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant->fresh(['domains']));
             }
         });
 
@@ -350,11 +351,9 @@ class TenantController extends Controller
      */
     public function suspend($id)
     {
-        $tenant = \App\Models\Tenant::findOrFail($id);
+        $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
         $tenant->update(['status' => 'suspended']);
-        
-        // Clear cache
-        \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id);
+        \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant);
         
         return redirect()->route('tenants.index')
             ->with('success', 'تم تعليق المستأجر بنجاح');
@@ -368,11 +367,9 @@ class TenantController extends Controller
      */
     public function activate($id)
     {
-        $tenant = \App\Models\Tenant::findOrFail($id);
+        $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
         $tenant->update(['status' => 'active']);
-        
-        // Clear cache
-        \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id);
+        \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant);
         
         return redirect()->route('tenants.index')
             ->with('success', 'تم تفعيل المستأجر بنجاح');

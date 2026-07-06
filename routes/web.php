@@ -208,8 +208,9 @@ Route::group(['prefix' => 'admin'], function () {
                 $domain->update(['domain' => $request->domain]);
                 
                 // Clear cache for old and new domains
-                \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $oldDomain);
-                \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $request->domain);
+                \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant->fresh(['domains']));
+            } else {
+                \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant->fresh(['domains']));
             }
         });
 
@@ -232,22 +233,18 @@ Route::group(['prefix' => 'admin'], function () {
     })->name('tenants.destroy');
     
     Route::post('tenants/{id}/suspend', function($id) {
-        $tenant = \App\Models\Tenant::findOrFail($id);
+        $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
         $tenant->update(['status' => 'suspended']);
-        
-        // Clear cache
-        \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id);
+        \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant);
         
         return redirect()->route('tenants.index')
             ->with('success', 'تم تعليق المستأجر بنجاح');
     })->name('tenants.suspend');
     
     Route::post('tenants/{id}/activate', function($id) {
-        $tenant = \App\Models\Tenant::findOrFail($id);
+        $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
         $tenant->update(['status' => 'active']);
-        
-        // Clear cache
-        \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id);
+        \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant);
         
         return redirect()->route('tenants.index')
             ->with('success', 'تم تفعيل المستأجر بنجاح');
@@ -517,8 +514,9 @@ Route::group(['middleware' => ['central'], 'prefix' => 'central-admin'], functio
                 $domain->update(['domain' => $request->domain]);
                 
                 // Clear cache for old and new domains
-                \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $oldDomain);
-                \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id, $request->domain);
+                \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant->fresh(['domains']));
+            } else {
+                \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant->fresh(['domains']));
             }
         });
 
@@ -541,22 +539,18 @@ Route::group(['middleware' => ['central'], 'prefix' => 'central-admin'], functio
     })->name('central.tenants.destroy');
     
     Route::post('tenants/{id}/suspend', function($id) {
-        $tenant = \App\Models\Tenant::findOrFail($id);
+        $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
         $tenant->update(['status' => 'suspended']);
-        
-        // Clear cache
-        \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id);
+        \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant);
         
         return redirect()->route('central.tenants.index')
             ->with('success', 'تم تعليق المستأجر بنجاح');
     })->name('central.tenants.suspend');
     
     Route::post('tenants/{id}/activate', function($id) {
-        $tenant = \App\Models\Tenant::findOrFail($id);
+        $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
         $tenant->update(['status' => 'active']);
-        
-        // Clear cache
-        \App\Helpers\SubdomainHelper::clearTenantCache($tenant->id);
+        \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant);
         
         return redirect()->route('central.tenants.index')
             ->with('success', 'تم تفعيل المستأجر بنجاح');
