@@ -368,9 +368,21 @@ class TenantController extends Controller
     public function activate($id)
     {
         $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
-        $tenant->update(['status' => 'active']);
-        \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant);
-        
+
+        $data = ['status' => 'active'];
+        // بعد التعليق قد يبقى الاشتراك منتهياً → isAccessBlocked يظل true
+        if ($tenant->subscription_expires_at && $tenant->subscription_expires_at->isPast()) {
+            $data['subscription_expires_at'] = now()->addYear();
+        }
+
+        $tenant->update($data);
+
+        // تأكد أن إعدادات قاعدة البيانات مفعّلة
+        \App\Models\TenantDatabaseConfig::where('tenant_id', $tenant->id)
+            ->update(['is_active' => true]);
+
+        \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant->fresh(['domains']));
+
         return redirect()->route('tenants.index')
             ->with('success', 'تم تفعيل المستأجر بنجاح');
     }

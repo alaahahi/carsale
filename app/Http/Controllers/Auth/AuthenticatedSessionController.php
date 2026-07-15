@@ -20,10 +20,7 @@ class AuthenticatedSessionController extends Controller
      */
     public function create()
     {
-        if (Auth::check()) {
-            return redirect()->to(RouteServiceProvider::HOME);
-        }
-
+        // دائماً اعرض Blade — لا تحوّل للداشبورد هنا (يمنع حلقة التحويل وتجديد الكوكيز)
         return view('auth.login', [
             'canResetPassword' => Route::has('password.request'),
             'systemConfig' => TenantDataHelper::getSystemConfig(),

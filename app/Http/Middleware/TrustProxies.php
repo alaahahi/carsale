@@ -8,15 +8,14 @@ use Illuminate\Http\Request;
 class TrustProxies extends Middleware
 {
     /**
-     * The trusted proxies for this application.
+     * Trust reverse proxies (nginx / Cloudflare) so HTTPS is detected correctly.
+     * بدون هذا: غالباً حلقة http↔https وكوكيز Session تتجدد بلا توقف على بعض الدومينات.
      *
      * @var array<int, string>|string|null
      */
-    protected $proxies;
+    protected $proxies = '*';
 
     /**
-     * The headers that should be used to detect proxies.
-     *
      * @var int
      */
     protected $headers =

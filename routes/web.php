@@ -255,8 +255,13 @@ Route::group(['prefix' => 'admin'], function () {
     
     Route::post('tenants/{id}/activate', function($id) {
         $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
-        $tenant->update(['status' => 'active']);
-        \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant);
+        $data = ['status' => 'active'];
+        if ($tenant->subscription_expires_at && $tenant->subscription_expires_at->isPast()) {
+            $data['subscription_expires_at'] = now()->addYear();
+        }
+        $tenant->update($data);
+        \App\Models\TenantDatabaseConfig::where('tenant_id', $tenant->id)->update(['is_active' => true]);
+        \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant->fresh(['domains']));
         
         return redirect()->route('tenants.index')
             ->with('success', 'تم تفعيل المستأجر بنجاح');
@@ -561,8 +566,13 @@ Route::group(['middleware' => ['central'], 'prefix' => 'central-admin'], functio
     
     Route::post('tenants/{id}/activate', function($id) {
         $tenant = \App\Models\Tenant::with('domains')->findOrFail($id);
-        $tenant->update(['status' => 'active']);
-        \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant);
+        $data = ['status' => 'active'];
+        if ($tenant->subscription_expires_at && $tenant->subscription_expires_at->isPast()) {
+            $data['subscription_expires_at'] = now()->addYear();
+        }
+        $tenant->update($data);
+        \App\Models\TenantDatabaseConfig::where('tenant_id', $tenant->id)->update(['is_active' => true]);
+        \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant->fresh(['domains']));
         
         return redirect()->route('central.tenants.index')
             ->with('success', 'تم تفعيل المستأجر بنجاح');
@@ -738,13 +748,8 @@ Route::group(['middleware' => ['tenant']], function () {
     Route::resource('/users', UserController::class)->middleware(['auth', 'verified']);
 
     Route::get('/', function () {
-        return Inertia::render('Welcome', [
-            'config' => SystemConfig::first(),
-            'systemConfig' => \App\Helpers\TenantDataHelper::getSystemConfig(),
-            'canLogin' => Route::has('login'),
-            'laravelVersion' => Application::VERSION,
-            'phpVersion' => PHP_VERSION,
-        ]);
+        // صفحة Blade لتسجيل الدخول بدلاً من Welcome/Inertia لتفادي حلقات التحويل
+        return redirect('/login');
     });
 
     Route::group(['middleware' => ['auth','verified']], function () {

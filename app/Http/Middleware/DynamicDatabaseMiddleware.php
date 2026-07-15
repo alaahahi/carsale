@@ -109,19 +109,12 @@ class DynamicDatabaseMiddleware
     }
 
     /**
-     * أغلق الاتصال بعد حفظ الجلسة (Session terminate ثم app()->terminating)
+     * لا نغلق الاتصال هنا — الإغلاق المبكر كان يساهم في فقدان الجلسة وحلقة التحويل.
+     * PHP-FPM ينهي العملية بعد الطلب.
      */
     public function terminate($request, $response): void
     {
-        if ($this->cleanupQueued || !$this->dynamicConnectionName) {
-            return;
-        }
-
-        $this->cleanupQueued = true;
-
-        app()->terminating(function () {
-            $this->cleanupTenantConnection();
-        });
+        // intentionally empty
     }
 
     private function cleanupTenantConnection(): void
