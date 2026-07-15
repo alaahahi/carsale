@@ -6,11 +6,15 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm } from '@inertiajs/inertia-vue3';
+import { computed } from 'vue';
 
-defineProps({
+const props = defineProps({
     canResetPassword: Boolean,
     status: String,
+    systemConfig: Object,
 });
+
+const loginBgUrl = computed(() => props.systemConfig?.login_bg_url || '');
 
 const form = useForm({
     email: '',
@@ -26,7 +30,7 @@ const submit = () => {
 </script>
 
 <template>
-    <GuestLayout>
+    <GuestLayout :login-bg-url="loginBgUrl">
         <Head title="Log in" />
         <div v-if="status" class="mb-4 font-medium text-sm text-green-600">
             {{ status }}

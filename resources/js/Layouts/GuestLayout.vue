@@ -1,13 +1,20 @@
 <script setup>
+defineProps({
+  loginBgUrl: {
+    type: String,
+    default: '',
+  },
+});
 </script>
 
 <template>
     <div
         class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100"
         :style="{
-            backgroundImage: `url('${$page.props.systemConfig?.login_bg_url || '/img/logo-color1.png'}')`,
+            backgroundImage: `url('${loginBgUrl || $page.props.systemConfig?.login_bg_url || '/img/logo-color1.png'}')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
         }"
     >
         <div></div>

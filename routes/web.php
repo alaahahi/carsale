@@ -740,6 +740,7 @@ Route::group(['middleware' => ['tenant']], function () {
     Route::get('/', function () {
         return Inertia::render('Welcome', [
             'config' => SystemConfig::first(),
+            'systemConfig' => \App\Helpers\TenantDataHelper::getSystemConfig(),
             'canLogin' => Route::has('login'),
             'laravelVersion' => Application::VERSION,
             'phpVersion' => PHP_VERSION,

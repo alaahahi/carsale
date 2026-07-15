@@ -6,7 +6,9 @@ use Closure;
 use Illuminate\Http\Request;
 use App\Helpers\DynamicDatabaseHelper;
 use App\Helpers\SubdomainHelper;
+use App\Helpers\TenantDataHelper;
 use Stancl\Tenancy\Tenancy;
+use Inertia\Inertia;
 
 class DynamicDatabaseMiddleware
 {
@@ -71,6 +73,13 @@ class DynamicDatabaseMiddleware
                 'dynamic_connection_name' => $this->dynamicConnectionName,
             ]);
 
+            // بعد اتصال قاعدة التاجر: مرّر إعدادات الشعار/الخلفية لـ Inertia مباشرة
+            try {
+                Inertia::share('systemConfig', TenantDataHelper::getSystemConfig());
+            } catch (\Throwable $e) {
+                Inertia::share('systemConfig', TenantDataHelper::defaultSystemConfig());
+            }
+
             \Log::info('Dynamic Database Connection Established', [
                 'host' => $host,
                 'subdomain' => $tenantData['subdomain'],
@@ -91,19 +100,21 @@ class DynamicDatabaseMiddleware
                 'trace' => $e->getTraceAsString(),
             ]);
 
+            // فشل قبل/أثناء الطلب: أغلق فوراً
+            $this->cleanupTenantConnection();
+
             return response()->json([
                 'error' => 'Database connection failed',
                 'message' => 'Unable to connect to tenant database',
                 'subdomain' => $tenantData['subdomain'] ?? 'unknown',
             ], 500);
-        } finally {
-            // أغلق الاتصال بعد انتهاء بناء الاستجابة (مهم لمنع بقاء اتصالات مفتوحة)
-            $this->cleanupTenantConnection();
         }
+        // ملاحظة: لا نغلق الاتصال في finally هنا حتى تكتمل استجابة Inertia بالكامل.
+        // الإغلاق يتم في terminate() بعد إرسال الاستجابة.
     }
 
     /**
-     * احتياطي: بعد إرسال الاستجابة أيضاً
+     * بعد إرسال الاستجابة: أغلق اتصال التاجر (مهم مع Multi-Tenant)
      */
     public function terminate($request, $response): void
     {
