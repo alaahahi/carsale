@@ -10,20 +10,22 @@ use App\Providers\RouteServiceProvider;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 class AuthenticatedSessionController extends Controller
 {
     /**
-     * Display the login view.
+     * Display the login view (Blade — full page, بدون Inertia).
      *
-     * @return \Inertia\Response
+     * @return \Illuminate\View\View|\Illuminate\Http\RedirectResponse
      */
     public function create()
     {
-        return Inertia::render('Auth/Login', [
+        if (Auth::check()) {
+            return redirect()->to(RouteServiceProvider::HOME);
+        }
+
+        return view('auth.login', [
             'canResetPassword' => Route::has('password.request'),
-            'status' => session('status'),
             'systemConfig' => TenantDataHelper::getSystemConfig(),
         ]);
     }
@@ -38,16 +40,16 @@ class AuthenticatedSessionController extends Controller
     {
         $user = User::where('email', $request->email)->first();
 
-        // is_band = 1 يعني محظور؛ أي قيمة فارغة/0 تسمح بالدخول
         if ($user && (int) $user->is_band === 1) {
             return back()->withErrors([
                 'email' => 'هذا الحساب محظور.',
-            ]);
+            ])->onlyInput('email');
         }
 
         $request->authenticate();
         $request->session()->regenerate();
 
+        // توجيه كامل للصفحة (ليس Inertia XHR) — يمنع حلقة login ↔ dashboard
         return redirect()->intended(RouteServiceProvider::HOME);
     }
 
@@ -65,6 +67,6 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerateToken();
 
-        return redirect('/');
+        return redirect('/login');
     }
 }
