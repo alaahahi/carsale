@@ -6,6 +6,7 @@ use App\Models\UserType;
 use App\Models\User;
 use App\Models\ExpensesType;
 use App\Models\SystemConfig;
+use Illuminate\Support\Facades\Schema;
 
 class TenantDataHelper
 {
@@ -121,7 +122,7 @@ class TenantDataHelper
             $name = $default;
         }
 
-        return '/img/' . $name;
+        return '/img/' . $name . '?v=' . max(1, @filemtime(public_path('img/' . $name)) ?: time());
     }
 
     public static function defaultSystemConfig(): array
@@ -150,8 +151,19 @@ class TenantDataHelper
             return self::defaultSystemConfig();
         }
 
-        $logoImage = $config->logo_image ?: 'logo-color1.png';
-        $loginBgImage = $config->login_bg_image ?: $logoImage;
+        $hasLogoCol = false;
+        $hasBgCol = false;
+        try {
+            $hasLogoCol = Schema::hasColumn('system_config', 'logo_image');
+            $hasBgCol = Schema::hasColumn('system_config', 'login_bg_image');
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
+        $logoImage = ($hasLogoCol && $config->logo_image) ? $config->logo_image : 'logo-color1.png';
+        $loginBgImage = ($hasBgCol && $config->login_bg_image)
+            ? $config->login_bg_image
+            : $logoImage;
 
         return [
             'company_name' => $config->first_title_ar ?? 'Salam Jalal Ayoub Company',
@@ -165,7 +177,7 @@ class TenantDataHelper
             'login_bg_image' => $loginBgImage,
             'logo_url' => self::resolvePublicImageUrl($logoImage),
             'login_bg_url' => self::resolvePublicImageUrl($loginBgImage),
-            'external_merchant_ids' => self::parseMerchantIds($config->external_merchant_ids),
+            'external_merchant_ids' => self::parseMerchantIds($config->external_merchant_ids ?? null),
         ];
     }
 

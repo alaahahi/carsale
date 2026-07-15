@@ -517,40 +517,48 @@ class TenantController extends Controller
     {
         try {
             $tenant = \App\Models\Tenant::findOrFail($id);
-            
-            // Initialize tenancy for this tenant
+
             tenancy()->initialize($tenant);
-            
-            // Get current database connection info
-            $connection = DB::connection();
-            $databaseName = $connection->getDatabaseName();
-            $host = $connection->getConfig('host');
-            $port = $connection->getConfig('port');
-            
-            // Test the connection
-            $pdo = $connection->getPdo();
-            $tables = $connection->select('SHOW TABLES');
-            
-            return response()->json([
-                'success' => true,
-                'tenant' => [
-                    'id' => $tenant->id,
-                    'name' => $tenant->name,
-                    'domains' => $tenant->domains->pluck('domain')
-                ],
-                'database' => [
-                    'name' => $databaseName,
-                    'host' => $host,
-                    'port' => $port,
-                    'connection_active' => true,
-                    'tables_count' => count($tables)
-                ]
-            ]);
-            
+
+            try {
+                $connection = DB::connection();
+                $databaseName = $connection->getDatabaseName();
+                $host = $connection->getConfig('host');
+                $port = $connection->getConfig('port');
+
+                $connection->getPdo();
+                $tables = $connection->select('SHOW TABLES');
+
+                return response()->json([
+                    'success' => true,
+                    'tenant' => [
+                        'id' => $tenant->id,
+                        'name' => $tenant->name,
+                        'domains' => $tenant->domains->pluck('domain'),
+                    ],
+                    'database' => [
+                        'name' => $databaseName,
+                        'host' => $host,
+                        'port' => $port,
+                        'connection_active' => true,
+                        'tables_count' => count($tables),
+                    ],
+                ]);
+            } finally {
+                try {
+                    tenancy()->end();
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+                $active = \App\Helpers\DynamicDatabaseHelper::getActiveConnectionName();
+                if ($active) {
+                    \App\Helpers\DynamicDatabaseHelper::releaseConnection($active);
+                }
+            }
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'خطأ في الاتصال بقاعدة البيانات: ' . $e->getMessage()
+                'message' => 'خطأ في الاتصال بقاعدة البيانات: ' . $e->getMessage(),
             ], 500);
         }
     }

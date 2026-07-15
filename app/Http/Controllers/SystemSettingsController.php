@@ -301,6 +301,14 @@ class SystemSettingsController extends Controller
             'login_bg_image' => 'nullable|string|max:255',
         ]);
 
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('system_config', 'logo_image')
+            || !\Illuminate\Support\Facades\Schema::hasColumn('system_config', 'login_bg_image')) {
+            return Response::json([
+                'success' => false,
+                'message' => 'أعمدة الشعار غير موجودة. شغّل المايغريشن: 2026_07_05_000001_add_logo_fields_to_system_config_table',
+            ], 422);
+        }
+
         $config = SystemConfig::query()->first();
         if (!$config) {
             $config = SystemConfig::create([]);

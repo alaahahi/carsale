@@ -8,23 +8,111 @@ use Illuminate\Support\Facades\Log;
 
 class DynamicDatabaseHelper
 {
+    protected static ?string $previousDefault = null;
+
+    protected static ?string $activeConnection = null;
+
     /**
      * تطبيق إعدادات قاعدة البيانات الديناميكية مباشرة
      */
     public static function setConnection(TenantDatabaseConfig $config): string
     {
+        // أغلق اتصالاً ديناميكياً سابقاً إن وُجد (مهم في PHP-FPM / أوامر متعددة التجار)
+        if (self::$activeConnection) {
+            self::releaseConnection(self::$activeConnection);
+        }
+
         $connectionName = 'dynamic_connection_' . $config->id;
         $connectionInfo = $config->getConnectionInfo();
-        
-        // تحديث إعدادات الاتصال
+
+        self::$previousDefault = config('database.default');
+
         config([
-            "database.connections.{$connectionName}" => $connectionInfo
+            "database.connections.{$connectionName}" => $connectionInfo,
+            'database.default' => $connectionName,
         ]);
 
-        // تعيين الاتصال الافتراضي للـ tenant
-        config(['database.default' => $connectionName]);
+        self::$activeConnection = $connectionName;
 
         return $connectionName;
+    }
+
+    /**
+     * إغلاق وتنظيف اتصال ديناميكي (disconnect + purge)
+     */
+    public static function releaseConnection(?string $connectionName = null): void
+    {
+        $name = $connectionName ?: self::$activeConnection;
+        if (!$name) {
+            return;
+        }
+
+        try {
+            DB::disconnect($name);
+        } catch (\Throwable $e) {
+            Log::debug('DB disconnect warning', [
+                'connection' => $name,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            DB::purge($name);
+        } catch (\Throwable $e) {
+            Log::debug('DB purge warning', [
+                'connection' => $name,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $connections = config('database.connections', []);
+        if (isset($connections[$name])) {
+            unset($connections[$name]);
+            config(['database.connections' => $connections]);
+        }
+
+        if (self::$activeConnection === $name) {
+            if (self::$previousDefault) {
+                config(['database.default' => self::$previousDefault]);
+            }
+            self::$activeConnection = null;
+            self::$previousDefault = null;
+        }
+    }
+
+    /**
+     * تنفيذ عمل على اتصال مؤقت ثم إغلاقه دائماً
+     */
+    public static function usingConnection(TenantDatabaseConfig $config, callable $callback, ?string $prefix = null)
+    {
+        $connectionName = ($prefix ?: 'tmp_tenant_') . $config->id;
+        $previousDefault = config('database.default');
+
+        config([
+            "database.connections.{$connectionName}" => $config->getConnectionInfo(),
+        ]);
+
+        try {
+            return $callback($connectionName, DB::connection($connectionName));
+        } finally {
+            try {
+                DB::disconnect($connectionName);
+            } catch (\Throwable $e) {
+                // ignore
+            }
+            try {
+                DB::purge($connectionName);
+            } catch (\Throwable $e) {
+                // ignore
+            }
+
+            $connections = config('database.connections', []);
+            unset($connections[$connectionName]);
+            config([
+                'database.connections' => $connections,
+                'database.default' => $previousDefault,
+            ]);
+        }
     }
 
     /**
@@ -33,7 +121,7 @@ class DynamicDatabaseHelper
     public static function getConnectionBySubdomain(string $subdomain): ?string
     {
         $config = TenantDatabaseConfig::findBySubdomain($subdomain);
-        
+
         if (!$config) {
             return null;
         }
@@ -46,22 +134,23 @@ class DynamicDatabaseHelper
      */
     public static function queryBySubdomain(string $subdomain, callable $callback)
     {
-        $connectionName = self::getConnectionBySubdomain($subdomain);
-        
-        if (!$connectionName) {
+        $config = TenantDatabaseConfig::findBySubdomain($subdomain);
+
+        if (!$config) {
             throw new \Exception("لم يتم العثور على إعدادات قاعدة البيانات للـ subdomain: {$subdomain}");
         }
 
         try {
-            return DB::connection($connectionName)->transaction($callback);
+            return self::usingConnection($config, function ($connectionName) use ($callback) {
+                return DB::connection($connectionName)->transaction($callback);
+            }, 'query_');
         } catch (\Exception $e) {
             Log::error('Dynamic Database Query Error', [
                 'subdomain' => $subdomain,
-                'connection_name' => $connectionName,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             throw $e;
         }
     }
@@ -88,22 +177,21 @@ class DynamicDatabaseHelper
     public static function testConnection(string $subdomain): bool
     {
         try {
-            $connectionName = self::getConnectionBySubdomain($subdomain);
-            
-            if (!$connectionName) {
+            $config = TenantDatabaseConfig::findBySubdomain($subdomain);
+            if (!$config) {
                 return false;
             }
 
-            $connection = DB::connection($connectionName);
-            $connection->getPdo();
-            
-            return true;
+            return (bool) self::usingConnection($config, function ($connectionName, $connection) {
+                $connection->getPdo();
+                return true;
+            }, 'test_');
         } catch (\Exception $e) {
             Log::error('Connection Test Failed', [
                 'subdomain' => $subdomain,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
-            
+
             return false;
         }
     }
@@ -114,7 +202,7 @@ class DynamicDatabaseHelper
     public static function getConnectionInfo(string $subdomain): ?array
     {
         $config = TenantDatabaseConfig::findBySubdomain($subdomain);
-        
+
         if (!$config) {
             return null;
         }
@@ -157,13 +245,18 @@ class DynamicDatabaseHelper
     public static function getConnectionStats()
     {
         $configs = TenantDatabaseConfig::getActiveConfigs();
-        $stats = [
+
+        return [
             'total_configs' => $configs->count(),
             'active_configs' => $configs->where('is_active', true)->count(),
             'inactive_configs' => $configs->where('is_active', false)->count(),
             'by_driver' => $configs->groupBy('driver')->map->count(),
+            'current_dynamic' => self::$activeConnection,
         ];
+    }
 
-        return $stats;
+    public static function getActiveConnectionName(): ?string
+    {
+        return self::$activeConnection;
     }
 }

@@ -86,6 +86,18 @@ Route::get('admin/tenants/database-info', function() {
                         'error' => $e->getMessage()
                     ]
                 ];
+            } finally {
+                try {
+                    if (tenancy()->initialized) {
+                        tenancy()->end();
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+                $active = \App\Helpers\DynamicDatabaseHelper::getActiveConnectionName();
+                if ($active) {
+                    \App\Helpers\DynamicDatabaseHelper::releaseConnection($active);
+                }
             }
         }
         
@@ -720,6 +732,9 @@ Route::group(['middleware' => ['central'], 'prefix' => 'central-admin'], functio
 
 // Tenant routes
 Route::group(['middleware' => ['tenant']], function () {
+    // Auth يجب أن يكون داخل tenant حتى login/welcome يقرأوا system_config الصحيح
+    require __DIR__.'/auth.php';
+
     Route::resource('/users', UserController::class)->middleware(['auth', 'verified']);
 
     Route::get('/', function () {
@@ -814,5 +829,3 @@ Route::get('simple-accounting',[SimpleAccountingController::class, 'index'])->na
 
     });
 });
-
-require __DIR__.'/auth.php';

@@ -64,39 +64,51 @@ class TenantDatabaseConfig extends Model
      */
     public function testConnection(): bool
     {
+        $connectionName = 'test_connection_' . $this->id;
+
         try {
             $connectionInfo = $this->getConnectionInfo();
-            $connectionName = 'test_connection_' . $this->id;
-            
+
             \Log::info('Setting up test connection', [
                 'config_id' => $this->id,
                 'connection_name' => $connectionName,
                 'host' => $this->host,
                 'database' => $this->database_name,
-                'driver' => $this->driver
+                'driver' => $this->driver,
             ]);
-            
+
             config([
-                "database.connections.{$connectionName}" => $connectionInfo
+                "database.connections.{$connectionName}" => $connectionInfo,
             ]);
-            
+
             $connection = \DB::connection($connectionName);
-            $pdo = $connection->getPdo();
-            
+            $connection->getPdo();
+
             \Log::info('Test connection successful', [
                 'config_id' => $this->id,
-                'connection_name' => $connectionName
+                'connection_name' => $connectionName,
             ]);
-            
+
             return true;
         } catch (\Exception $e) {
             \Log::error('Test connection failed', [
                 'config_id' => $this->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return false;
+        } finally {
+            try {
+                \DB::disconnect($connectionName);
+            } catch (\Throwable $e) {
+                // ignore
+            }
+            try {
+                \DB::purge($connectionName);
+            } catch (\Throwable $e) {
+                // ignore
+            }
         }
     }
 

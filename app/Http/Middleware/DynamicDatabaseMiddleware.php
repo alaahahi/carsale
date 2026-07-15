@@ -6,18 +6,19 @@ use Closure;
 use Illuminate\Http\Request;
 use App\Helpers\DynamicDatabaseHelper;
 use App\Helpers\SubdomainHelper;
-use App\Models\TenantDatabaseConfig;
 use Stancl\Tenancy\Tenancy;
 
 class DynamicDatabaseMiddleware
 {
     protected $tenancy;
-    
+
+    protected ?string $dynamicConnectionName = null;
+
     public function __construct(Tenancy $tenancy)
     {
         $this->tenancy = $tenancy;
     }
-    
+
     /**
      * Handle an incoming request.
      *
@@ -28,76 +29,104 @@ class DynamicDatabaseMiddleware
     public function handle(Request $request, Closure $next)
     {
         $host = $request->getHost();
-        
+
         // التحقق من أن الدومين ليس من الدومينات المركزية
         if (SubdomainHelper::isCentralDomain($host)) {
             return $next($request);
         }
-        
+
         // الحصول على بيانات المستأجر وإعدادات قاعدة البيانات (تحترم إعداد تعطيل الكاش)
         $tenantData = SubdomainHelper::getTenantAndDatabaseConfigByDomain($host);
 
         if ($tenantData && $tenantData['tenant'] && $tenantData['tenant']->isAccessBlocked()) {
             return $this->blockedTenantResponse($request, $tenantData['tenant']);
         }
-        
-        if ($tenantData && $tenantData['tenant'] && $tenantData['database_config']) {
-            try {
-                // تطبيق إعدادات قاعدة البيانات الديناميكية
-                DynamicDatabaseHelper::setConnection($tenantData['database_config']);
-                
-                // تهيئة نظام المستأجرين
-                $this->tenancy->initialize($tenantData['tenant']);
-                
-                // إضافة معلومات إضافية إلى الطلب
-                $request->merge([
-                    'current_tenant' => $tenantData['tenant'],
-                    'current_database_config' => $tenantData['database_config'],
-                    'current_subdomain' => $tenantData['subdomain'],
-                    'dynamic_connection_active' => true,
-                ]);
-                
-                // تسجيل العملية
-                \Log::info('Dynamic Database Connection Established', [
-                    'host' => $host,
-                    'subdomain' => $tenantData['subdomain'],
-                    'tenant_id' => $tenantData['tenant']->id,
-                    'tenant_name' => $tenantData['tenant']->name,
-                    'database_name' => $tenantData['database_config']->database_name,
-                    'url' => $request->url(),
-                    'method' => $request->method(),
-                ]);
-                
-            } catch (\Exception $e) {
-                \Log::error('Dynamic Database Connection Failed', [
-                    'host' => $host,
-                    'subdomain' => $tenantData['subdomain'] ?? 'unknown',
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                ]);
-                
-                // في حالة فشل الاتصال، يمكن إما إرجاع خطأ أو المتابعة بدون اتصال ديناميكي
-                return response()->json([
-                    'error' => 'Database connection failed',
-                    'message' => 'Unable to connect to tenant database',
-                    'subdomain' => $tenantData['subdomain'] ?? 'unknown'
-                ], 500);
-            }
-        } else {
-            // لا يوجد مستأجر أو إعدادات قاعدة بيانات لهذا الدومين
+
+        if (!($tenantData && $tenantData['tenant'] && $tenantData['database_config'])) {
             \Log::warning('No tenant or database config found for domain', [
                 'host' => $host,
                 'subdomain' => SubdomainHelper::extractSubdomain($host),
             ]);
-            
+
             return response()->json([
                 'error' => 'Tenant not found',
                 'message' => 'No tenant or database configuration found for this domain',
-                'host' => $host
+                'host' => $host,
             ], 404);
         }
-        
-        return $next($request);
+
+        try {
+            // تطبيق إعدادات قاعدة البيانات الديناميكية
+            $this->dynamicConnectionName = DynamicDatabaseHelper::setConnection($tenantData['database_config']);
+
+            // تهيئة نظام المستأجرين
+            $this->tenancy->initialize($tenantData['tenant']);
+
+            // إضافة معلومات إضافية إلى الطلب
+            $request->merge([
+                'current_tenant' => $tenantData['tenant'],
+                'current_database_config' => $tenantData['database_config'],
+                'current_subdomain' => $tenantData['subdomain'],
+                'dynamic_connection_active' => true,
+                'dynamic_connection_name' => $this->dynamicConnectionName,
+            ]);
+
+            \Log::info('Dynamic Database Connection Established', [
+                'host' => $host,
+                'subdomain' => $tenantData['subdomain'],
+                'tenant_id' => $tenantData['tenant']->id,
+                'tenant_name' => $tenantData['tenant']->name,
+                'database_name' => $tenantData['database_config']->database_name,
+                'connection_name' => $this->dynamicConnectionName,
+                'url' => $request->url(),
+                'method' => $request->method(),
+            ]);
+
+            return $next($request);
+        } catch (\Exception $e) {
+            \Log::error('Dynamic Database Connection Failed', [
+                'host' => $host,
+                'subdomain' => $tenantData['subdomain'] ?? 'unknown',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Database connection failed',
+                'message' => 'Unable to connect to tenant database',
+                'subdomain' => $tenantData['subdomain'] ?? 'unknown',
+            ], 500);
+        } finally {
+            // أغلق الاتصال بعد انتهاء بناء الاستجابة (مهم لمنع بقاء اتصالات مفتوحة)
+            $this->cleanupTenantConnection();
+        }
+    }
+
+    /**
+     * احتياطي: بعد إرسال الاستجابة أيضاً
+     */
+    public function terminate($request, $response): void
+    {
+        $this->cleanupTenantConnection();
+    }
+
+    private function cleanupTenantConnection(): void
+    {
+        try {
+            if ($this->tenancy->initialized) {
+                $this->tenancy->end();
+            }
+        } catch (\Throwable $e) {
+            \Log::debug('Tenancy end warning', ['error' => $e->getMessage()]);
+        }
+
+        $connectionName = $this->dynamicConnectionName
+            ?: DynamicDatabaseHelper::getActiveConnectionName();
+
+        if ($connectionName) {
+            DynamicDatabaseHelper::releaseConnection($connectionName);
+            $this->dynamicConnectionName = null;
+        }
     }
 
     /**

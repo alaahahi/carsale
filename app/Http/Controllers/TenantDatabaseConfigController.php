@@ -273,6 +273,10 @@ class TenantDatabaseConfigController extends Controller
                 'success' => false,
                 'message' => 'خطأ في الاتصال بقاعدة البيانات: ' . $e->getMessage()
             ], 500);
+        } finally {
+            if (isset($connectionName)) {
+                $this->releaseTempConnection($connectionName);
+            }
         }
     }
 
@@ -335,6 +339,10 @@ class TenantDatabaseConfigController extends Controller
                 'success' => false,
                 'message' => 'خطأ في فحص الجداول: ' . $e->getMessage()
             ], 500);
+        } finally {
+            if (isset($connectionName)) {
+                $this->releaseTempConnection($connectionName);
+            }
         }
     }
 
@@ -398,6 +406,10 @@ class TenantDatabaseConfigController extends Controller
                 'hasAdmin' => false,
                 'message' => 'خطأ في فحص الأدمن: ' . $e->getMessage()
             ], 500);
+        } finally {
+            if (isset($connectionName)) {
+                $this->releaseTempConnection($connectionName);
+            }
         }
     }
 
@@ -548,6 +560,10 @@ class TenantDatabaseConfigController extends Controller
                 'success' => false,
                 'message' => 'خطأ في تشغيل المايكريشن: ' . $e->getMessage()
             ], 500);
+        } finally {
+            if (isset($connectionName)) {
+                $this->releaseTempConnection($connectionName);
+            }
         }
     }
 
@@ -609,6 +625,10 @@ class TenantDatabaseConfigController extends Controller
                 'success' => false,
                 'message' => 'خطأ في إنشاء مستخدم الأدمن: ' . $e->getMessage()
             ], 500);
+        } finally {
+            if (isset($connectionName)) {
+                $this->releaseTempConnection($connectionName);
+            }
         }
     }
 
@@ -761,6 +781,30 @@ class TenantDatabaseConfigController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
             throw $e;
+        }
+    }
+
+    /**
+     * إغلاق اتصال مؤقت لمنع بقاء اتصالات MySQL مفتوحة
+     */
+    private function releaseTempConnection(string $connectionName): void
+    {
+        try {
+            DB::disconnect($connectionName);
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
+        try {
+            DB::purge($connectionName);
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
+        $connections = config('database.connections', []);
+        if (isset($connections[$connectionName])) {
+            unset($connections[$connectionName]);
+            config(['database.connections' => $connections]);
         }
     }
 }

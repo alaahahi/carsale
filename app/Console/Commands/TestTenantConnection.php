@@ -80,6 +80,9 @@ class TestTenantConnection extends Command
                         
                     } catch (\Exception $e) {
                         $this->error("   ❌ Database query failed: " . $e->getMessage());
+                    } finally {
+                        DynamicDatabaseHelper::releaseConnection($connectionName);
+                        $this->line("   ✓ Connection closed");
                     }
                     
                 } else {
