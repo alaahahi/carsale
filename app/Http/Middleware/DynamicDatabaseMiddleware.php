@@ -5,24 +5,17 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use App\Helpers\DynamicDatabaseHelper;
 use App\Helpers\SubdomainHelper;
 use App\Helpers\TenantDataHelper;
-use Stancl\Tenancy\Tenancy;
 use Inertia\Inertia;
 
 class DynamicDatabaseMiddleware
 {
-    protected $tenancy;
-
     protected ?string $dynamicConnectionName = null;
 
     protected bool $cleanupQueued = false;
-
-    public function __construct(Tenancy $tenancy)
-    {
-        $this->tenancy = $tenancy;
-    }
 
     /**
      * Handle an incoming request.
@@ -35,12 +28,15 @@ class DynamicDatabaseMiddleware
     {
         $host = $request->getHost();
 
-        // التحقق من أن الدومين ليس من الدومينات المركزية
         if (SubdomainHelper::isCentralDomain($host)) {
             return $next($request);
         }
 
-        // الحصول على بيانات المستأجر وإعدادات قاعدة البيانات (تحترم إعداد تعطيل الكاش)
+        // تجنّب تهيئة مزدوجة إن وُضع الميدلوير أكثر من مرة
+        if (DynamicDatabaseHelper::getActiveConnectionName()) {
+            return $next($request);
+        }
+
         $tenantData = SubdomainHelper::getTenantAndDatabaseConfigByDomain($host);
 
         if ($tenantData && $tenantData['tenant'] && $tenantData['tenant']->isAccessBlocked()) {
@@ -61,16 +57,13 @@ class DynamicDatabaseMiddleware
         }
 
         try {
-            // تطبيق إعدادات قاعدة البيانات الديناميكية
+            // اتصال واحد فقط من TenantDatabaseConfig — بدون tenancy()->initialize()
+            // لأن DatabaseTenancyBootstrapper يستبدل default بقاعدة Stancl (aindubai_*) ويكسر الجلسة/الدخول
             $this->dynamicConnectionName = DynamicDatabaseHelper::setConnection($tenantData['database_config']);
+            DB::setDefaultConnection($this->dynamicConnectionName);
 
-            // تهيئة نظام المستأجرين
-            $this->tenancy->initialize($tenantData['tenant']);
+            Auth::forgetGuards();
 
-            // إعادة حل المستخدم من قاعدة التاجر (قد يكون تم تحميله مبكراً من القاعدة المركزية)
-            $this->forgetResolvedAuthUsers();
-
-            // إضافة معلومات إضافية إلى الطلب
             $request->merge([
                 'current_tenant' => $tenantData['tenant'],
                 'current_database_config' => $tenantData['database_config'],
@@ -79,7 +72,6 @@ class DynamicDatabaseMiddleware
                 'dynamic_connection_name' => $this->dynamicConnectionName,
             ]);
 
-            // بعد اتصال قاعدة التاجر: مرّر إعدادات الشعار/الخلفية لـ Inertia مباشرة
             try {
                 Inertia::share('systemConfig', TenantDataHelper::getSystemConfig());
             } catch (\Throwable $e) {
@@ -106,7 +98,6 @@ class DynamicDatabaseMiddleware
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            // فشل قبل/أثناء الطلب: أغلق فوراً
             $this->cleanupTenantConnection();
 
             return response()->json([
@@ -118,8 +109,7 @@ class DynamicDatabaseMiddleware
     }
 
     /**
-     * بعد إرسال الاستجابة: أغلق اتصال التاجر بعد حفظ الجلسة
-     * (terminate للـ Session يعمل قبل app()->terminating)
+     * أغلق الاتصال بعد حفظ الجلسة (Session terminate ثم app()->terminating)
      */
     public function terminate($request, $response): void
     {
@@ -134,26 +124,8 @@ class DynamicDatabaseMiddleware
         });
     }
 
-    private function forgetResolvedAuthUsers(): void
-    {
-        try {
-            // Laravel 9: لا يوجد forgetUser على SessionGuard
-            Auth::forgetGuards();
-        } catch (\Throwable $e) {
-            \Log::debug('Auth forgetGuards warning', ['error' => $e->getMessage()]);
-        }
-    }
-
     private function cleanupTenantConnection(): void
     {
-        try {
-            if ($this->tenancy->initialized) {
-                $this->tenancy->end();
-            }
-        } catch (\Throwable $e) {
-            \Log::debug('Tenancy end warning', ['error' => $e->getMessage()]);
-        }
-
         $connectionName = $this->dynamicConnectionName
             ?: DynamicDatabaseHelper::getActiveConnectionName();
 
@@ -163,9 +135,6 @@ class DynamicDatabaseMiddleware
         }
     }
 
-    /**
-     * Return blocked-access response for suspended/inactive/expired tenants
-     */
     private function blockedTenantResponse(Request $request, $tenant)
     {
         $whatsapp = config('tenancy.developer_whatsapp', '+9647511077812');
