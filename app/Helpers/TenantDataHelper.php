@@ -6,7 +6,6 @@ use App\Models\UserType;
 use App\Models\User;
 use App\Models\ExpensesType;
 use App\Models\SystemConfig;
-use Illuminate\Support\Facades\Schema;
 
 class TenantDataHelper
 {
@@ -151,18 +150,13 @@ class TenantDataHelper
             return self::defaultSystemConfig();
         }
 
-        $hasLogoCol = false;
-        $hasBgCol = false;
-        try {
-            $hasLogoCol = Schema::hasColumn('system_config', 'logo_image');
-            $hasBgCol = Schema::hasColumn('system_config', 'login_bg_image');
-        } catch (\Throwable $e) {
-            // ignore
-        }
-
-        $logoImage = ($hasLogoCol && $config->logo_image) ? $config->logo_image : 'logo-color1.png';
-        $loginBgImage = ($hasBgCol && $config->login_bg_image)
-            ? $config->login_bg_image
+        // اقرأ من صفات الصف مباشرة (بدون Schema::hasColumn) — تجنباً لكاش الأعمدة على اتصال خاطئ
+        $attrs = $config->getAttributes();
+        $logoImage = !empty($attrs['logo_image'])
+            ? basename(str_replace('\\', '/', (string) $attrs['logo_image']))
+            : 'logo-color1.png';
+        $loginBgImage = !empty($attrs['login_bg_image'])
+            ? basename(str_replace('\\', '/', (string) $attrs['login_bg_image']))
             : $logoImage;
 
         return [

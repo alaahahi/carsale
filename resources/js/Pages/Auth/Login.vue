@@ -5,7 +5,7 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import { Head, Link, useForm } from '@inertiajs/inertia-vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/inertia-vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -14,7 +14,13 @@ const props = defineProps({
     systemConfig: Object,
 });
 
-const loginBgUrl = computed(() => props.systemConfig?.login_bg_url || '');
+const page = usePage();
+
+const loginBgUrl = computed(() => {
+    return props.systemConfig?.login_bg_url
+        || page.props.systemConfig?.login_bg_url
+        || '';
+});
 
 const form = useForm({
     email: '',
@@ -38,7 +44,7 @@ const submit = () => {
         <form @submit.prevent="submit">
             <div>
                 <InputLabel for="email" :value="$t('username')" />
-                <TextInput id="email" type="text" class="mt-1 block w-full" v-model="form.email" required autofocus autocomplete="username" />
+                <TextInput id="email" type="email" class="mt-1 block w-full" v-model="form.email" required autofocus autocomplete="username" />
                 <InputError class="mt-2" :message="form.errors.email" />
             </div>
 
@@ -49,17 +55,20 @@ const submit = () => {
             </div>
 
             <div class="block mt-4">
-                <label  class="dark:text-gray-200 flex items-center" >
-                <Checkbox name="remember" v-model:checked="form.remember" />
-                <span class="ml-2 text-sm text-gray-600">{{ $t('remember') }}</span>
+                <label class="dark:text-gray-200 flex items-center">
+                    <Checkbox name="remember" v-model:checked="form.remember" />
+                    <span class="ml-2 text-sm text-gray-600">{{ $t('Remember me') }}</span>
                 </label>
             </div>
 
             <div class="flex items-center justify-end mt-4">
+                <Link v-if="canResetPassword" :href="route('password.request')" class="underline text-sm text-gray-600 hover:text-gray-900">
+                    {{ $t('Forgot your password?') }}
+                </Link>
                 <PrimaryButton class="ml-4" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                {{ $t('login') }}
+                    {{ $t('Log in') }}
                 </PrimaryButton>
             </div>
-            </form>
+        </form>
     </GuestLayout>
 </template>
