@@ -36,8 +36,9 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request)
     {
         return array_merge(parent::share($request), [
+            // إغلاق مؤجّل: لا تحلّ المستخدم قبل اتصال قاعدة التاجر (tenant middleware)
             'auth' => [
-                'user' => $request->user(),
+                'user' => fn () => $request->user(),
             ],
             'ziggy' => function () use ($request) {
                 return array_merge((new Ziggy)->toArray(), [

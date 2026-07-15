@@ -15,7 +15,8 @@ class Authenticate extends Middleware
     protected function redirectTo($request)
     {
         if (! $request->expectsJson()) {
-            return route('login');
+            // مسار نسبي لتجنّب حلقة تحويل عند اختلاف APP_URL عن دومين التاجر
+            return '/login';
         }
     }
 }

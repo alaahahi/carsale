@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use App\Helpers\DynamicDatabaseHelper;
 use App\Helpers\SubdomainHelper;
 use App\Helpers\TenantDataHelper;
@@ -15,6 +16,8 @@ class DynamicDatabaseMiddleware
     protected $tenancy;
 
     protected ?string $dynamicConnectionName = null;
+
+    protected bool $cleanupQueued = false;
 
     public function __construct(Tenancy $tenancy)
     {
@@ -64,6 +67,9 @@ class DynamicDatabaseMiddleware
             // تهيئة نظام المستأجرين
             $this->tenancy->initialize($tenantData['tenant']);
 
+            // إعادة حل المستخدم من قاعدة التاجر (قد يكون تم تحميله مبكراً من القاعدة المركزية)
+            $this->forgetResolvedAuthUsers();
+
             // إضافة معلومات إضافية إلى الطلب
             $request->merge([
                 'current_tenant' => $tenantData['tenant'],
@@ -109,16 +115,33 @@ class DynamicDatabaseMiddleware
                 'subdomain' => $tenantData['subdomain'] ?? 'unknown',
             ], 500);
         }
-        // ملاحظة: لا نغلق الاتصال في finally هنا حتى تكتمل استجابة Inertia بالكامل.
-        // الإغلاق يتم في terminate() بعد إرسال الاستجابة.
     }
 
     /**
-     * بعد إرسال الاستجابة: أغلق اتصال التاجر (مهم مع Multi-Tenant)
+     * بعد إرسال الاستجابة: أغلق اتصال التاجر بعد حفظ الجلسة
+     * (terminate للـ Session يعمل قبل app()->terminating)
      */
     public function terminate($request, $response): void
     {
-        $this->cleanupTenantConnection();
+        if ($this->cleanupQueued || !$this->dynamicConnectionName) {
+            return;
+        }
+
+        $this->cleanupQueued = true;
+
+        app()->terminating(function () {
+            $this->cleanupTenantConnection();
+        });
+    }
+
+    private function forgetResolvedAuthUsers(): void
+    {
+        try {
+            // Laravel 9: لا يوجد forgetUser على SessionGuard
+            Auth::forgetGuards();
+        } catch (\Throwable $e) {
+            \Log::debug('Auth forgetGuards warning', ['error' => $e->getMessage()]);
+        }
     }
 
     private function cleanupTenantConnection(): void

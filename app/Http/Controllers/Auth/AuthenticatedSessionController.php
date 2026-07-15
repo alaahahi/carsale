@@ -36,21 +36,19 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request)
     {
-        $user_id = User::where('email', $request->email)->first()
-            ? User::where('email', $request->email)->first()->is_band
-            : 1;
+        $user = User::where('email', $request->email)->first();
 
-        if (!$user_id) {
-            $request->authenticate();
-            $request->session()->regenerate();
-            return redirect()->intended(RouteServiceProvider::HOME);
+        // is_band = 1 يعني محظور؛ أي قيمة فارغة/0 تسمح بالدخول
+        if ($user && (int) $user->is_band === 1) {
+            return back()->withErrors([
+                'email' => 'هذا الحساب محظور.',
+            ]);
         }
 
-        return Inertia::render('Auth/Login', [
-            'canResetPassword' => Route::has('password.request'),
-            'status' => session('status'),
-            'systemConfig' => TenantDataHelper::getSystemConfig(),
-        ]);
+        $request->authenticate();
+        $request->session()->regenerate();
+
+        return redirect()->intended(RouteServiceProvider::HOME);
     }
 
     /**
