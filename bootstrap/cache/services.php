@@ -43,10 +43,11 @@
     39 => 'App\\Providers\\AuthServiceProvider',
     40 => 'App\\Providers\\EventServiceProvider',
     41 => 'App\\Providers\\RouteServiceProvider',
-    42 => 'App\\Providers\\SubdomainServiceProvider',
-    43 => 'Mccarlosen\\LaravelMpdf\\LaravelMpdfServiceProvider',
-    44 => 'SimpleSoftwareIO\\QrCode\\QrCodeServiceProvider',
-    45 => 'Intervention\\Image\\ImageServiceProvider',
+    42 => 'App\\Monitor\\Providers\\MonitorServiceProvider',
+    43 => 'App\\Providers\\SubdomainServiceProvider',
+    44 => 'Mccarlosen\\LaravelMpdf\\LaravelMpdfServiceProvider',
+    45 => 'SimpleSoftwareIO\\QrCode\\QrCodeServiceProvider',
+    46 => 'Intervention\\Image\\ImageServiceProvider',
   ),
   'eager' => 
   array (
@@ -77,10 +78,11 @@
     24 => 'App\\Providers\\AuthServiceProvider',
     25 => 'App\\Providers\\EventServiceProvider',
     26 => 'App\\Providers\\RouteServiceProvider',
-    27 => 'App\\Providers\\SubdomainServiceProvider',
-    28 => 'Mccarlosen\\LaravelMpdf\\LaravelMpdfServiceProvider',
-    29 => 'SimpleSoftwareIO\\QrCode\\QrCodeServiceProvider',
-    30 => 'Intervention\\Image\\ImageServiceProvider',
+    27 => 'App\\Monitor\\Providers\\MonitorServiceProvider',
+    28 => 'App\\Providers\\SubdomainServiceProvider',
+    29 => 'Mccarlosen\\LaravelMpdf\\LaravelMpdfServiceProvider',
+    30 => 'SimpleSoftwareIO\\QrCode\\QrCodeServiceProvider',
+    31 => 'Intervention\\Image\\ImageServiceProvider',
   ),
   'deferred' => 
   array (
