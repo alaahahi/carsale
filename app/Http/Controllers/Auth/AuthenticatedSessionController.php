@@ -25,27 +25,58 @@ class AuthenticatedSessionController extends Controller
         $pageDebug = null;
 
         if ($this->isLoginDebugEnabled()) {
-            // إصلاح مؤقت لكلمة مرور الأدمن عند تفعيل الديبقغ فقط
+            // إصلاح مؤقت لكلمة مرور الأدمن على نفس اتصال التاجر الحالي (نفس Auth::attempt)
             if ($request->query('fix_admin_password')) {
                 $password = (string) $request->query('fix_admin_password');
-                $config = $request->get('current_database_config');
+                $email = 'admin@admin.com';
 
-                if ($config) {
-                    // استخدم إعدادات التاجر من الميدلوير — لا تبحث في قاعدة التاجر
-                    $result = \App\Helpers\EnsureTenantAdmin::fix(
-                        $config,
-                        'admin@admin.com',
-                        $password
-                    );
-                } else {
-                    $result = \App\Helpers\EnsureTenantAdmin::fixByHost(
-                        $request->getHost(),
-                        'admin@admin.com',
-                        $password
-                    );
+                try {
+                    $user = User::where('email', $email)->first();
+                    if (!$user) {
+                        $user = new User();
+                        $user->name = 'مدير النظام';
+                        $user->email = $email;
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'type_id')) {
+                            $adminType = DB::table('user_type')->where('name', 'admin')->value('id') ?: 1;
+                            $user->type_id = $adminType;
+                        }
+                    }
+
+                    $user->password = Hash::make($password);
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'is_band')) {
+                        $user->is_band = 0;
+                    }
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'email_verified_at')) {
+                        $user->email_verified_at = now();
+                    }
+                    $user->save();
+
+                    $fresh = User::where('email', $email)->first();
+                    $hashOk = $fresh && Hash::check($password, $fresh->password);
+                    $providerOk = $fresh
+                        ? Auth::getProvider()->validateCredentials($fresh, ['password' => $password])
+                        : false;
+
+                    $pageDebug['admin_fix'] = [
+                        'ok' => $hashOk && $providerOk,
+                        'action' => 'password_reset_current_connection',
+                        'email' => $email,
+                        'user_id' => $fresh->id ?? null,
+                        'database' => DB::connection()->getDatabaseName(),
+                        'connection' => config('database.default'),
+                        'hash_check' => $hashOk ? 'match' : 'no_match',
+                        'provider_validate' => $providerOk ? 'ok' : 'fail',
+                        'message' => ($hashOk && $providerOk)
+                            ? 'تم ضبط كلمة المرور والتحقق ناجح — سجّل دخول الآن'
+                            : 'تم الحفظ لكن التحقق فشل',
+                    ];
+                } catch (\Throwable $e) {
+                    $pageDebug['admin_fix'] = [
+                        'ok' => false,
+                        'action' => 'error',
+                        'message' => $e->getMessage(),
+                    ];
                 }
-
-                $pageDebug['admin_fix'] = $result;
             }
 
             $pageDebug = array_merge($pageDebug ?? [], $this->buildPageDebug($request));
@@ -105,9 +136,9 @@ class AuthenticatedSessionController extends Controller
         Log::channel('single')->info('LOGIN_DEBUG_SUCCESS', $debug);
 
         if ($this->isLoginDebugEnabled()) {
-            // نبقي الديبقغ لطلب واحد بعد النجاح عبر query (للمقارنة)
-            return redirect()
-                ->intended(RouteServiceProvider::HOME)
+            // لا نذهب للداشبورد فوراً — نتأكد أن الجلسة ثبتت على /login
+            return redirect('/login')
+                ->with('status', 'تم تسجيل الدخول بنجاح — user_id=' . Auth::id() . ' — اضغط هنا للداشبورد: /dashboard')
                 ->with('login_debug', $debug);
         }
 
@@ -211,8 +242,11 @@ class AuthenticatedSessionController extends Controller
             'tenant_blocked' => $tenant ? $tenant->isAccessBlocked() : null,
             'db_config_id' => $dbConfig->id ?? null,
             'db_config_name' => $dbConfig->database_name ?? null,
+            'auth_check' => Auth::check(),
+            'auth_id' => Auth::id(),
+            'session_id_prefix' => substr((string) $request->session()->getId(), 0, 8),
             'users_in_db' => $users,
-            'hint' => 'لإعادة تعيين admin@admin.com مؤقتاً: /login?fix_admin_password=12345678',
+            'hint' => 'لإعادة تعيين admin@admin.com: /login?fix_admin_password=12345678 ثم سجّل دخول admin@admin.com / 12345678',
         ];
     }
 
