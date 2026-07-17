@@ -120,42 +120,9 @@
             margin-bottom: 1rem;
         }
         .field-error { color: #dc2626; font-size: 0.8rem; margin-top: 0.35rem; }
-        .debug-box {
-            margin-top: 1rem;
-            width: 100%;
-            max-width: 640px;
-            background: #0f172a;
-            color: #e2e8f0;
-            border-radius: 0.75rem;
-            padding: 1rem;
-            font-size: 0.78rem;
-            line-height: 1.45;
-            direction: ltr;
-            text-align: left;
-            box-shadow: 0 12px 30px rgba(0,0,0,0.35);
-        }
-        .debug-box h3 {
-            color: #fbbf24;
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-        }
-        .debug-box pre {
-            white-space: pre-wrap;
-            word-break: break-word;
-            font-family: ui-monospace, Consolas, monospace;
-        }
-        .wrap {
-            width: 100%;
-            max-width: 640px;
-            display: flex;
-            flex-direction: column;
-            align-items: stretch;
-            gap: 0.75rem;
-        }
     </style>
 </head>
 <body>
-    <div class="wrap">
     <div class="card">
         <div class="brand">
             @if(!empty($systemConfig['logo_url']))
@@ -214,21 +181,6 @@
 
             <button type="submit" class="btn">تسجيل الدخول</button>
         </form>
-
-        @if (auth()->check())
-            <a href="/dashboard" class="btn" style="display:block;text-align:center;margin-top:1rem;background:#059669;text-decoration:none;">
-                أنت مسجّل دخول (id={{ auth()->id() }}) — ادخل الداشبورد
-            </a>
-        @endif
-    </div>
-
-    @if (config('app.login_debug') && ($loginDebug ?? session('login_debug')))
-        <div class="debug-box">
-            <h3>LOGIN DEBUG — انسخ هذا كله وأرسله</h3>
-            <pre id="login-debug-json">{{ json_encode(($loginDebug ?? session('login_debug')), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
-            <button type="button" class="btn" style="margin-top:0.75rem;background:#334155;" onclick="navigator.clipboard.writeText(document.getElementById('login-debug-json').innerText)">نسخ النتيجة</button>
-        </div>
-    @endif
     </div>
     <script>
         // عند الرجوع من الكاش أو بعد 419: حدّث الصفحة لأخذ CSRF جديد

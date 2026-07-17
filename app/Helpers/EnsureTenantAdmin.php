@@ -20,7 +20,7 @@ class EnsureTenantAdmin
     }
 
     /**
-     * يضمن وجود أدمن قابل للدخول على قاعدة التاجر ويعيد ضبط كلمة المرور.
+     * يضمن وجود أدمن id=1 قابل للدخول على قاعدة التاجر ويعيد ضبط كلمة المرور.
      *
      * @return array{ok:bool,action:string,email:string,user_id:?int,database:?string,message:string}
      */
@@ -54,9 +54,7 @@ class EnsureTenantAdmin
                 $adminTypeId = $db->table('user_type')->where('name', 'admin')->value('id');
             }
 
-            $user = $db->table('users')->where('email', $email)->first();
             $hash = Hash::make($password);
-
             $payload = [
                 'password' => $hash,
                 'updated_at' => now(),
@@ -72,32 +70,19 @@ class EnsureTenantAdmin
                 $payload['type_id'] = $adminTypeId;
             }
 
-            if ($user) {
-                $db->table('users')->where('id', $user->id)->update($payload);
-                $action = 'password_reset';
-                $userId = (int) $user->id;
-            } else {
-                $insert = array_merge($payload, [
-                    'name' => 'مدير النظام',
-                    'email' => $email,
-                    'created_at' => now(),
-                ]);
-                if ($db->getSchemaBuilder()->hasColumn('users', 'show_wallet')) {
-                    $insert['show_wallet'] = true;
-                }
-                $userId = (int) $db->table('users')->insertGetId($insert);
-                $action = 'admin_created';
+            $result = self::ensureAdminIdOne($db, $email, $payload);
+            $userId = $result['user_id'];
+            $action = $result['action'];
 
-                if ($db->getSchemaBuilder()->hasTable('wallets')) {
-                    $walletExists = $db->table('wallets')->where('user_id', $userId)->exists();
-                    if (!$walletExists) {
-                        $db->table('wallets')->insert([
-                            'user_id' => $userId,
-                            'balance' => 0,
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ]);
-                    }
+            if ($db->getSchemaBuilder()->hasTable('wallets')) {
+                $walletExists = $db->table('wallets')->where('user_id', 1)->exists();
+                if (!$walletExists) {
+                    $db->table('wallets')->insert([
+                        'user_id' => 1,
+                        'balance' => 0,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
                 }
             }
 
@@ -116,8 +101,8 @@ class EnsureTenantAdmin
                 'user_id' => $userId,
                 'database' => $config->database_name,
                 'message' => $action === 'admin_created'
-                    ? 'تم إنشاء الأدمن بنجاح'
-                    : 'تم إعادة ضبط كلمة مرور الأدمن',
+                    ? 'تم إنشاء الأدمن (id=1) بنجاح'
+                    : 'تم ضبط الأدمن على id=1 وإعادة كلمة المرور',
             ];
         } catch (\Throwable $e) {
             Log::error('EnsureTenantAdmin failed', [
@@ -148,6 +133,93 @@ class EnsureTenantAdmin
     }
 
     /**
+     * الأدمن يجب أن يكون دائماً users.id = 1 (متطلبات النظام المحاسبي/الصلاحيات).
+     *
+     * @return array{user_id:int,action:string}
+     */
+    private static function ensureAdminIdOne($db, string $email, array $payload): array
+    {
+        $db->statement('SET FOREIGN_KEY_CHECKS=0');
+
+        try {
+            $adminByEmail = $db->table('users')->where('email', $email)->first();
+            $idOne = $db->table('users')->where('id', 1)->first();
+
+            // الحالة المثالية: الأدمن موجود و id=1
+            if ($adminByEmail && (int) $adminByEmail->id === 1) {
+                $db->table('users')->where('id', 1)->update($payload);
+
+                return ['user_id' => 1, 'action' => 'password_reset'];
+            }
+
+            // أدمن موجود لكن id ≠ 1 — انقله إلى 1
+            if ($adminByEmail && (int) $adminByEmail->id !== 1) {
+                $oldId = (int) $adminByEmail->id;
+
+                if (!$idOne) {
+                    $db->table('users')->where('id', $oldId)->update(array_merge($payload, ['id' => 1]));
+                    self::repointUserForeignKeys($db, $oldId, 1);
+
+                    return ['user_id' => 1, 'action' => 'admin_id_moved_to_1'];
+                }
+
+                // id=1 مشغول بمستخدم آخر: حوّل الصف 1 إلى الأدمن واحذف الصف القديم
+                $db->table('users')->where('id', 1)->update(array_merge($payload, [
+                    'name' => 'مدير النظام',
+                    'email' => $email,
+                ]));
+                self::repointUserForeignKeys($db, $oldId, 1);
+                $db->table('users')->where('id', $oldId)->delete();
+
+                return ['user_id' => 1, 'action' => 'admin_merged_to_id_1'];
+            }
+
+            // لا يوجد أدمن بهذا الإيميل
+            if ($idOne) {
+                $db->table('users')->where('id', 1)->update(array_merge($payload, [
+                    'name' => 'مدير النظام',
+                    'email' => $email,
+                ]));
+
+                return ['user_id' => 1, 'action' => 'id_1_converted_to_admin'];
+            }
+
+            $insert = array_merge($payload, [
+                'id' => 1,
+                'name' => 'مدير النظام',
+                'email' => $email,
+                'created_at' => now(),
+            ]);
+            if ($db->getSchemaBuilder()->hasColumn('users', 'show_wallet')) {
+                $insert['show_wallet'] = true;
+            }
+            $db->table('users')->insert($insert);
+
+            return ['user_id' => 1, 'action' => 'admin_created'];
+        } finally {
+            $db->statement('SET FOREIGN_KEY_CHECKS=1');
+        }
+    }
+
+    private static function repointUserForeignKeys($db, int $fromId, int $toId): void
+    {
+        if ($fromId === $toId) {
+            return;
+        }
+
+        if ($db->getSchemaBuilder()->hasTable('wallets')) {
+            // ادمج المحفظة إن وُجدت على الوجهة
+            $fromWallet = $db->table('wallets')->where('user_id', $fromId)->first();
+            $toWallet = $db->table('wallets')->where('user_id', $toId)->first();
+            if ($fromWallet && $toWallet) {
+                $db->table('wallets')->where('user_id', $fromId)->delete();
+            } elseif ($fromWallet) {
+                $db->table('wallets')->where('user_id', $fromId)->update(['user_id' => $toId]);
+            }
+        }
+    }
+
+    /**
      * إصلاح حسب الدومين (مثل sarwan.intellij-app.com أو subdomain sarwan)
      * مهم: جدول tenant_database_configs موجود فقط في القاعدة المركزية
      */
@@ -165,7 +237,6 @@ class EnsureTenantAdmin
             ->first();
 
         if (!$config) {
-            // SubdomainHelper يقرأ من المركزية أيضاً (domains/tenants)
             $previousDefault = config('database.default');
             try {
                 config(['database.default' => $central]);

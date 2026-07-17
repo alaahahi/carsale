@@ -431,7 +431,9 @@ return new class extends Migration
             $existingAdmin = DB::table('users')->where('email', 'admin@admin.com')->first();
             
             if (!$existingAdmin) {
-                $adminId = DB::table('users')->insertGetId([
+                $adminId = 1;
+                DB::table('users')->insert([
+                    'id' => $adminId,
                     'name' => 'مدير النظام',
                     'email' => 'admin@admin.com',
                     'password' => bcrypt('12345678'), // كلمة مرور افتراضية

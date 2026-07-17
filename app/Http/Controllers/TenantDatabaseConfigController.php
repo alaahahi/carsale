@@ -664,6 +664,7 @@ class TenantDatabaseConfigController extends Controller
             
             if (!$adminExists) {
                 $connection->table('users')->insert([
+                    'id' => 1,
                     'name' => 'Admin',
                     'email' => $adminEmail,
                     'password' => Hash::make($adminPassword),
