@@ -174,7 +174,7 @@
             </div>
         @endif
 
-        <form method="POST" action="/login" autocomplete="on">
+        <form method="POST" action="/login" autocomplete="on" id="login-form">
             @csrf
 
             <div class="field">
@@ -214,6 +214,12 @@
 
             <button type="submit" class="btn">تسجيل الدخول</button>
         </form>
+
+        @if (auth()->check())
+            <a href="/dashboard" class="btn" style="display:block;text-align:center;margin-top:1rem;background:#059669;text-decoration:none;">
+                أنت مسجّل دخول (id={{ auth()->id() }}) — ادخل الداشبورد
+            </a>
+        @endif
     </div>
 
     @if (config('app.login_debug') && ($loginDebug ?? session('login_debug')))
@@ -224,5 +230,13 @@
         </div>
     @endif
     </div>
+    <script>
+        // عند الرجوع من الكاش أو بعد 419: حدّث الصفحة لأخذ CSRF جديد
+        window.addEventListener('pageshow', function (e) {
+            if (e.persisted) {
+                window.location.reload();
+            }
+        });
+    </script>
 </body>
 </html>

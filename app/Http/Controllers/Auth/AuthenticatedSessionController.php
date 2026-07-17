@@ -135,13 +135,6 @@ class AuthenticatedSessionController extends Controller
         $debug['auth_id_after'] = Auth::id();
         Log::channel('single')->info('LOGIN_DEBUG_SUCCESS', $debug);
 
-        if ($this->isLoginDebugEnabled()) {
-            // لا نذهب للداشبورد فوراً — نتأكد أن الجلسة ثبتت على /login
-            return redirect('/login')
-                ->with('status', 'تم تسجيل الدخول بنجاح — user_id=' . Auth::id() . ' — اضغط هنا للداشبورد: /dashboard')
-                ->with('login_debug', $debug);
-        }
-
         return redirect()->intended(RouteServiceProvider::HOME);
     }
 

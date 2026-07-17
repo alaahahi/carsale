@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Session\TokenMismatchException;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -47,6 +48,20 @@ class Handler extends ExceptionHandler
             if (app()->bound(\App\Monitor\Services\ExceptionMonitor::class)) {
                 app(\App\Monitor\Services\ExceptionMonitor::class)->log($e);
             }
+        });
+
+        // 419 Page Expired — أعد فتح صفحة الدخول بجلسة/توكن جديد
+        $this->renderable(function (TokenMismatchException $e, $request) {
+            if ($request->is('login') || $request->routeIs('login')) {
+                return redirect()
+                    ->to('/login')
+                    ->with('status', 'انتهت صلاحية النموذج، أعد تسجيل الدخول.');
+            }
+
+            return redirect()
+                ->back()
+                ->withInput($request->except('password', 'password_confirmation', '_token'))
+                ->with('status', 'انتهت صلاحية الصفحة، أعد المحاولة.');
         });
     }
 }
