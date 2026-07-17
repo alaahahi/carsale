@@ -128,14 +128,21 @@ class AuthenticatedSessionController extends Controller
                 ->onlyInput('email');
         }
 
+        // ثبّت الجلسة + remember cookie — يمنع رجوع /dashboard إلى /login
+        $authed = Auth::user();
         $request->session()->regenerate();
+        if ($authed) {
+            Auth::login($authed, true);
+        }
+        $request->session()->save();
 
         $debug['result'] = 'success';
         $debug['auth_check_after'] = Auth::check();
         $debug['auth_id_after'] = Auth::id();
+        $debug['session_cookie'] = config('session.cookie');
         Log::channel('single')->info('LOGIN_DEBUG_SUCCESS', $debug);
 
-        return redirect()->intended(RouteServiceProvider::HOME);
+        return redirect()->to(RouteServiceProvider::HOME);
     }
 
     /**
@@ -237,6 +244,8 @@ class AuthenticatedSessionController extends Controller
             'db_config_name' => $dbConfig->database_name ?? null,
             'auth_check' => Auth::check(),
             'auth_id' => Auth::id(),
+            'session_cookie' => config('session.cookie'),
+            'session_domain' => config('session.domain'),
             'session_id_prefix' => substr((string) $request->session()->getId(), 0, 8),
             'users_in_db' => $users,
             'hint' => 'لإعادة تعيين admin@admin.com: /login?fix_admin_password=12345678 ثم سجّل دخول admin@admin.com / 12345678',
