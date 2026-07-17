@@ -1199,10 +1199,10 @@ getResultsCar();
                         <div>
                           <a
                             type="button"
-                            :href="route('getIndexCar')"
+                            :href="route('stats')"
                             style="min-width:150px;"
                             className="px-6 mb-12 text-center mx-2 py-2 font-bold text-white bg-blue-600 rounded">
-                            {{ $t('allCars') }}
+                            {{ $t('stats') }}
                           </a>
                         </div>
                         <div>

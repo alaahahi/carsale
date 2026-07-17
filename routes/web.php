@@ -767,6 +767,7 @@ Route::group(['middleware' => ['tenant']], function () {
     Route::post('/import-cars', [InfoController::class, 'import'])->name('car.import');
     
     Route::get('dashboard',[DashboardController::class,'index'])->middleware(['auth', 'verified'])->name('dashboard');
+    Route::get('stats',[DashboardController::class,'statsPage'])->name('stats');
     
     Route::get('getIndex',[UserController::class, 'getIndex'])->name("getIndex");
     Route::get('ban/{id}',[UserController::class, 'ban'])->name("ban");

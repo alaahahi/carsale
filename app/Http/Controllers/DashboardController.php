@@ -1909,5 +1909,124 @@ class DashboardController extends Controller
         DB::table('car_field_histories')->insert($row);
     }
 
-    
+    /**
+     * صفحة إحصائيات Blade: سيارات / بيع / ربح / دين
+     */
+    public function statsPage(Request $request)
+    {
+        $from = $request->query('from');
+        $to = $request->query('to');
+
+        $stats = $this->buildBusinessStats($from, $to);
+        $systemConfig = TenantDataHelper::getSystemConfig();
+
+        return view('stats.dashboard', [
+            'stats' => $stats,
+            'from' => $from,
+            'to' => $to,
+            'systemConfig' => $systemConfig,
+            'user' => auth()->user(),
+        ]);
+    }
+
+    /**
+     * تجميع مؤشرات الأعمال (سيارات، بيع، ربح، دين).
+     */
+    private function buildBusinessStats(?string $from = null, ?string $to = null): array
+    {
+        $carsQuery = Car::query();
+        $soldQuery = Car::query()->where('results', '!=', 0);
+        $txIn = Transactions::where('type', 'in');
+        $txOut = Transactions::where('type', 'out');
+
+        if ($from) {
+            $carsQuery->whereDate('created_at', '>=', $from);
+            $soldQuery->whereDate('pay_data', '>=', $from);
+            $txIn->whereDate('created_at', '>=', $from);
+            $txOut->whereDate('created_at', '>=', $from);
+        }
+        if ($to) {
+            $carsQuery->whereDate('created_at', '<=', $to);
+            $soldQuery->whereDate('pay_data', '<=', $to);
+            $txIn->whereDate('created_at', '<=', $to);
+            $txOut->whereDate('created_at', '<=', $to);
+        }
+
+        $carsInStock = (clone $carsQuery)->where('results', 0)->count();
+        $carsPartial = (clone $carsQuery)->where('results', 1)->count();
+        $carsPaid = (clone $carsQuery)->where('results', 2)->count();
+        $carsTotal = (clone $carsQuery)->count();
+
+        $salesCount = (clone $soldQuery)->count();
+        $salesAmount = (float) (clone $soldQuery)->sum('pay_price');
+        $salesCollected = (float) (clone $soldQuery)->sum('paid_amount_pay');
+
+        $costExpr = 'purchase_price + COALESCE(erbil_exp, 0) + COALESCE(erbil_shipping, 0) + COALESCE(dubai_exp, 0) + COALESCE(dubai_shipping, 0)';
+        $totalCostSold = (float) ((clone $soldQuery)->selectRaw("SUM({$costExpr}) as total")->value('total') ?? 0);
+        $profit = $salesAmount - $totalCostSold;
+
+        $customerDebt = (float) (
+            (clone $soldQuery)->sum('pay_price') - (clone $soldQuery)->sum('paid_amount_pay')
+        );
+
+        $supplierDebtQuery = Car::query()->selectRaw(
+            'SUM(GREATEST(COALESCE(purchase_price, 0) - COALESCE(paid_amount, 0), 0)) as total'
+        );
+        if ($from) {
+            $supplierDebtQuery->whereDate('purchase_data', '>=', $from);
+        }
+        if ($to) {
+            $supplierDebtQuery->whereDate('purchase_data', '<=', $to);
+        }
+        $supplierDebt = (float) ($supplierDebtQuery->value('total') ?? 0);
+
+        $totalCapital = (float) (
+            Car::selectRaw("SUM({$costExpr}) as total")->value('total') ?? 0
+        );
+
+        $totalIncome = (float) $txIn->sum('amount');
+        $totalExpenses = (float) $txOut->sum('amount');
+
+        $monthly = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $monthStart = now()->subMonths($i)->startOfMonth();
+            $monthEnd = now()->subMonths($i)->endOfMonth();
+            $label = $monthStart->translatedFormat('M Y');
+
+            $monthSold = Car::where('results', '!=', 0)
+                ->whereNotNull('pay_data')
+                ->whereBetween('pay_data', [$monthStart->toDateString(), $monthEnd->toDateString()]);
+
+            $monthSales = (float) (clone $monthSold)->sum('pay_price');
+            $monthCost = (float) ((clone $monthSold)->selectRaw("SUM({$costExpr}) as total")->value('total') ?? 0);
+
+            $monthly[] = [
+                'label' => $label,
+                'month' => (int) $monthStart->month,
+                'year' => (int) $monthStart->year,
+                'sales' => $monthSales,
+                'profit' => $monthSales - $monthCost,
+                'count' => (clone $monthSold)->count(),
+            ];
+        }
+
+        return [
+            'cars_total' => $carsTotal,
+            'cars_in_stock' => $carsInStock,
+            'cars_partial' => $carsPartial,
+            'cars_paid' => $carsPaid,
+            'sales_count' => $salesCount,
+            'sales_amount' => $salesAmount,
+            'sales_collected' => $salesCollected,
+            'profit' => $profit,
+            'customer_debt' => $customerDebt,
+            'supplier_debt' => $supplierDebt,
+            'total_debt' => $customerDebt + $supplierDebt,
+            'total_capital' => $totalCapital,
+            'total_income' => $totalIncome,
+            'total_expenses' => $totalExpenses,
+            'net_cash' => $totalIncome - $totalExpenses,
+            'monthly' => $monthly,
+        ];
+    }
 }

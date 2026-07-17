@@ -39,6 +39,15 @@ const switchLocale = (locale) => {
                   {{ $t("home") }}
                 </NavLink>
               </div>
+
+              <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
+                <NavLink
+                  :href="route('stats')"
+                  :active="route().current('stats')"
+                >
+                  {{ $t("stats") }}
+                </NavLink>
+              </div>
      
         
               <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
@@ -242,6 +251,12 @@ const switchLocale = (locale) => {
               :active="route().current('dashboard')"
             >
               {{ $t("dashboard") }}
+            </ResponsiveNavLink>
+            <ResponsiveNavLink
+              :href="route('stats')"
+              :active="route().current('stats')"
+            >
+              {{ $t("stats") }}
             </ResponsiveNavLink>
           </div>
 
