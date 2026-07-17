@@ -11,6 +11,14 @@ class Tenant extends BaseTenant implements TenantWithDatabase
 {
     use HasDatabase, HasDomains;
 
+    /**
+     * جدول tenants مركزي فقط — حتى لو وُجد بالخطأ داخل قاعدة تاجر (مثل sarwan)
+     */
+    public function getConnectionName()
+    {
+        return config('tenancy.database.central_connection', 'mysql');
+    }
+
     protected $fillable = [
         'id',
         'name',

@@ -3,7 +3,7 @@
 namespace App\Helpers;
 
 use Illuminate\Support\Facades\Cache;
-use Stancl\Tenancy\Database\Models\Domain;
+use App\Models\Domain;
 use App\Models\Tenant;
 use App\Models\TenantDatabaseConfig;
 

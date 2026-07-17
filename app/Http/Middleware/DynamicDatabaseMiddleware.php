@@ -17,13 +17,6 @@ class DynamicDatabaseMiddleware
 
     protected bool $cleanupQueued = false;
 
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Closure(\Illuminate\Http\Request): (\Illuminate\Http\Response|\Illuminate\Http\RedirectResponse)  $next
-     * @return \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse
-     */
     public function handle(Request $request, Closure $next)
     {
         $host = $request->getHost();
@@ -32,12 +25,21 @@ class DynamicDatabaseMiddleware
             return $next($request);
         }
 
-        // تجنّب تهيئة مزدوجة إن وُضع الميدلوير أكثر من مرة
-        if (DynamicDatabaseHelper::getActiveConnectionName()) {
+        // نفس الطلب فقط (مكرر في web + route) — ليس بين طلبات PHP-FPM
+        if ($request->attributes->get('dynamic_database_ready')) {
             return $next($request);
         }
 
-        $tenantData = SubdomainHelper::getTenantAndDatabaseConfigByDomain($host);
+        // ابحث عن التاجر دائماً من القاعدة المركزية
+        $central = config('tenancy.database.central_connection', 'mysql');
+        $previousDefault = config('database.default');
+        config(['database.default' => $central]);
+
+        try {
+            $tenantData = SubdomainHelper::getTenantAndDatabaseConfigByDomain($host);
+        } finally {
+            config(['database.default' => $previousDefault]);
+        }
 
         if ($tenantData && $tenantData['tenant'] && $tenantData['tenant']->isAccessBlocked()) {
             return $this->blockedTenantResponse($request, $tenantData['tenant']);
@@ -57,13 +59,11 @@ class DynamicDatabaseMiddleware
         }
 
         try {
-            // اتصال واحد فقط من TenantDatabaseConfig — بدون tenancy()->initialize()
-            // لأن DatabaseTenancyBootstrapper يستبدل default بقاعدة Stancl (aindubai_*) ويكسر الجلسة/الدخول
             $this->dynamicConnectionName = DynamicDatabaseHelper::setConnection($tenantData['database_config']);
             DB::setDefaultConnection($this->dynamicConnectionName);
-
             Auth::forgetGuards();
 
+            $request->attributes->set('dynamic_database_ready', true);
             $request->merge([
                 'current_tenant' => $tenantData['tenant'],
                 'current_database_config' => $tenantData['database_config'],
@@ -109,12 +109,19 @@ class DynamicDatabaseMiddleware
     }
 
     /**
-     * لا نغلق الاتصال هنا — الإغلاق المبكر كان يساهم في فقدان الجلسة وحلقة التحويل.
-     * PHP-FPM ينهي العملية بعد الطلب.
+     * بعد حفظ الجلسة: أغلق الاتصال ونظّف الـ static حتى لا يتسرّب لتاجر آخر
      */
     public function terminate($request, $response): void
     {
-        // intentionally empty
+        if ($this->cleanupQueued || !$this->dynamicConnectionName) {
+            return;
+        }
+
+        $this->cleanupQueued = true;
+
+        app()->terminating(function () {
+            $this->cleanupTenantConnection();
+        });
     }
 
     private function cleanupTenantConnection(): void
