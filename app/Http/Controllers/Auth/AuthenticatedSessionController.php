@@ -27,12 +27,24 @@ class AuthenticatedSessionController extends Controller
         if ($this->isLoginDebugEnabled()) {
             // إصلاح مؤقت لكلمة مرور الأدمن عند تفعيل الديبقغ فقط
             if ($request->query('fix_admin_password')) {
-                $host = $request->getHost();
-                $result = \App\Helpers\EnsureTenantAdmin::fixByHost(
-                    $host,
-                    'admin@admin.com',
-                    (string) $request->query('fix_admin_password')
-                );
+                $password = (string) $request->query('fix_admin_password');
+                $config = $request->get('current_database_config');
+
+                if ($config) {
+                    // استخدم إعدادات التاجر من الميدلوير — لا تبحث في قاعدة التاجر
+                    $result = \App\Helpers\EnsureTenantAdmin::fix(
+                        $config,
+                        'admin@admin.com',
+                        $password
+                    );
+                } else {
+                    $result = \App\Helpers\EnsureTenantAdmin::fixByHost(
+                        $request->getHost(),
+                        'admin@admin.com',
+                        $password
+                    );
+                }
+
                 $pageDebug['admin_fix'] = $result;
             }
 

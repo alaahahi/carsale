@@ -10,6 +10,14 @@ class TenantDatabaseConfig extends Model
 {
     use HasFactory;
 
+    /**
+     * هذا الجدول مركزي فقط — لا يُقرأ من قاعدة التاجر
+     */
+    public function getConnectionName()
+    {
+        return config('tenancy.database.central_connection', 'mysql');
+    }
+
     protected $fillable = [
         'tenant_id',
         'subdomain',

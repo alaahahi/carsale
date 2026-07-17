@@ -149,18 +149,32 @@ class EnsureTenantAdmin
 
     /**
      * إصلاح حسب الدومين (مثل sarwan.intellij-app.com أو subdomain sarwan)
+     * مهم: جدول tenant_database_configs موجود فقط في القاعدة المركزية
      */
     public static function fixByHost(string $hostOrSubdomain, ?string $email = null, ?string $password = null): array
     {
         $host = trim($hostOrSubdomain);
-        $config = TenantDatabaseConfig::query()
-            ->where('subdomain', $host)
-            ->orWhere('subdomain', explode('.', $host)[0] ?? $host)
+        $subdomain = explode('.', $host)[0] ?? $host;
+        $central = config('tenancy.database.central_connection', 'mysql');
+
+        $config = TenantDatabaseConfig::on($central)
+            ->where(function ($q) use ($host, $subdomain) {
+                $q->where('subdomain', $host)
+                    ->orWhere('subdomain', $subdomain);
+            })
             ->first();
 
         if (!$config) {
-            $tenantData = SubdomainHelper::getTenantAndDatabaseConfigByDomain($host);
-            $config = $tenantData['database_config'] ?? null;
+            // SubdomainHelper يقرأ من المركزية أيضاً (domains/tenants)
+            $previousDefault = config('database.default');
+            try {
+                config(['database.default' => $central]);
+                DB::purge($central);
+                $tenantData = SubdomainHelper::getTenantAndDatabaseConfigByDomain($host);
+                $config = $tenantData['database_config'] ?? null;
+            } finally {
+                config(['database.default' => $previousDefault]);
+            }
         }
 
         if (!$config) {
