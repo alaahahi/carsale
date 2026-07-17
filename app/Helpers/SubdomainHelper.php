@@ -40,14 +40,18 @@ class SubdomainHelper
     public static function getTenantBySubdomain($subdomain)
     {
         $cacheKey = "tenant_subdomain_{$subdomain}";
+        $central = config('tenancy.database.central_connection', 'mysql');
+        $compute = function () use ($subdomain, $central) {
+            $domain = Domain::on($central)
+                ->where('domain', 'LIKE', $subdomain . '.%')
+                ->with('tenant')
+                ->first();
+            return $domain ? $domain->tenant : null;
+        };
         if (!self::isCacheEnabled()) {
-            $domain = Domain::where('domain', 'LIKE', $subdomain . '.%')->with('tenant')->first();
-            return $domain ? $domain->tenant : null;
+            return $compute();
         }
-        return Cache::store(self::getCacheStore())->remember($cacheKey, self::getCacheDuration(), function () use ($subdomain) {
-            $domain = Domain::where('domain', 'LIKE', $subdomain . '.%')->with('tenant')->first();
-            return $domain ? $domain->tenant : null;
-        });
+        return Cache::store(self::getCacheStore())->remember($cacheKey, self::getCacheDuration(), $compute);
     }
     
     /**
@@ -56,14 +60,18 @@ class SubdomainHelper
     public static function getTenantByDomain($domain)
     {
         $cacheKey = "tenant_domain_{$domain}";
+        $central = config('tenancy.database.central_connection', 'mysql');
+        $compute = function () use ($domain, $central) {
+            $domainModel = Domain::on($central)
+                ->where('domain', $domain)
+                ->with('tenant')
+                ->first();
+            return $domainModel ? $domainModel->tenant : null;
+        };
         if (!self::isCacheEnabled()) {
-            $domainModel = Domain::where('domain', $domain)->with('tenant')->first();
-            return $domainModel ? $domainModel->tenant : null;
+            return $compute();
         }
-        return Cache::store(self::getCacheStore())->remember($cacheKey, self::getCacheDuration(), function () use ($domain) {
-            $domainModel = Domain::where('domain', $domain)->with('tenant')->first();
-            return $domainModel ? $domainModel->tenant : null;
-        });
+        return Cache::store(self::getCacheStore())->remember($cacheKey, self::getCacheDuration(), $compute);
     }
     
     /**

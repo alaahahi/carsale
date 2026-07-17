@@ -85,6 +85,17 @@ class RepairTenantDatabaseCommand extends Command
         $this->newLine();
         $this->info("=== {$config->subdomain} / {$config->database_name} ===");
 
+        $centralDb = config('database.connections.' . config('tenancy.database.central_connection', 'mysql') . '.database')
+            ?: env('DB_DATABASE');
+
+        // لا تلمس القاعدة المركزية أبداً (فيها domains/tenants الحقيقية)
+        if ($centralDb && strcasecmp((string) $config->database_name, (string) $centralDb) === 0) {
+            $this->error("SKIP central database `{$config->database_name}` — لن نحذف domains/tenants من القاعدة الرئيسية");
+            $result = EnsureTenantAdmin::fix($config);
+            $this->line(($result['ok'] ? '[OK] ' : '[FAIL] ') . $result['message']);
+            return;
+        }
+
         $name = 'repair_' . $config->id;
         config(["database.connections.{$name}" => $config->getConnectionInfo()]);
 
