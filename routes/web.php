@@ -261,10 +261,14 @@ Route::group(['prefix' => 'admin'], function () {
         }
         $tenant->update($data);
         \App\Models\TenantDatabaseConfig::where('tenant_id', $tenant->id)->update(['is_active' => true]);
+        $dbConfig = \App\Models\TenantDatabaseConfig::where('tenant_id', $tenant->id)->where('is_active', true)->first();
+        if ($dbConfig) {
+            \App\Helpers\EnsureTenantAdmin::fix($dbConfig);
+        }
         \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant->fresh(['domains']));
         
         return redirect()->route('tenants.index')
-            ->with('success', 'تم تفعيل المستأجر بنجاح');
+            ->with('success', 'تم تفعيل المستأجر بنجاح — أدمن: admin@admin.com / 12345678');
     })->name('tenants.activate');
     
     Route::post('tenants/{id}/domains', function(\Illuminate\Http\Request $request, $id) {
@@ -572,10 +576,14 @@ Route::group(['middleware' => ['central'], 'prefix' => 'central-admin'], functio
         }
         $tenant->update($data);
         \App\Models\TenantDatabaseConfig::where('tenant_id', $tenant->id)->update(['is_active' => true]);
+        $dbConfig = \App\Models\TenantDatabaseConfig::where('tenant_id', $tenant->id)->where('is_active', true)->first();
+        if ($dbConfig) {
+            \App\Helpers\EnsureTenantAdmin::fix($dbConfig);
+        }
         \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant->fresh(['domains']));
         
         return redirect()->route('central.tenants.index')
-            ->with('success', 'تم تفعيل المستأجر بنجاح');
+            ->with('success', 'تم تفعيل المستأجر بنجاح — أدمن: admin@admin.com / 12345678');
     })->name('central.tenants.activate');
     
     Route::post('tenants/{id}/domains', function(\Illuminate\Http\Request $request, $id) {

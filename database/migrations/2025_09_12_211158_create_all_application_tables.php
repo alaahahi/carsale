@@ -434,7 +434,7 @@ return new class extends Migration
                 $adminId = DB::table('users')->insertGetId([
                     'name' => 'مدير النظام',
                     'email' => 'admin@admin.com',
-                    'password' => bcrypt('admin123'), // كلمة مرور افتراضية
+                    'password' => bcrypt('12345678'), // كلمة مرور افتراضية
                     'type_id' => $adminTypeId,
                     'show_wallet' => true, // المدير يحتاج لعرض القاسة
                     'created_at' => now(),

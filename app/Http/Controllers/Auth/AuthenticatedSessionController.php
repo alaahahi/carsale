@@ -20,12 +20,29 @@ class AuthenticatedSessionController extends Controller
     /**
      * Display the login view (Blade — full page, بدون Inertia).
      */
-    public function create()
+    public function create(Request $request)
     {
+        $pageDebug = null;
+
+        if ($this->isLoginDebugEnabled()) {
+            // إصلاح مؤقت لكلمة مرور الأدمن عند تفعيل الديبقغ فقط
+            if ($request->query('fix_admin_password')) {
+                $host = $request->getHost();
+                $result = \App\Helpers\EnsureTenantAdmin::fixByHost(
+                    $host,
+                    'admin@admin.com',
+                    (string) $request->query('fix_admin_password')
+                );
+                $pageDebug['admin_fix'] = $result;
+            }
+
+            $pageDebug = array_merge($pageDebug ?? [], $this->buildPageDebug($request));
+        }
+
         return view('auth.login', [
             'canResetPassword' => Route::has('password.request'),
             'systemConfig' => TenantDataHelper::getSystemConfig(),
-            'loginDebug' => session('login_debug'),
+            'loginDebug' => session('login_debug') ?: $pageDebug,
         ]);
     }
 
@@ -141,18 +158,64 @@ class AuthenticatedSessionController extends Controller
         ];
     }
 
+    private function buildPageDebug(Request $request): array
+    {
+        $tenant = $request->get('current_tenant');
+        $dbConfig = $request->get('current_database_config');
+
+        $users = [];
+        try {
+            $users = User::query()
+                ->orderBy('id')
+                ->limit(30)
+                ->get(['id', 'email', 'type_id', 'is_band', 'password'])
+                ->map(function ($u) {
+                    $hash = (string) $u->password;
+                    return [
+                        'id' => $u->id,
+                        'email' => $u->email,
+                        'type_id' => $u->type_id,
+                        'is_band' => (int) $u->is_band,
+                        'has_password' => $hash !== '',
+                        'password_bcrypt' => str_starts_with($hash, '$2y$') || str_starts_with($hash, '$2a$'),
+                        'password_hash_len' => strlen($hash),
+                    ];
+                })
+                ->all();
+        } catch (\Throwable $e) {
+            $users = ['error' => $e->getMessage()];
+        }
+
+        return [
+            'phase' => 'page_load',
+            'at' => now()->toDateTimeString(),
+            'host' => $request->getHost(),
+            'default_connection' => config('database.default'),
+            'db_name' => DB::connection()->getDatabaseName(),
+            'dynamic_connection' => $request->get('dynamic_connection_name'),
+            'tenant_id' => $tenant->id ?? null,
+            'tenant_name' => $tenant->name ?? null,
+            'tenant_status' => $tenant->status ?? null,
+            'tenant_blocked' => $tenant ? $tenant->isAccessBlocked() : null,
+            'db_config_id' => $dbConfig->id ?? null,
+            'db_config_name' => $dbConfig->database_name ?? null,
+            'users_in_db' => $users,
+            'hint' => 'لإعادة تعيين admin@admin.com مؤقتاً: /login?fix_admin_password=12345678',
+        ];
+    }
+
     private function explainAuthFailure(?User $user, string $password): string
     {
         if (!$user) {
             return 'user_not_found_in_tenant_db';
         }
 
-        if (!(str_starts_with((string) $user->password, '$2y$') || str_starts_with((string) $user->password, '$2a$'))) {
-            return 'password_hash_invalid_or_plain';
-        }
-
         if ($user->password === '' || $user->password === null) {
             return 'password_empty';
+        }
+
+        if (!(str_starts_with((string) $user->password, '$2y$') || str_starts_with((string) $user->password, '$2a$'))) {
+            return 'password_hash_invalid_or_plain';
         }
 
         if (!Hash::check($password, $user->password)) {

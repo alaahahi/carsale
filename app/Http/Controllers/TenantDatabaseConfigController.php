@@ -531,7 +531,7 @@ class TenantDatabaseConfigController extends Controller
             
             // إدراج البيانات الافتراضية
             $adminEmail = $request->input('admin_email', 'admin@admin.com');
-            $adminPassword = $request->input('admin_password', '123456789');
+            $adminPassword = $request->input('admin_password', '12345678');
             $this->insertDefaultData($connection, $adminEmail, $adminPassword);
             
             Log::info('Migrations Run Successfully', [
@@ -635,7 +635,7 @@ class TenantDatabaseConfigController extends Controller
     /**
      * إدراج البيانات الافتراضية
      */
-    private function insertDefaultData($connection, $adminEmail = 'admin@admin.com', $adminPassword = '123456789')
+    private function insertDefaultData($connection, $adminEmail = 'admin@admin.com', $adminPassword = '12345678')
     {
         try {
             // إدراج أنواع المستخدمين الافتراضية

@@ -381,10 +381,18 @@ class TenantController extends Controller
         \App\Models\TenantDatabaseConfig::where('tenant_id', $tenant->id)
             ->update(['is_active' => true]);
 
+        // إصلاح أدمن الدخول (إنشاء أو إعادة كلمة المرور الافتراضية)
+        $dbConfig = \App\Models\TenantDatabaseConfig::where('tenant_id', $tenant->id)
+            ->where('is_active', true)
+            ->first();
+        if ($dbConfig) {
+            \App\Helpers\EnsureTenantAdmin::fix($dbConfig);
+        }
+
         \App\Helpers\SubdomainHelper::clearAllCachesForTenant($tenant->fresh(['domains']));
 
         return redirect()->route('tenants.index')
-            ->with('success', 'تم تفعيل المستأجر بنجاح');
+            ->with('success', 'تم تفعيل المستأجر بنجاح — أدمن الدخول: admin@admin.com / 12345678');
     }
 
     /**

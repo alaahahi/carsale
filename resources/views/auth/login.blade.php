@@ -216,10 +216,10 @@
         </form>
     </div>
 
-    @if (config('app.login_debug') && session('login_debug'))
+    @if (config('app.login_debug') && ($loginDebug ?? session('login_debug')))
         <div class="debug-box">
             <h3>LOGIN DEBUG — انسخ هذا كله وأرسله</h3>
-            <pre id="login-debug-json">{{ json_encode(session('login_debug'), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
+            <pre id="login-debug-json">{{ json_encode(($loginDebug ?? session('login_debug')), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
             <button type="button" class="btn" style="margin-top:0.75rem;background:#334155;" onclick="navigator.clipboard.writeText(document.getElementById('login-debug-json').innerText)">نسخ النتيجة</button>
         </div>
     @endif
