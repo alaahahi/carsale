@@ -1198,10 +1198,9 @@ getResultsCar();
                         </div>
                         <div>
                           <a
-                            type="button"
-                            :href="route('stats')"
+                            href="/stats"
                             style="min-width:150px;"
-                            className="px-6 mb-12 text-center mx-2 py-2 font-bold text-white bg-blue-600 rounded">
+                            class="px-6 mb-12 text-center mx-2 py-2 font-bold text-white bg-blue-600 rounded inline-block">
                             {{ $t('stats') }}
                           </a>
                         </div>

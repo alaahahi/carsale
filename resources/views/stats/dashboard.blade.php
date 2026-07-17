@@ -270,11 +270,11 @@
                     <button type="button" class="lang-btn" data-lang="ar">العربية</button>
                     <button type="button" class="lang-btn" data-lang="kr">کوردی</button>
                 </div>
-                <a class="btn btn-ghost" href="{{ route('dashboard') }}">
+                <a class="btn btn-ghost" href="/dashboard" id="back-btn">
                     <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
                     </svg>
-                    <span data-i18n="home">الرئيسية</span>
+                    <span data-i18n="back">رجوع</span>
                 </a>
                 <button type="button" class="btn btn-primary" onclick="window.print()">
                     <span data-i18n="print">طباعة</span>
@@ -435,6 +435,7 @@
                 pageTitle: 'الإحصائيات — ' + COMPANY,
                 title: 'إحصائيات الأعمال',
                 home: 'الرئيسية',
+                back: 'رجوع',
                 print: 'طباعة',
                 filtersAria: 'تصفية الإحصائيات',
                 fromDate: 'من تاريخ',
@@ -478,6 +479,7 @@
                 pageTitle: 'ئامارەکان — ' + COMPANY,
                 title: 'ئامارەکانی کاروبار',
                 home: 'سەرەکی',
+                back: 'گەڕانەوە',
                 print: 'چاپکردن',
                 filtersAria: 'فلتەرکردنی ئامارەکان',
                 fromDate: 'لە بەرواری',
@@ -659,6 +661,19 @@
         }
 
         document.addEventListener('DOMContentLoaded', function () {
+            const backBtn = document.getElementById('back-btn');
+            if (backBtn) {
+                backBtn.addEventListener('click', function (e) {
+                    // رجوع للمتصفح إن وُجد تاريخ، وإلا افتح الداشبورد بتحميل كامل
+                    if (window.history.length > 1 && document.referrer) {
+                        e.preventDefault();
+                        window.history.back();
+                        return;
+                    }
+                    // رابط a عادي → /dashboard (تحميل كامل خارج SPA)
+                });
+            }
+
             document.querySelectorAll('.lang-btn').forEach((btn) => {
                 btn.addEventListener('click', () => applyLang(btn.getAttribute('data-lang')));
             });
